@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meeting Notes</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%97%92%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <!-- ---------- Auth gate ---------- -->
+  <div id="authGate" class="auth-gate hidden">
+    <div class="auth-card">
+      <h1>🗒️ Meeting Notes</h1>
+      <p id="authSubtitle" class="muted"></p>
+      <form id="authForm">
+        <label id="authLabel" for="passphrase">Passphrase</label>
+        <input id="passphrase" type="password" autocomplete="current-password" placeholder="Your passphrase" required>
+        <input id="passphrase2" type="password" autocomplete="new-password" placeholder="Confirm passphrase" class="hidden">
+        <div id="authError" class="auth-error hidden"></div>
+        <button id="authSubmit" type="submit">Unlock</button>
+      </form>
+      <p class="auth-note muted">
+        Your notes are encrypted at rest with a key derived from this passphrase.
+        It is never stored — if you forget it, the data cannot be recovered.
+      </p>
+    </div>
+  </div>
+
+  <!-- ---------- App ---------- -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="brand">🗒️ <span>Meeting Notes</span></div>
+      <div class="ws-picker">
+        <select id="workspaceSelect" title="Workspace"></select>
+        <button id="manageWs" class="icon-btn" title="Manage workspaces">⚙︎</button>
+      </div>
+      <div class="search-wrap">
+        <input id="globalSearch" type="search" placeholder="Search all notes…">
+      </div>
+      <nav class="top-actions">
+        <button id="navNote" class="tab active" title="Current note">Note</button>
+        <button id="navTodos" class="tab" title="All open to-dos">To-Dos</button>
+        <button id="navFavs" class="tab" title="Favorites">★ Favorites</button>
+        <button id="layoutToggle" class="icon-btn" title="Toggle columns / rows layout">☷</button>
+        <button id="logoutBtn" class="icon-btn" title="Lock / log out">⏻</button>
+      </nav>
+    </header>
+
+    <div class="body">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <span>Notes</span>
+          <button id="newNoteBtn" class="primary sm" title="New note from most recent">+ New</button>
+        </div>
+        <div class="sidebar-actions">
+          <button id="importBtn" class="link-btn">⭳ Import</button>
+        </div>
+        <ul id="noteList" class="note-list"></ul>
+      </aside>
+
+      <main id="main" class="main">
+        <!-- Note view -->
+        <section id="noteView" class="view">
+          <div class="note-header">
+            <div class="title-block">
+              <span id="noteDate" class="note-date"></span>
+              <input id="noteCustomTitle" class="custom-title" placeholder="Add a specific title…">
+            </div>
+            <div class="note-tools">
+              <button id="favBtn" class="icon-btn" title="Favorite">☆</button>
+              <button id="printBtn" class="icon-btn" title="Print">🖨</button>
+              <button id="exportBtn" class="icon-btn" title="Export">⭱</button>
+              <div id="exportMenu" class="menu hidden">
+                <button data-fmt="pdf">Save as PDF (print)</button>
+                <button data-fmt="html">Export HTML</button>
+                <button data-fmt="md">Export Markdown</button>
+                <button data-fmt="json">Export JSON</button>
+              </div>
+              <button id="deleteNoteBtn" class="icon-btn danger" title="Delete note">🗑</button>
+            </div>
+          </div>
+
+          <div id="sections" class="sections columns">
+            <!-- Section 1: To-Do -->
+            <div class="section" data-sec="todos">
+              <h2>✔ To-Do</h2>
+              <div class="add-row">
+                <input id="todoInput" placeholder="Add a to-do…">
+              </div>
+              <ul id="todoList" class="todo-list"></ul>
+            </div>
+
+            <!-- Section 2: Reminders -->
+            <div class="section" data-sec="reminders">
+              <h2>⏰ Reminders</h2>
+              <div class="add-row reminder-add">
+                <input id="reminderText" placeholder="Remind me to…">
+                <select id="reminderCadence">
+                  <option value="once">Once</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="everyNDays">Every N days</option>
+                </select>
+                <input id="reminderN" type="number" min="1" value="2" class="hidden" title="N days">
+                <input id="reminderDue" type="date" class="hidden" title="Due date">
+                <button id="addReminderBtn" class="sm">Add</button>
+              </div>
+              <ul id="reminderList" class="reminder-list"></ul>
+            </div>
+
+            <!-- Section 3: Carryover -->
+            <div class="section" data-sec="carryover">
+              <h2>↻ Carryover Notes</h2>
+              <div class="rte-toolbar" data-target="carryoverEditor"></div>
+              <div id="carryoverEditor" class="rte" contenteditable="true"></div>
+            </div>
+
+            <!-- Section 4: Meeting notes -->
+            <div class="section" data-sec="meeting">
+              <div class="section-title-row">
+                <h2>📝 Meeting Notes</h2>
+                <div class="mode-toggle">
+                  <button id="modeFlow" class="mini active">Flow</button>
+                  <button id="modeFree" class="mini">Free-form</button>
+                </div>
+              </div>
+              <div id="flowWrap">
+                <div class="rte-toolbar" data-target="meetingEditor"></div>
+                <div id="meetingEditor" class="rte" contenteditable="true"></div>
+              </div>
+              <div id="freeWrap" class="hidden">
+                <p class="muted tiny">Double-click anywhere to add a text box. Drag to move.</p>
+                <div id="freeCanvas" class="free-canvas"></div>
+              </div>
+              <div class="attachments">
+                <div class="attach-head">
+                  <span>Attachments</span>
+                  <label class="link-btn">＋ Add file<input id="attachInput" type="file" multiple hidden></label>
+                </div>
+                <ul id="attachList" class="attach-list"></ul>
+              </div>
+            </div>
+          </div>
+          <div id="saveStatus" class="save-status"></div>
+        </section>
+
+        <!-- Global to-dos view -->
+        <section id="todosView" class="view hidden">
+          <h1>All Open To-Dos</h1>
+          <p class="muted">Across every workspace. Completing here updates the source note.</p>
+          <ul id="globalTodoList" class="global-todo-list"></ul>
+        </section>
+
+        <!-- Favorites view -->
+        <section id="favsView" class="view hidden">
+          <h1>★ Favorite Notes</h1>
+          <ul id="favList" class="fav-list"></ul>
+        </section>
+
+        <!-- Search view -->
+        <section id="searchView" class="view hidden">
+          <h1>Search results</h1>
+          <ul id="searchResults" class="search-results"></ul>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- ---------- Modals ---------- -->
+  <div id="modalBackdrop" class="modal-backdrop hidden">
+    <div class="modal" id="wsModal">
+      <h3>Manage workspaces</h3>
+      <ul id="wsManageList" class="ws-manage-list"></ul>
+      <div class="add-row">
+        <input id="newWsName" placeholder="New workspace name">
+        <button id="createWsBtn" class="sm primary">Create</button>
+      </div>
+      <div class="modal-actions"><button class="modal-close">Close</button></div>
+    </div>
+    <div class="modal hidden" id="importModal">
+      <h3>Import a note</h3>
+      <p class="muted tiny">Upload a note previously exported as JSON, HTML, or Markdown.</p>
+      <input id="importFile" type="file" accept=".json,.html,.htm,.md,.markdown,.txt">
+      <input id="importTitle" placeholder="Optional title">
+      <div class="modal-actions">
+        <button id="doImportBtn" class="primary">Import</button>
+        <button class="modal-close">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/editor.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

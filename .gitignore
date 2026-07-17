@@ -1,0 +1,14 @@
+# Encrypted user data — never commit
+/data/
+data/
+*.enc
+vault.json
+
+# Local environment overrides
+.env
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+node_modules/
+*.log
