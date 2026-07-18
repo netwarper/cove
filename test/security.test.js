@@ -37,6 +37,8 @@ function walk(dir, out) {
     // --- setup, then write identifiable plaintext into a note ---
     r = await c.request('POST', '/api/setup', { passphrase: PASS });
     t.eq(r.status, 200, 'setup ok');
+    t.ok(typeof r.body.recoveryKey === 'string' && r.body.recoveryKey.length >= 16, 'setup returns a one-time recovery key');
+    const RECOVERY_KEY = r.body.recoveryKey;
     r = await c.request('GET', '/api/workspaces/general/current');
     const noteId = r.body.id;
     await c.request('PUT', '/api/notes/' + noteId, {
@@ -57,11 +59,29 @@ function walk(dir, out) {
     const encFile = files.find((f) => f.endsWith('.json.enc'));
     t.ok(encFile && fs.readFileSync(encFile).subarray(0, 3).toString() === 'MN1', 'note stored with encryption marker');
 
-    // --- vault descriptor does not contain the passphrase ---
+    // --- vault descriptor does not contain the passphrase (envelope v2) ---
     const vault = fs.readFileSync(path.join(DATA_DIR, 'vault.json'));
     t.ok(!vault.includes(Buffer.from(PASS)), 'vault.json does not contain the passphrase');
     const vjson = JSON.parse(vault.toString()).vault;
-    t.ok(vjson.salt && vjson.verifier && vjson.kdf === 'scrypt', 'vault stores salt + verifier via scrypt');
+    t.ok(vjson.version === 2 && vjson.kdf === 'scrypt', 'vault is v2 scrypt envelope');
+    t.ok(vjson.passphrase && vjson.passphrase.salt && vjson.passphrase.wrapped, 'vault has a passphrase key slot (wrapped DEK)');
+    t.ok(vjson.recovery && vjson.recovery.wrapped, 'vault has a recovery key slot');
+
+    // --- CSRF: the same session succeeds with a valid token, fails with a bad one ---
+    r = await c.request('POST', '/api/workspaces', { name: 'csrf-ok' });
+    t.eq(r.status, 200, 'authenticated request WITH csrf token succeeds');
+    const goodCsrf = c.getCsrf();
+    c.setCsrf('forged-token-value');
+    r = await c.request('POST', '/api/workspaces', { name: 'csrf-bad' });
+    t.eq(r.status, 403, 'mutating request with a bad CSRF token is rejected (403)');
+    c.setCsrf(goodCsrf);
+
+    // --- recovery key can unlock and reset the passphrase (back to PASS) ---
+    const cr = makeClient(port);
+    r = await cr.request('POST', '/api/recover', { recoveryKey: 'not-the-real-key-0000', newPassphrase: 'whatever12345' });
+    t.eq(r.status, 401, 'wrong recovery key rejected');
+    r = await cr.request('POST', '/api/recover', { recoveryKey: RECOVERY_KEY, newPassphrase: PASS });
+    t.eq(r.status, 200, 'valid recovery key unlocks and resets passphrase');
 
     // --- wrong passphrase rejected ---
     const c2 = makeClient(port);

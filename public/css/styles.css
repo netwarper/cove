@@ -228,6 +228,57 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .ws-manage-list input { flex: 1; margin: 0; }
 .ws-manage-list .wm-del { border: 0; background: none; color: var(--danger); }
 
+/* ---- Auth extras ---- */
+.auth-link { display: block; margin-top: 12px; text-align: center; }
+#recoverForm { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+#recoverForm input { padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
+#recoverForm button { padding: 11px; border: 0; border-radius: 8px; background: var(--brand); color: var(--brand-ink); font-weight: 600; }
+#recoverForm label { font-weight: 600; font-size: 13px; }
+
+/* ---- Tags ---- */
+.tag-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; align-items: center; }
+.tag-chip { font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 2px 4px 2px 8px; color: var(--brand); display: inline-flex; align-items: center; gap: 4px; }
+.tag-chip button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 11px; }
+.tag-input { border: 1px dashed var(--line); background: transparent; color: var(--ink); border-radius: 12px; padding: 2px 8px; width: 66px; font-size: 11px; }
+.tag-input:focus { outline: none; border-color: var(--brand); }
+.nl-tags, .sr-tags { color: var(--brand); }
+
+/* ---- To-do due + drag ---- */
+.todo-due { border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 0 2px; }
+.todo-list li.overdue .todo-due { color: var(--danger); font-weight: 700; }
+.todo-list li.overdue .todo-text { color: var(--danger); }
+.todo-list li.dragging { opacity: .5; }
+.todo-list li[draggable="true"] { cursor: grab; }
+.gt-due { font-size: 11px; color: var(--muted); }
+.global-todo-list li.overdue .gt-due { color: var(--danger); font-weight: 700; }
+
+/* ---- Menus / new-note / more ---- */
+.new-note-wrap, .more-wrap { position: relative; display: inline-flex; }
+.new-note-wrap .caret { margin-left: 2px; padding: 7px 6px; }
+.menu-sep { height: 1px; background: var(--line); margin: 4px 0; }
+.menu-label { font-size: 11px; color: var(--muted); padding: 4px 12px 2px; text-transform: uppercase; letter-spacing: .04em; }
+.menu-empty { font-size: 12px; color: var(--muted); padding: 6px 12px; }
+#templatePickList button, #newNoteMenu button { text-align: left; padding: 8px 12px; border: 0; background: none; color: var(--ink); width: 100%; }
+#templatePickList button:hover, #newNoteMenu button:hover, #moreMenu button:hover, #noteMoreMenu button:hover { background: var(--panel-2); }
+#moreMenu button, #noteMoreMenu button { text-align: left; padding: 9px 12px; border: 0; background: none; color: var(--ink); }
+.menu .danger-item { color: var(--danger); }
+.more-wrap .menu, .new-note-wrap .menu { left: auto; right: 0; }
+
+/* ---- Attachments thumb ---- */
+.at-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
+
+/* ---- Templates + account modals ---- */
+.tpl-editor { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.tpl-editor textarea { border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); padding: 8px; resize: vertical; }
+.rte.small { min-height: 70px; }
+.acct-block { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.acct-block h4 { margin: 0 0 8px; font-size: 13px; }
+.recovery-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; letter-spacing: 1px; background: var(--panel-2); border: 1px dashed var(--brand); border-radius: 8px; padding: 14px; text-align: center; word-break: break-all; margin: 10px 0; }
+.ws-tpl { padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--ink); max-width: 150px; }
+select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
+.reminder-time { max-width: 92px; }
+.link-btn.danger { color: var(--danger); }
+
 /* ---- Print ---- */
 @media print {
   .topbar, .sidebar, .note-tools, .rte-toolbar, .add-row, .mode-toggle, .save-status, #reminderList, .attach-head label { display: none !important; }

@@ -3,9 +3,9 @@
 This file captures how to re-generate this application from a prompt, so the
 same app can be reproduced or evolved consistently.
 
-- **App version:** 1.0.0 (see `package.json`)
-- **Prompt version:** v1
-- **Date:** 2026-07-17
+- **App version:** 1.1.0 (see `package.json`)
+- **Prompt version:** v2
+- **Date:** 2026-07-18
 - **Stack chosen:** Node.js standard library only (zero runtime dependencies) +
   vanilla HTML/CSS/JS frontend (no build step).
 
@@ -115,11 +115,51 @@ npm run check   # 0 issues
 npm test        # functional + security suites, 0 failures
 ```
 
-At the time of this version: **quality 0 issues · functional 31/31 · security 14/14.**
+At the time of this version: **quality 0 issues · functional 49/49 · security 21/21.**
 
 ---
 
+## Follow-up prompt (v2 → 1.1.0)
+
+The v2 batch was requested with "let's do it all" plus two design decisions
+captured via a clarifying question:
+
+- **Templates seed Meeting Notes only.** Carry-forward is unchanged and always
+  sources from the most recently created note; a template fills the (non-carried)
+  Meeting Notes section, and fills To-Do / Carryover only when carry-forward left
+  them empty (i.e. the first note in a workspace). Templates are a per-workspace
+  default and/or picked ad-hoc from "New ▾".
+- **Multi-user vaults deferred** to a later phase (single-passphrase model kept).
+
+Everything else in the batch was implemented:
+
+1. **Envelope encryption** (`lib/crypto.js`): random DEK encrypts data; DEK
+   wrapped in passphrase + recovery key slots via scrypt. Enables **passphrase
+   change** and **recovery key** without re-encrypting data. Includes a
+   transparent **v1→v2 migration** (`migrateVaultV1`) that re-encrypts existing
+   data under a fresh DEK on first login.
+2. **Sync-conflict safety:** `saveNote` takes `baseUpdatedAt` and returns `409`
+   with the server copy on a stale write; the client offers to reload.
+3. **Soft-delete trash** with 30-day auto-purge, restore, and permanent delete.
+4. **CSRF tokens** on all mutating requests; **Secure cookie** via `COOKIE_SECURE`;
+   **client idle auto-lock** (15 min).
+5. **Time-aware reminders** + `/api/reminders/process` polling + desktop
+   notifications across all workspaces.
+6. **Per-todo due dates**, **drag-to-reorder** todos, **tags** + `tag:` search.
+7. **Move / duplicate** notes; **encrypted backup export + restore**.
+8. **Keyboard shortcuts** (`/`, `n`, `l`), **attachment image thumbnails**,
+   inline Meeting-Notes images stored as attachments (Carryover keeps self-
+   contained data URLs so carried images travel with the note).
+9. **Accessibility** passes (ARIA labels, `aria-live`, Escape-to-close).
+10. **Dockerfile** + `/api/health` health check.
+
 ## Changelog
 
+- **v2 (1.1.0, 2026-07-18):** Envelope encryption + passphrase rotation +
+  recovery key; sync-conflict guard; trash; CSRF + idle-lock + Secure cookie;
+  time-aware reminders + notifications; per-todo due dates, drag-reorder, tags;
+  templates (Meeting-Notes-only); move/duplicate; encrypted backup/restore;
+  keyboard shortcuts; Docker + health check. Verified: quality 0 · functional
+  49/49 · security 21/21.
 - **v1 (1.0.0, 2026-07-17):** Initial version. All prompt requirements
   implemented and verified.

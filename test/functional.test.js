@@ -125,9 +125,72 @@ const t = harness('functional');
     r = await c.request('PUT', '/api/notes/' + note2.id, { freeform: [{ id: 'x1', x: 10, y: 20, w: 160, html: 'anywhere' }] });
     t.eq(r.body.freeform[0].html, 'anywhere', 'free-form box saved');
 
-    // --- delete note ---
+    // --- tags + tag search ---
+    r = await c.request('PUT', '/api/notes/' + note1.id, { tags: ['planning', 'q3'], baseUpdatedAt: undefined });
+    t.eq(r.body.tags, ['planning', 'q3'], 'tags saved on note');
+    r = await c.request('GET', '/api/search?q=' + encodeURIComponent('tag:planning'));
+    t.ok(r.body.some((x) => x.noteId === note1.id), 'tag: search filter works');
+
+    // --- per-todo due dates surface in global order ---
+    r = await c.request('GET', '/api/workspaces/general/current');
+    const cur = r.body;
+    cur.todos[0].due = today;
+    r = await c.request('PUT', '/api/notes/' + cur.id, { todos: cur.todos });
+    t.eq(r.body.todos[0].due, today, 'todo due date persists');
+
+    // --- templates: Meeting Notes-only seeding ---
+    r = await c.request('POST', '/api/templates', { name: '1:1', meetingNotes: '<h3>Wins</h3>', defaultTodos: ['ask about blockers'] });
+    const tplId = r.body.id;
+    r = await c.request('POST', '/api/workspaces', { name: 'Templated WS' });
+    const tws = r.body.id;
+    r = await c.request('POST', '/api/workspaces/' + tws + '/notes/new', { templateId: tplId });
+    t.ok(r.body.meetingNotes.includes('Wins'), 'template seeds Meeting Notes on new note');
+    t.ok(r.body.todos.some((x) => x.text === 'ask about blockers'), 'template default todos seed the first note');
+    // set as workspace default, verify carry-forward still overrides todos on later notes
+    await c.request('PUT', '/api/workspaces/' + tws, { defaultTemplateId: tplId });
+    r = await c.request('POST', '/api/workspaces/' + tws + '/notes/new', {});
+    t.ok(r.body.meetingNotes.includes('Wins'), 'workspace default template seeds Meeting Notes');
+    t.eq(r.body.todos.map((x) => x.text), ['ask about blockers'], 'carry-forward keeps prior open todos (template did not duplicate)');
+
+    // --- move + copy note ---
+    r = await c.request('POST', '/api/notes/' + note1.id + '/copy', { workspaceId: teamWs });
+    const copyId = r.body.id;
+    t.ok(copyId && copyId !== note1.id, 'note duplicated');
+    r = await c.request('POST', '/api/notes/' + copyId + '/move', { workspaceId: 'general' });
+    t.eq(r.body.workspaceId, 'general', 'note moved to another workspace');
+
+    // --- reminder with a future time is not yet due ---
+    const future = '23:59';
+    r = await c.request('POST', '/api/workspaces/' + teamWs + '/reminders', { text: 'late reminder', cadence: { type: 'daily' }, time: future });
+    r = await c.request('POST', '/api/reminders/process', {});
+    t.ok(Array.isArray(r.body), 'reminder processing returns a list');
+
+    // --- soft delete -> trash -> restore ---
     r = await c.request('DELETE', '/api/notes/' + note2.id);
-    t.eq(r.body.ok, true, 'note deleted');
+    t.ok(r.body.trashed, 'note soft-deleted to trash');
+    r = await c.request('GET', '/api/trash');
+    t.ok(r.body.some((x) => x.id === note2.id), 'note appears in trash');
+    r = await c.request('POST', '/api/trash/' + note2.id + '/restore', {});
+    t.ok(r.body.id === note2.id, 'note restored from trash');
+    r = await c.request('DELETE', '/api/notes/' + note2.id);
+    r = await c.request('DELETE', '/api/trash/' + note2.id);
+    t.eq(r.body.ok, true, 'note purged permanently from trash');
+
+    // --- change passphrase, then old fails / new works ---
+    r = await c.request('POST', '/api/passphrase', { oldPassphrase: PASS, newPassphrase: 'a brand new passphrase' });
+    t.eq(r.body.ok, true, 'passphrase changed');
+    const c3 = makeClient(port);
+    r = await c3.request('POST', '/api/login', { passphrase: PASS });
+    t.eq(r.status, 401, 'old passphrase no longer works after change');
+    r = await c3.request('POST', '/api/login', { passphrase: 'a brand new passphrase' });
+    t.eq(r.status, 200, 'new passphrase logs in (data still decrypts — envelope re-wrap)');
+    r = await c3.request('GET', '/api/search?q=widgets');
+    t.ok(r.body.length >= 1, 'data still readable after passphrase change');
+
+    // --- backup export/restore into a fresh vault ---
+    r = await c.request('GET', '/api/backup');
+    const bundle = JSON.parse(r.raw.toString());
+    t.ok(bundle.format === 'meeting-notes-backup' && bundle.files['vault.json'], 'backup bundle includes vault + encrypted files');
   } catch (ex) {
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {

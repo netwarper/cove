@@ -15,9 +15,9 @@
     { cmd: 'removeFormat', label: '⌫', title: 'Clear formatting' },
   ];
 
-  function exec(command, editor) {
+  function exec(command, editor, uploader) {
     editor.focus();
-    if (command === 'insertImage') return pickImage(editor);
+    if (command === 'insertImage') return pickImage(editor, uploader);
     if (command === 'createLink') {
       var url = prompt('Link URL:');
       if (url) document.execCommand('createLink', false, url);
@@ -30,27 +30,38 @@
     document.execCommand(command, false, null);
   }
 
-  function pickImage(editor) {
+  function insertImageFile(editor, f, uploader) {
+    if (f.size > 8 * 1024 * 1024) { alert('Image too large (max 8 MB).'); return; }
+    if (uploader) {
+      // store as an encrypted attachment and reference by URL (keeps note lean)
+      uploader(f).then(function (src) {
+        editor.focus();
+        document.execCommand('insertImage', false, src);
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+      }).catch(function (e) { alert('Image upload failed: ' + e.message); });
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function () {
+      editor.focus();
+      document.execCommand('insertImage', false, reader.result); // inline data URL (self-contained)
+      editor.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    reader.readAsDataURL(f);
+  }
+
+  function pickImage(editor, uploader) {
     var input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
     input.onchange = function () {
       var f = input.files[0];
-      if (!f) return;
-      if (f.size > 8 * 1024 * 1024) { alert('Image too large (max 8 MB).'); return; }
-      var reader = new FileReader();
-      reader.onload = function () {
-        editor.focus();
-        document.execCommand('insertImage', false, reader.result);
-        // fire input so the change is persisted
-        editor.dispatchEvent(new Event('input', { bubbles: true }));
-      };
-      reader.readAsDataURL(f);
+      if (f) insertImageFile(editor, f, uploader);
     };
     input.click();
   }
 
-  function buildToolbar(toolbarEl, editor) {
+  function buildToolbar(toolbarEl, editor, uploader) {
     toolbarEl.innerHTML = '';
     TOOLS.forEach(function (t) {
       var b = document.createElement('button');
@@ -60,7 +71,7 @@
       if (t.style) b.setAttribute('style', t.style);
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function () {
-        exec(t.cmd, editor);
+        exec(t.cmd, editor, uploader);
         editor.dispatchEvent(new Event('input', { bubbles: true }));
       });
       toolbarEl.appendChild(b);
@@ -108,29 +119,26 @@
   }
 
   /* Paste images inline (OneNote-like). */
-  function enablePasteImages(editor) {
+  function enablePasteImages(editor, uploader) {
     editor.addEventListener('paste', function (e) {
       var items = (e.clipboardData || {}).items || [];
       for (var i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') === 0) {
           e.preventDefault();
-          var file = items[i].getAsFile();
-          var reader = new FileReader();
-          reader.onload = function () {
-            document.execCommand('insertImage', false, reader.result);
-            editor.dispatchEvent(new Event('input', { bubbles: true }));
-          };
-          reader.readAsDataURL(file);
+          insertImageFile(editor, items[i].getAsFile(), uploader);
         }
       }
     });
   }
 
   window.Editor = {
-    init: function (toolbarEl, editor) {
-      buildToolbar(toolbarEl, editor);
+    // opts.uploader(file) -> Promise<url>; when provided, inserted images are
+    // stored as attachments and referenced by URL instead of embedded as data URLs.
+    init: function (toolbarEl, editor, opts) {
+      var uploader = (opts && opts.uploader) || null;
+      buildToolbar(toolbarEl, editor, uploader);
       enableImageResize(editor);
-      enablePasteImages(editor);
+      enablePasteImages(editor, uploader);
     },
   };
 })();

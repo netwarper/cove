@@ -45,9 +45,15 @@ everything stays on your machine.
 | **Global search** | Search across every note in every workspace. |
 | **Global to-dos** | One view of all open to-dos across workspaces. Completing one there updates the source note, and vice-versa. |
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
+| **Tags** | Tag notes and filter search with `tag:name`. |
+| **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carry-forward is unchanged — To-Do & Carryover still come from the previous note; a template's defaults fill them only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
+| **Trash** | Deleted notes go to Trash and can be restored for 30 days before permanent removal. |
+| **Move / duplicate** | Move a note to another workspace, or duplicate it. |
+| **Reminders (time-aware)** | Optional time-of-day; a background poll surfaces due reminders and (with permission) raises **desktop notifications** even for workspaces you aren't viewing. |
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |
 | **Import** | Upload a previously exported JSON / HTML / Markdown note into a workspace. |
-| **Security** | AES-256-GCM **encryption at rest**, scrypt key derivation, session auth, CSP + anti-clickjacking headers, login rate-limiting. |
+| **Encrypted backup** | Download a single encrypted backup file of everything; restore it on a fresh install. |
+| **Security** | AES-256-GCM **envelope encryption at rest**, scrypt key derivation, **passphrase change + recovery key**, CSRF tokens, session auth with idle auto-lock, CSP + anti-clickjacking headers, login rate-limiting. |
 
 ---
 
@@ -113,28 +119,49 @@ All optional, via environment variables (or a `.env` file):
 | `DATA_DIR` | `./data` | Encrypted data directory (point at a cloud-sync folder) |
 | `MAX_BODY` | `33554432` (32 MB) | Max request body (attachments travel as JSON) |
 | `SESSION_TTL` | `240` | Session lifetime in minutes |
+| `COOKIE_SECURE` | `auto` | `auto` adds the `Secure` cookie flag over TLS; `always` / `never` to force |
 
 ---
 
 ## Security model
 
-- **Key derivation:** `scrypt` (N=16384, r=8, p=1) over your passphrase + a random salt.
-- **Encryption:** every note, workspace metadata blob, and attachment is
-  encrypted with **AES-256-GCM** (authenticated) before being written to disk.
-  Files carry a `MN1` format marker and are unreadable without the key.
-- **Key handling:** the derived key lives **only in server memory** while a
-  session is unlocked; it is never written to disk.
-- **Auth:** HttpOnly, SameSite=Strict session cookie; failed logins are
-  rate-limited per IP.
+- **Envelope encryption:** a single random 32-byte **Data Encryption Key (DEK)**
+  encrypts every note, workspace blob, and attachment with **AES-256-GCM**
+  (authenticated; files carry a `MN1` marker). The DEK is itself wrapped in
+  **key slots** — one derived from your passphrase, one from a recovery key —
+  via `scrypt` (N=16384, r=8, p=1). Because data is keyed by the DEK, changing
+  your passphrase or rotating the recovery key only re-wraps the DEK; data files
+  are never re-encrypted.
+- **Passphrase change & recovery key:** change your passphrase any time; a
+  one-time recovery key (shown at setup, regenerable) is the only way back in if
+  you forget it.
+- **Key handling:** the DEK lives **only in server memory** while a session is
+  unlocked; it is never written to disk.
+- **Auth:** HttpOnly, SameSite=Strict session cookie (`Secure` added
+  automatically over TLS — see `COOKIE_SECURE`), **CSRF token** on every
+  state-changing request, per-IP login rate-limiting, and **client-side idle
+  auto-lock** after 15 minutes.
 - **Hardening:** strict Content-Security-Policy, `X-Frame-Options: DENY`,
   `nosniff`, path-traversal-safe IDs, request size limits, and a small HTML
   sanitizer for imported/rendered content.
+- **Trash safety:** deletes are recoverable for 30 days rather than immediate.
 
 If the endpoint (or a synced Drive/Box/Dropbox copy) is breached, the attacker
 gets only ciphertext.
 
-> This protects **data at rest**. For a multi-user or internet-facing
-> deployment, add TLS (the `Secure` cookie flag) and consider per-user vaults.
+> This protects **data at rest** for a single vault. Per-user/multi-tenant
+> vaults are a planned follow-up; for an internet-facing deployment, front the
+> app with TLS (which flips the `Secure` cookie flag on automatically).
+
+## Docker
+
+```bash
+docker build -t meeting-notes .
+docker run -p 3000:3000 -v mn-data:/data meeting-notes
+```
+
+A `/api/health` endpoint (also used by the image's `HEALTHCHECK`) returns
+`{ ok, initialized }` without auth.
 
 ---
 

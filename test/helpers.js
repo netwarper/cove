@@ -5,6 +5,7 @@ const http = require('http');
 
 function makeClient(port) {
   let cookie = '';
+  let csrf = null;
   function request(method, path, body, rawBodyBuf) {
     return new Promise((resolve, reject) => {
       let data = null;
@@ -12,6 +13,7 @@ function makeClient(port) {
       if (rawBodyBuf) { data = rawBodyBuf; headers['Content-Type'] = 'application/json'; headers['Content-Length'] = data.length; }
       else if (body !== undefined) { data = Buffer.from(JSON.stringify(body)); headers['Content-Type'] = 'application/json'; headers['Content-Length'] = data.length; }
       if (cookie) headers.Cookie = cookie;
+      if (csrf && (method === 'POST' || method === 'PUT' || method === 'DELETE')) headers['X-CSRF-Token'] = csrf;
       const req = http.request({ host: '127.0.0.1', port, path, method, headers }, (res) => {
         const chunks = [];
         res.on('data', (c) => chunks.push(c));
@@ -22,6 +24,7 @@ function makeClient(port) {
           const ct = res.headers['content-type'] || '';
           let parsed = buf;
           if (ct.includes('application/json')) { try { parsed = JSON.parse(buf.toString()); } catch (_e) { parsed = buf.toString(); } }
+          if (parsed && typeof parsed === 'object' && parsed.csrf) csrf = parsed.csrf; // adopt session CSRF token
           resolve({ status: res.statusCode, body: parsed, headers: res.headers, raw: buf });
         });
       });
@@ -30,7 +33,12 @@ function makeClient(port) {
       req.end();
     });
   }
-  return { request, clearCookie: () => { cookie = ''; } };
+  return {
+    request,
+    clearCookie: () => { cookie = ''; },
+    getCsrf: () => csrf,
+    setCsrf: (t) => { csrf = t; },
+  };
 }
 
 function harness(name) {
