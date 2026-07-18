@@ -23,6 +23,7 @@
   async function boot() {
     var st = await API.status();
     state.initialized = st.initialized;
+    state.instance = st.instance || null;
     if (st.csrf) API.setCsrf(st.csrf);
     if (st.authenticated) return startApp();
     showAuth(st.initialized);
@@ -85,11 +86,42 @@
     $('app').classList.remove('hidden');
     state.settings = await API.getSettings();
     applyLayout();
+    applyFontSize(state.settings.fontSize || 14);
     await loadTemplates();
     await loadWorkspaces();
     await loadCurrentNote();
     startIdleTimer();
     startReminderPolling();
+    startLiveSync();
+  }
+
+  // Service worker (offline app shell + notifications)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  }
+
+  // Live-sync: refresh when note files change on disk (e.g. another device via a synced folder)
+  function startLiveSync() {
+    if (!('EventSource' in window)) return;
+    try {
+      var es = new EventSource('/api/events');
+      es.addEventListener('change', function (ev) {
+        var data = {}; try { data = JSON.parse(ev.data); } catch (e) {}
+        // don't clobber in-progress edits
+        if (state.saveTimer) return;
+        if (state.view === 'note' && state.note && data.noteId && data.noteId === state.note.id) {
+          API.getNote(state.note.id).then(function (fresh) {
+            if (fresh.updatedAt !== state.note.updatedAt) { state.note = fresh; renderNote(); setSaveStatus('Updated from another device'); }
+          }).catch(function () {});
+        }
+        if (state.view === 'note') renderNoteList();
+      });
+      es.onerror = function () { /* browser auto-reconnects */ };
+    } catch (e) { /* SSE unsupported */ }
+  }
+
+  function applyFontSize(px) {
+    document.documentElement.style.setProperty('--note-font', px + 'px');
   }
 
   // ---------------- Workspaces ----------------
@@ -131,10 +163,33 @@
     renderFreeform();
     renderAttachments();
     setSaveStatus('');
+    updateWordCount();
+    renderBacklinks();
+  }
+
+  function updateWordCount() {
+    var txt = ($('carryoverEditor').textContent + ' ' + $('meetingEditor').textContent).trim();
+    var n = txt ? txt.split(/\s+/).length : 0;
+    $('wordCount').textContent = n + (n === 1 ? ' word' : ' words');
+  }
+
+  async function renderBacklinks() {
+    try {
+      var links = await API.backlinks(state.note.id);
+      var wrap = $('backlinks'); var list = $('backlinksList');
+      if (!links.length) { wrap.classList.add('hidden'); return; }
+      list.innerHTML = '';
+      links.forEach(function (l) {
+        var a = document.createElement('button'); a.className = 'bl-item'; a.textContent = l.displayTitle;
+        a.addEventListener('click', function () { openNote(l.id); });
+        list.appendChild(a);
+      });
+      wrap.classList.remove('hidden');
+    } catch (e) { $('backlinks').classList.add('hidden'); }
   }
 
   async function renderNoteList() {
-    var notes = await API.listNotes(state.wsId);
+    var notes = await API.listNotes(state.wsId, $('noteFilter').value);
     var ul = $('noteList'); ul.innerHTML = '';
     notes.forEach(function (nm) {
       var li = document.createElement('li');
@@ -198,7 +253,12 @@
         renderTodos(); scheduleSave();
       });
       li.appendChild(cb); li.appendChild(span);
-      if (t.sourceReminderId) { var b = document.createElement('span'); b.className = 'reminder-badge'; b.textContent = '⏰'; li.appendChild(b); }
+      if (t.sourceReminderId) {
+        var b = document.createElement('span'); b.className = 'reminder-badge'; b.textContent = '⏰'; li.appendChild(b);
+        var sn = document.createElement('button'); sn.className = 'todo-snooze'; sn.title = 'Snooze this reminder'; sn.textContent = '💤';
+        sn.addEventListener('click', function () { snoozeReminderTodo(t); });
+        li.appendChild(sn);
+      }
       li.appendChild(due); li.appendChild(del);
       addTodoDnd(li);
       ul.appendChild(li);
@@ -258,6 +318,7 @@
     var v = $('reminderCadence').value;
     $('reminderN').classList.toggle('hidden', v !== 'everyNDays');
     $('reminderDue').classList.toggle('hidden', v !== 'once');
+    $('reminderEnd').classList.toggle('hidden', v === 'once'); // "repeat until" only for recurring
   });
   $('addReminderBtn').addEventListener('click', async function () {
     var text = $('reminderText').value.trim(); if (!text) return;
@@ -265,6 +326,7 @@
     var cadence = { type: type };
     if (type === 'everyNDays') cadence.n = parseInt($('reminderN').value, 10) || 1;
     if (type === 'once') cadence.dueDate = $('reminderDue').value || undefined;
+    if (type !== 'once' && $('reminderEnd').value) cadence.endDate = $('reminderEnd').value;
     await API.addReminder(state.wsId, { text: text, cadence: cadence, time: $('reminderTime').value || null });
     $('reminderText').value = '';
     await renderReminders();
@@ -307,10 +369,11 @@
     state.note.attachments = state.note.attachments || []; state.note.attachments.push(meta); renderAttachments();
     return API.attachmentUrl(state.note.id, meta.id);
   };
-  window.Editor.init($('sections').querySelector('[data-target="carryoverEditor"]'), $('carryoverEditor'));
-  window.Editor.init($('sections').querySelector('[data-target="meetingEditor"]'), $('meetingEditor'), { uploader: function (f) { return meetingUploader(f); } });
-  $('carryoverEditor').addEventListener('input', function () { state.note.carryover = $('carryoverEditor').innerHTML; scheduleSave(); });
-  $('meetingEditor').addEventListener('input', function () { state.note.meetingNotes = $('meetingEditor').innerHTML; scheduleSave(); });
+  window.Editor.init($('sections').querySelector('[data-target="carryoverEditor"]'), $('carryoverEditor'), { noteLinkPicker: openNotePicker });
+  window.Editor.init($('sections').querySelector('[data-target="meetingEditor"]'), $('meetingEditor'), { uploader: function (f) { return meetingUploader(f); }, noteLinkPicker: openNotePicker });
+  $('carryoverEditor').addEventListener('input', function () { state.note.carryover = $('carryoverEditor').innerHTML; scheduleSave(); updateWordCount(); });
+  $('meetingEditor').addEventListener('input', function () { state.note.meetingNotes = $('meetingEditor').innerHTML; scheduleSave(); updateWordCount(); });
+  window.addEventListener('mn-open-note', function (e) { openNote(e.detail); });
 
   // ---------------- Free-form ----------------
   $('modeFlow').addEventListener('click', function () { setFreeMode(false); });
@@ -424,7 +487,61 @@
     } else if (act === 'copy') {
       var copy = await API.copyNote(state.note.id, null); await loadWorkspaces(); await openNote(copy.id);
     } else if (act === 'move') { openMoveModal(); }
+    else if (act === 'pin') {
+      state.note.pinned = !state.note.pinned;
+      await API.saveNote(state.note.id, { pinned: state.note.pinned, baseUpdatedAt: state.note.updatedAt }).then(function (s) { state.note.updatedAt = s.updatedAt; });
+      renderNoteList();
+    } else if (act === 'archive') {
+      state.note.archived = !state.note.archived;
+      await API.saveNote(state.note.id, { archived: state.note.archived, baseUpdatedAt: state.note.updatedAt }).then(function (s) { state.note.updatedAt = s.updatedAt; });
+      renderNoteList();
+    } else if (act === 'history') { openHistory(); }
   });
+
+  function snoozeReminderTodo(t) {
+    var hours = parseFloat(prompt('Snooze this reminder for how many hours?', '24')) || 24;
+    var until = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+    API.snoozeReminder(state.wsId, t.sourceReminderId, until).then(function () { return loadCurrentNote(); });
+  }
+
+  // Note-link picker (for the editor's "link to a note" tool)
+  function openNotePicker(insert) {
+    openModal('notePickerModal');
+    var search = $('notePickerSearch'); search.value = '';
+    API.listNotes(state.wsId, 'all').then(function (notes) {
+      function draw(filter) {
+        var ul = $('notePickerList'); ul.innerHTML = '';
+        notes.filter(function (n) { return !filter || n.displayTitle.toLowerCase().indexOf(filter) >= 0; }).forEach(function (n) {
+          var li = document.createElement('li');
+          var b = document.createElement('button'); b.className = 'link-btn'; b.textContent = n.displayTitle; b.style.flex = '1'; b.style.textAlign = 'left';
+          b.addEventListener('click', function () { closeModals(); insert({ id: n.id, title: n.displayTitle }); });
+          li.appendChild(b); ul.appendChild(li);
+        });
+      }
+      draw('');
+      search.oninput = function () { draw(search.value.trim().toLowerCase()); };
+    });
+  }
+
+  // Version history
+  async function openHistory() {
+    openModal('historyModal');
+    var versions = await API.listVersions(state.note.id);
+    var ul = $('historyList'); ul.innerHTML = '';
+    if (!versions.length) { ul.innerHTML = '<li class="muted tiny">No earlier versions yet — they accumulate as you edit.</li>'; return; }
+    versions.forEach(function (v) {
+      var li = document.createElement('li');
+      var label = document.createElement('span'); label.style.flex = '1'; label.textContent = new Date(v.savedAt).toLocaleString();
+      var restore = document.createElement('button'); restore.className = 'link-btn'; restore.textContent = 'restore';
+      restore.addEventListener('click', async function () {
+        if (!confirm('Restore this version? The current content is snapshotted first.')) return;
+        state.note = await API.restoreVersion(state.note.id, v.ts); closeModals(); renderNote();
+      });
+      li.appendChild(label); li.appendChild(restore); ul.appendChild(li);
+    });
+  }
+
+  $('noteFilter').addEventListener('change', renderNoteList);
 
   // Export menu
   $('exportBtn').addEventListener('click', function (e) { e.stopPropagation(); $('exportMenu').classList.toggle('hidden'); });
@@ -450,10 +567,15 @@
     } catch (ex) {
       if (ex.status === 409) {
         setSaveStatus('⚠ Changed elsewhere');
-        if (confirm('This note was changed in another tab or device. Reload the latest version? Your unsaved changes here will be lost.')) {
-          if (ex.data && ex.data.current) { state.note = ex.data.current; renderNote(); }
-          else await loadCurrentNote();
-        }
+        var keepBoth = confirm('This note was changed in another tab or device.\n\nOK = keep BOTH (save your version as a conflict copy).\nCancel = discard your changes and load the latest.');
+        if (keepBoth) {
+          var fork = await API.forkNote(state.note.id, {
+            customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
+            meetingNotes: state.note.meetingNotes, freeform: state.note.freeform, tags: state.note.tags,
+          });
+          await loadWorkspaces(); await openNote(fork.id); setSaveStatus('Saved as a conflict copy ✓');
+        } else if (ex.data && ex.data.current) { state.note = ex.data.current; renderNote(); }
+        else await loadCurrentNote();
       } else { setSaveStatus('Save failed: ' + ex.message); }
     }
   }
@@ -470,16 +592,40 @@
   // ---------------- Views ----------------
   function showView(v) {
     state.view = v;
-    ['noteView', 'todosView', 'favsView', 'trashView', 'searchView'].forEach(function (id) { $(id).classList.add('hidden'); });
+    ['noteView', 'todosView', 'favsView', 'trashView', 'searchView', 'agendaView'].forEach(function (id) { $(id).classList.add('hidden'); });
     $('navNote').classList.toggle('active', v === 'note');
     $('navTodos').classList.toggle('active', v === 'todos');
     $('navFavs').classList.toggle('active', v === 'favs');
-    var map = { note: 'noteView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView' };
+    $('navAgenda').classList.toggle('active', v === 'agenda');
+    var map = { note: 'noteView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', agenda: 'agendaView' };
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
   $('navNote').addEventListener('click', function () { showView('note'); renderNoteList(); });
   $('navTodos').addEventListener('click', renderGlobalTodos);
   $('navFavs').addEventListener('click', renderFavorites);
+  $('navAgenda').addEventListener('click', renderAgenda);
+
+  async function renderAgenda() {
+    showView('agenda');
+    var box = $('agendaList'); box.innerHTML = '<p class="muted">Loading…</p>';
+    var todos = await API.globalTodos();
+    var groups = {};
+    todos.filter(function (t) { return t.due; }).forEach(function (t) { (groups[t.due] = groups[t.due] || []).push(t); });
+    var dates = Object.keys(groups).sort();
+    box.innerHTML = '';
+    if (!dates.length) { box.innerHTML = '<p class="muted">No dated to-dos. Add a due date to a to-do to see it here.</p>'; return; }
+    dates.forEach(function (d) {
+      var h = document.createElement('div'); h.className = 'agenda-day' + (d < todayStr() ? ' overdue' : '');
+      h.innerHTML = '<div class="agenda-date">' + esc(d) + (d < todayStr() ? ' · overdue' : (d === todayStr() ? ' · today' : '')) + '</div>';
+      groups[d].forEach(function (t) {
+        var row = document.createElement('div'); row.className = 'agenda-item';
+        row.innerHTML = '<span class="gt-ws">' + esc(t.workspaceName) + '</span> ' + esc(t.text);
+        row.addEventListener('click', function () { openNote(t.noteId); });
+        h.appendChild(row);
+      });
+      box.appendChild(h);
+    });
+  }
 
   async function renderGlobalTodos() {
     showView('todos');
@@ -592,7 +738,15 @@
     if (m === 'templates') openTemplateModal();
     else if (m === 'trash') renderTrash();
     else if (m === 'backup') openModal('backupModal');
-    else if (m === 'account') { $('acctMsg').textContent = ''; openModal('accountModal'); }
+    else if (m === 'account') {
+      $('acctMsg').textContent = '';
+      var inst = state.instance || {};
+      $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Meeting Notes') + '</b> · v' + esc(inst.version || '') +
+        '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
+        (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
+      $('fontSize').value = state.settings.fontSize || 14;
+      openModal('accountModal');
+    }
   });
 
   // Workspaces modal
@@ -664,8 +818,15 @@
   });
   function acctMsg(s, isErr) { var el = $('acctMsg'); el.textContent = s; el.style.color = isErr ? 'var(--danger)' : 'var(--muted)'; }
 
-  // Backup / restore
+  // Font size
+  $('fontSize').addEventListener('input', function () {
+    var px = parseInt($('fontSize').value, 10) || 14; applyFontSize(px);
+    state.settings.fontSize = px; API.saveSettings({ fontSize: px });
+  });
+
+  // Backup / restore + bulk export
   $('downloadBackupBtn').addEventListener('click', function () { downloadUrl(API.backupUrl()); });
+  $('bulkExportBtn').addEventListener('click', function () { downloadUrl(API.workspaceZipUrl(state.wsId, $('bulkFormat').value)); });
   $('restoreBtn').addEventListener('click', async function () {
     var f = $('restoreFile').files[0]; if (!f) { $('restoreMsg').textContent = 'Choose a backup file.'; return; }
     try {
@@ -686,13 +847,14 @@
   });
 
   // Modal helpers
+  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal'];
   function openModal(id) {
     $('modalBackdrop').classList.remove('hidden');
-    ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal'].forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });
+    MODALS.forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });
   }
   function closeModals() {
     $('modalBackdrop').classList.add('hidden');
-    ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal'].forEach(function (m) { $(m).classList.add('hidden'); });
+    MODALS.forEach(function (m) { $(m).classList.add('hidden'); });
   }
   document.querySelectorAll('.modal-close').forEach(function (b) { b.addEventListener('click', closeModals); });
   $('modalBackdrop').addEventListener('click', function (e) { if (e.target === $('modalBackdrop')) closeModals(); });

@@ -55,7 +55,19 @@
     setWorkspaceTemplate: (id, defaultTemplateId) => req('PUT', '/api/workspaces/' + id, { defaultTemplateId }),
     deleteWorkspace: (id) => req('DELETE', '/api/workspaces/' + id),
 
-    listNotes: (wsId) => req('GET', '/api/workspaces/' + wsId + '/notes'),
+    listNotes: (wsId, filter) => {
+      var qs = '';
+      if (filter === 'open') qs = '?archived=active&sort=open';
+      else if (filter === 'archived') qs = '?archived=archived';
+      else if (filter === 'all') qs = '?archived=all';
+      return req('GET', '/api/workspaces/' + wsId + '/notes' + qs);
+    },
+    backlinks: (id) => req('GET', '/api/notes/' + id + '/backlinks'),
+    listVersions: (id) => req('GET', '/api/notes/' + id + '/versions'),
+    restoreVersion: (id, ts) => req('POST', '/api/notes/' + id + '/versions/' + ts + '/restore', {}),
+    forkNote: (id, patch) => req('POST', '/api/notes/' + id + '/fork', patch),
+    snoozeReminder: (wsId, id, until) => req('POST', '/api/workspaces/' + wsId + '/reminders/' + id + '/snooze', { until }),
+    workspaceZipUrl: (wsId, fmt) => '/api/workspaces/' + wsId + '/export?format=' + fmt,
     currentNote: (wsId) => req('GET', '/api/workspaces/' + wsId + '/current'),
     newNote: (wsId, opts) => req('POST', '/api/workspaces/' + wsId + '/notes/new', opts || {}),
     getNote: (id) => req('GET', '/api/notes/' + id),

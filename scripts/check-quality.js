@@ -55,11 +55,17 @@ for (const f of files) {
   }
 }
 
-// 3. Ensure server binds to localhost by default (no accidental 0.0.0.0 default)
-const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-if (!/HOST\s*=\s*process\.env\.HOST\s*\|\|\s*'127\.0\.0\.1'/.test(server)) {
+// 3. Ensure the bind address defaults to localhost (no accidental 0.0.0.0 default).
+//    Host resolution lives in lib/config.js; the server binds to the resolved host.
+const cfg = fs.readFileSync(path.join(ROOT, 'lib', 'config.js'), 'utf8');
+if (!/host\s*=\s*env\.HOST\s*\|\|\s*inst\.host\s*\|\|\s*'127\.0\.0\.1'/.test(cfg)) {
   errors++;
-  console.log("✗ server.js: default HOST should be 127.0.0.1 (local-only by default)");
+  console.log("✗ lib/config.js: default bind host should be 127.0.0.1 (local-only by default)");
+}
+const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+if (!/const HOST = CFG\.host/.test(server)) {
+  errors++;
+  console.log('✗ server.js: HOST should come from the resolved config (CFG.host)');
 }
 
 console.log('\nquality: checked ' + checked + ' files, ' + errors + ' issue(s)');

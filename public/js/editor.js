@@ -10,14 +10,39 @@
     { cmd: 'insertUnorderedList', label: '•', title: 'Bullet list' },
     { cmd: 'insertOrderedList', label: '1.', title: 'Numbered list' },
     { cmd: 'formatBlock:H3', label: 'H', title: 'Heading' },
+    { cmd: 'insertTable', label: '▦', title: 'Insert table' },
     { cmd: 'insertImage', label: '🖼', title: 'Insert image' },
     { cmd: 'createLink', label: '🔗', title: 'Insert link' },
+    { cmd: 'noteLink', label: '⧉', title: 'Link to a note' },
     { cmd: 'removeFormat', label: '⌫', title: 'Clear formatting' },
   ];
 
-  function exec(command, editor, uploader) {
+  function insertHTML(html) { document.execCommand('insertHTML', false, html); }
+
+  function exec(command, editor, opts) {
     editor.focus();
+    var uploader = opts && opts.uploader;
     if (command === 'insertImage') return pickImage(editor, uploader);
+    if (command === 'insertTable') {
+      var cols = Math.max(1, Math.min(8, parseInt(prompt('Columns?', '2'), 10) || 2));
+      var rows = Math.max(1, Math.min(20, parseInt(prompt('Rows?', '2'), 10) || 2));
+      var cells = '';
+      for (var r = 0; r < rows; r++) {
+        var row = '';
+        for (var col = 0; col < cols; col++) row += '<td>&nbsp;</td>';
+        cells += '<tr>' + row + '</tr>';
+      }
+      insertHTML('<table class="rte-table"><tbody>' + cells + '</tbody></table><p><br></p>');
+      return;
+    }
+    if (command === 'noteLink') {
+      if (opts && opts.noteLinkPicker) opts.noteLinkPicker(function (note) {
+        editor.focus();
+        insertHTML('<a href="#note-' + note.id + '" data-note-id="' + note.id + '">' + note.title + '</a>&nbsp;');
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      return;
+    }
     if (command === 'createLink') {
       var url = prompt('Link URL:');
       if (url) document.execCommand('createLink', false, url);
@@ -61,9 +86,10 @@
     input.click();
   }
 
-  function buildToolbar(toolbarEl, editor, uploader) {
+  function buildToolbar(toolbarEl, editor, opts) {
     toolbarEl.innerHTML = '';
     TOOLS.forEach(function (t) {
+      if (t.cmd === 'noteLink' && !(opts && opts.noteLinkPicker)) return;
       var b = document.createElement('button');
       b.type = 'button';
       b.title = t.title;
@@ -71,10 +97,59 @@
       if (t.style) b.setAttribute('style', t.style);
       b.addEventListener('mousedown', function (e) { e.preventDefault(); });
       b.addEventListener('click', function () {
-        exec(t.cmd, editor, uploader);
+        exec(t.cmd, editor, opts);
         editor.dispatchEvent(new Event('input', { bubbles: true }));
       });
       toolbarEl.appendChild(b);
+    });
+  }
+
+  var SLASH = [
+    { key: 'h', label: 'Heading', run: function () { document.execCommand('formatBlock', false, 'H3'); } },
+    { key: 'b', label: 'Bullet list', run: function () { document.execCommand('insertUnorderedList'); } },
+    { key: 'n', label: 'Numbered list', run: function () { document.execCommand('insertOrderedList'); } },
+    { key: 't', label: 'Table', run: function (editor, opts) { exec('insertTable', editor, opts); } },
+    { key: 'q', label: 'Quote', run: function () { document.execCommand('formatBlock', false, 'BLOCKQUOTE'); } },
+    { key: 'c', label: 'Code', run: function () { document.execCommand('formatBlock', false, 'PRE'); } },
+  ];
+
+  /* Type "/" at the start of an empty line to open a block menu. */
+  function enableSlashMenu(editor, opts) {
+    var menu = null;
+    function close() { if (menu) { menu.remove(); menu = null; } }
+    editor.addEventListener('keyup', function (e) {
+      if (e.key === '/') {
+        var sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        var rect = sel.getRangeAt(0).getBoundingClientRect();
+        close();
+        menu = document.createElement('div');
+        menu.className = 'slash-menu';
+        menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+        menu.style.left = (rect.left + window.scrollX) + 'px';
+        SLASH.forEach(function (s) {
+          var b = document.createElement('button');
+          b.textContent = s.label;
+          b.addEventListener('mousedown', function (ev) {
+            ev.preventDefault();
+            document.execCommand('delete'); // remove the "/"
+            s.run(editor, opts);
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+            close();
+          });
+          menu.appendChild(b);
+        });
+        document.body.appendChild(menu);
+      } else if (e.key === 'Escape') { close(); }
+    });
+    editor.addEventListener('blur', function () { setTimeout(close, 200); });
+  }
+
+  /* Clicking a note-link opens that note (handled by the app). */
+  function enableNoteLinks(editor) {
+    editor.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[data-note-id]');
+      if (a) { e.preventDefault(); window.dispatchEvent(new CustomEvent('mn-open-note', { detail: a.getAttribute('data-note-id') })); }
     });
   }
 
@@ -132,13 +207,15 @@
   }
 
   window.Editor = {
-    // opts.uploader(file) -> Promise<url>; when provided, inserted images are
-    // stored as attachments and referenced by URL instead of embedded as data URLs.
+    // opts.uploader(file) -> Promise<url>: inserted images become attachments.
+    // opts.noteLinkPicker(insertFn): lets the app supply a note to link to.
     init: function (toolbarEl, editor, opts) {
-      var uploader = (opts && opts.uploader) || null;
-      buildToolbar(toolbarEl, editor, uploader);
+      opts = opts || {};
+      buildToolbar(toolbarEl, editor, opts);
       enableImageResize(editor);
-      enablePasteImages(editor, uploader);
+      enablePasteImages(editor, opts.uploader || null);
+      enableSlashMenu(editor, opts);
+      enableNoteLinks(editor);
     },
   };
 })();

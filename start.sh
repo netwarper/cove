@@ -15,8 +15,18 @@ if [ -f .env ]; then
   set -a; . ./.env; set +a
 fi
 
-PORT="${PORT:-3000}"
-URL="http://${HOST:-127.0.0.1}:${PORT}"
+DATA_DIR="${DATA_DIR:-./data}"
+
+# First run: offer to pick a durable local domain for this instance so the URL
+# (and port) stay stable across restarts and avoid clashes with other apps.
+if [ ! -f "${DATA_DIR}/instance.json" ] && [ -z "$PORT" ] && [ -t 0 ]; then
+  printf "Pick a durable local domain for this instance [meeting-notes]: "
+  read -r NAME
+  NAME="${NAME:-meeting-notes}"
+  node server.js --set-domain "$NAME"
+fi
+
+URL="$(node server.js --print-config | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).url)}catch(e){console.log('http://127.0.0.1:3000')}})")"
 echo "Starting Meeting Notes at ${URL}"
 
 # Try to open a browser (best-effort, non-fatal).

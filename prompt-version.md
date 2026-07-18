@@ -3,8 +3,8 @@
 This file captures how to re-generate this application from a prompt, so the
 same app can be reproduced or evolved consistently.
 
-- **App version:** 1.1.0 (see `package.json`)
-- **Prompt version:** v2
+- **App version:** 1.2.0 (see `package.json`)
+- **Prompt version:** v3
 - **Date:** 2026-07-18
 - **Stack chosen:** Node.js standard library only (zero runtime dependencies) +
   vanilla HTML/CSS/JS frontend (no build step).
@@ -115,7 +115,7 @@ npm run check   # 0 issues
 npm test        # functional + security suites, 0 failures
 ```
 
-At the time of this version: **quality 0 issues · functional 49/49 · security 21/21.**
+At the latest version: **quality 0 issues · functional 61/61 · security 21/21 · config 14/14.**
 
 ---
 
@@ -153,8 +153,48 @@ Everything else in the batch was implemented:
 9. **Accessibility** passes (ARIA labels, `aria-live`, Escape-to-close).
 10. **Dockerfile** + `/api/health` health check.
 
+## Follow-up prompt (v3 → 1.2.0)
+
+"Do it all, but keep deferring multi-user vaults" — plus a mid-stream
+durability requirement: no port conflicts, graceful start, and a durable
+local domain per instance.
+
+Deferred (with reasoning, like multi-user): **WebAuthn/passkey second factor** —
+can't be built responsibly or verified in a headless, non-HTTPS environment, and
+the browser PRF extension needed to make a passkey contribute to *encryption* is
+too thinly supported to base the data key on. **Closed-app push notifications**
+are a browser platform limit (need a push service); the service worker shows
+notifications while the browser runs.
+
+Implemented:
+
+1. **Durability / graceful start** (`lib/config.js`): durable `instance.json`
+   (name + `*.localhost` domain + stable derived port) stored in the data dir so
+   identity travels with the data. `--set-domain` / `--print-config` CLI. On a
+   port clash, probe `/api/health` to detect our own app vs. another program and
+   exit gracefully; a lock file prevents two instances on one data directory.
+   Launchers prompt for a domain on first run.
+2. **PWA**: manifest, icon, service worker (offline shell + notifications).
+3. **Live sync** (SSE + `fs.watch`) + conflict "keep both" (`forkNote`).
+4. **Per-note version history** (coalesced snapshots, list/view/restore).
+5. **Encrypted search index** (`search.idx.enc`) replacing the O(n) scan, kept
+   in sync across every mutation.
+6. **Reminders**: time-of-day, end date, and snooze.
+7. **Tables, note links + backlinks, slash commands** in the editor.
+8. **Pin/archive**, note-list filter/sort, **agenda** view, word count,
+   font-size, **bulk workspace export (zero-dep ZIP)**.
+9. Fixed two latent bugs found via tests: a greedy reminder route that turned
+   `/snooze` into an empty reminder, and reminder-sourced todos being both
+   carried forward and re-injected (duplicates).
+
 ## Changelog
 
+- **v3 (1.2.0, 2026-07-18):** Durable per-instance domain/port + graceful
+  multi-instance start; PWA/offline; live-sync (SSE) + keep-both conflict
+  resolution; version history; encrypted search index; reminder time/end/snooze;
+  editor tables, note links, backlinks, slash commands; pin/archive, agenda,
+  bulk ZIP export, word count, font size. Verified: quality 0 · functional 61/61
+  · security 21/21 · config 14/14.
 - **v2 (1.1.0, 2026-07-18):** Envelope encryption + passphrase rotation +
   recovery key; sync-conflict guard; trash; CSRF + idle-lock + Secure cookie;
   time-aware reminders + notifications; per-todo due dates, drag-reorder, tags;

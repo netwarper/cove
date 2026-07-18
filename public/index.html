@@ -4,7 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Meeting Notes</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%97%92%EF%B8%8F%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="/icon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#3b6cf6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Notes">
+  <link rel="apple-touch-icon" href="/icon.svg">
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
@@ -52,6 +57,7 @@
       <nav class="top-actions">
         <button id="navNote" class="tab active" title="Current note">Note</button>
         <button id="navTodos" class="tab" title="All open to-dos">To-Dos</button>
+        <button id="navAgenda" class="tab" title="Agenda (due items &amp; reminders)">📅</button>
         <button id="navFavs" class="tab" title="Favorites">★</button>
         <button id="notifyBtn" class="icon-btn" title="Enable reminder notifications" aria-label="Enable notifications">🔔</button>
         <button id="layoutToggle" class="icon-btn" title="Toggle columns / rows layout" aria-label="Toggle layout">☷</button>
@@ -86,6 +92,12 @@
         </div>
         <div class="sidebar-actions">
           <button id="importBtn" class="link-btn">⭳ Import</button>
+          <select id="noteFilter" class="note-filter" title="Filter / sort notes">
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+            <option value="all">All</option>
+            <option value="open">Most open to-dos</option>
+          </select>
         </div>
         <ul id="noteList" class="note-list"></ul>
       </aside>
@@ -111,6 +123,9 @@
               </div>
               <button id="noteMoreBtn" class="icon-btn" title="More note actions" aria-label="More note actions">⋯</button>
               <div id="noteMoreMenu" class="menu hidden">
+                <button data-note="pin">📌 Pin / unpin</button>
+                <button data-note="archive">🗄 Archive / unarchive</button>
+                <button data-note="history">🕐 Version history</button>
                 <button data-note="move">➜ Move to workspace…</button>
                 <button data-note="copy">⧉ Duplicate</button>
                 <button data-note="delete" class="danger-item">🗑 Delete (to trash)</button>
@@ -138,6 +153,7 @@
                 </select>
                 <input id="reminderN" type="number" min="1" value="2" class="hidden" title="N days" aria-label="Every N days">
                 <input id="reminderDue" type="date" class="hidden" title="Due date" aria-label="Due date">
+                <input id="reminderEnd" type="date" class="hidden reminder-time" title="Repeat until (optional)" aria-label="Repeat until">
                 <input id="reminderTime" type="time" class="reminder-time" title="Time of day (optional)" aria-label="Time of day">
                 <button id="addReminderBtn" class="sm">Add</button>
               </div>
@@ -175,7 +191,20 @@
               </div>
             </div>
           </div>
-          <div id="saveStatus" class="save-status" aria-live="polite"></div>
+          <div id="backlinks" class="backlinks hidden">
+            <span class="bl-label">Linked from:</span>
+            <span id="backlinksList"></span>
+          </div>
+          <div class="save-row">
+            <div id="saveStatus" class="save-status" aria-live="polite"></div>
+            <div id="wordCount" class="word-count"></div>
+          </div>
+        </section>
+
+        <section id="agendaView" class="view hidden">
+          <h1>📅 Agenda</h1>
+          <p class="muted">Upcoming due to-dos and reminders across all workspaces.</p>
+          <div id="agendaList" class="agenda-list"></div>
         </section>
 
         <section id="todosView" class="view hidden">
@@ -258,6 +287,16 @@
         <p class="muted tiny">If you lose your passphrase, a recovery key is the only way back in. Regenerating invalidates the old one.</p>
         <button id="regenRecoveryBtn" class="sm">Regenerate recovery key</button>
       </div>
+      <div class="acct-block">
+        <h4>This instance</h4>
+        <p class="muted tiny">The durable local address is set at launch (<code>node server.js --set-domain &lt;name&gt;</code>) so it never drifts.</p>
+        <div id="instanceInfo" class="tiny"></div>
+      </div>
+      <div class="acct-block">
+        <h4>Display</h4>
+        <label class="tiny muted">Note text size</label>
+        <input id="fontSize" type="range" min="13" max="20" step="1" value="14">
+      </div>
       <div id="acctMsg" class="tiny" aria-live="polite"></div>
       <div class="modal-actions"><button class="modal-close">Close</button></div>
     </div>
@@ -276,7 +315,31 @@
         <button id="restoreBtn" class="sm">Restore from file</button>
         <div id="restoreMsg" class="tiny" aria-live="polite"></div>
       </div>
+      <div class="acct-block">
+        <h4>Export this workspace</h4>
+        <p class="muted tiny">Download every note in the current workspace as a ZIP.</p>
+        <select id="bulkFormat" class="ws-tpl">
+          <option value="html">HTML</option>
+          <option value="md">Markdown</option>
+          <option value="json">JSON</option>
+        </select>
+        <button id="bulkExportBtn" class="sm">Download ZIP</button>
+      </div>
       <div class="modal-actions"><button class="modal-close">Close</button></div>
+    </div>
+
+    <div class="modal hidden" id="historyModal">
+      <h3>🕐 Version history</h3>
+      <p class="muted tiny">Snapshots are kept automatically (up to 20). Restoring first snapshots the current version, so nothing is lost.</p>
+      <ul id="historyList" class="ws-manage-list"></ul>
+      <div class="modal-actions"><button class="modal-close">Close</button></div>
+    </div>
+
+    <div class="modal hidden" id="notePickerModal">
+      <h3>Link to a note</h3>
+      <input id="notePickerSearch" placeholder="Filter notes…">
+      <ul id="notePickerList" class="ws-manage-list"></ul>
+      <div class="modal-actions"><button class="modal-close">Cancel</button></div>
     </div>
 
     <div class="modal hidden" id="moveModal">

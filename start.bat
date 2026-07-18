@@ -9,8 +9,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if "%PORT%"=="" set PORT=3000
-echo Starting Meeting Notes at http://127.0.0.1:%PORT%
-start "" http://127.0.0.1:%PORT%
+if "%DATA_DIR%"=="" set DATA_DIR=.\data
+
+REM First run: offer to pick a durable local domain for this instance.
+if not exist "%DATA_DIR%\instance.json" if "%PORT%"=="" (
+  set /p NAME="Pick a durable local domain for this instance [meeting-notes]: "
+  if "%NAME%"=="" set NAME=meeting-notes
+  node server.js --set-domain "%NAME%"
+)
+
+echo Starting Meeting Notes...
+node server.js --print-config
+start "" http://127.0.0.1:3000
 node server.js
 pause

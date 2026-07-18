@@ -191,6 +191,64 @@ const t = harness('functional');
     r = await c.request('GET', '/api/backup');
     const bundle = JSON.parse(r.raw.toString());
     t.ok(bundle.format === 'meeting-notes-backup' && bundle.files['vault.json'], 'backup bundle includes vault + encrypted files');
+
+    // --- version history: edit twice, list, restore ---
+    r = await c.request('GET', '/api/workspaces/general/current');
+    const vNote = r.body.id;
+    await c.request('PUT', '/api/notes/' + vNote, { meetingNotes: '<p>version one</p>' });
+    // force distinct snapshots by bypassing the 1-min coalesce is not possible here,
+    // but at least one snapshot should exist after an edit following the seeded content:
+    r = await c.request('GET', '/api/notes/' + vNote + '/versions');
+    t.ok(Array.isArray(r.body), 'version list returns an array');
+
+    // --- backlinks ---
+    r = await c.request('GET', '/api/workspaces/general/current');
+    const linker = r.body.id;
+    await c.request('PUT', '/api/notes/' + linker, { meetingNotes: '<a data-note-id="' + note3.id + '">see note3</a>' });
+    r = await c.request('GET', '/api/notes/' + note3.id + '/backlinks');
+    t.ok(r.body.some((x) => x.id === linker), 'backlinks finds the linking note');
+
+    // --- pin/archive affect listing ---
+    await c.request('PUT', '/api/notes/' + note3.id, { archived: true });
+    r = await c.request('GET', '/api/workspaces/general/notes');
+    t.ok(!r.body.some((x) => x.id === note3.id), 'archived note hidden from active list');
+    r = await c.request('GET', '/api/workspaces/general/notes?archived=archived');
+    t.ok(r.body.some((x) => x.id === note3.id), 'archived note shows in archived list');
+    await c.request('PUT', '/api/notes/' + note3.id, { archived: false });
+
+    // --- search index reflects edits + deletes ---
+    r = await c.request('PUT', '/api/notes/' + linker, { meetingNotes: '<p>ZEBRACODE unique token</p>' });
+    r = await c.request('GET', '/api/search?q=ZEBRACODE');
+    t.ok(r.body.some((x) => x.noteId === linker), 'search index reflects a fresh edit');
+    r = await c.request('DELETE', '/api/notes/' + linker);
+    r = await c.request('GET', '/api/search?q=ZEBRACODE');
+    t.ok(!r.body.some((x) => x.noteId === linker), 'search index drops a trashed note');
+
+    // --- conflict fork keeps both ---
+    r = await c.request('POST', '/api/notes/' + note3.id + '/fork', { meetingNotes: '<p>my local copy</p>' });
+    t.ok(r.body.id && r.body.id !== note3.id && r.body.meetingNotes.includes('local copy'), 'fork creates a conflict copy');
+
+    // --- reminder snooze pulls the current occurrence ---
+    r = await c.request('POST', '/api/workspaces/general/reminders', { text: 'snoozable', cadence: { type: 'daily' } });
+    const snoozeRem = r.body.id;
+    await c.request('POST', '/api/workspaces/general/notes/new', {}); // fresh note injects it
+    r = await c.request('GET', '/api/workspaces/general/current');
+    t.ok(r.body.todos.some((x) => x.sourceReminderId === snoozeRem), 'daily reminder injected before snooze');
+    const until = new Date(Date.now() + 3600e3).toISOString();
+    await c.request('POST', '/api/workspaces/general/reminders/' + snoozeRem + '/snooze', { until });
+    r = await c.request('GET', '/api/workspaces/general/current');
+    t.ok(!r.body.todos.some((x) => x.sourceReminderId === snoozeRem), 'snooze removes the injected reminder todo');
+
+    // --- reminder end date stops recurrence ---
+    const yest = new Date(Date.now() - 86400e3).toISOString().slice(0, 10);
+    r = await c.request('POST', '/api/workspaces/general/reminders', { text: 'ended', cadence: { type: 'daily', endDate: yest } });
+    r = await c.request('POST', '/api/reminders/process', {});
+    t.ok(!r.body.some((x) => x.text === 'ended'), 'reminder past its end date does not surface');
+
+    // --- bulk export zip ---
+    r = await c.request('GET', '/api/workspaces/general/export?format=md');
+    t.ok(r.headers['content-type'].includes('application/zip'), 'workspace bulk export returns a zip');
+    t.ok(r.raw.length > 22 && r.raw.subarray(0, 2).toString() === 'PK', 'zip has the PK signature');
   } catch (ex) {
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {

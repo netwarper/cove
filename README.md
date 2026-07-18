@@ -52,7 +52,13 @@ everything stays on your machine.
 | **Reminders (time-aware)** | Optional time-of-day; a background poll surfaces due reminders and (with permission) raises **desktop notifications** even for workspaces you aren't viewing. |
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |
 | **Import** | Upload a previously exported JSON / HTML / Markdown note into a workspace. |
-| **Encrypted backup** | Download a single encrypted backup file of everything; restore it on a fresh install. |
+| **Encrypted backup** | Download a single encrypted backup file of everything; restore on a fresh install. Bulk-export a whole workspace as a ZIP (HTML/MD/JSON). |
+| **Version history** | Every note keeps automatic snapshots (up to 20); view and restore any earlier version. |
+| **Live sync** | Changes to the data directory (e.g. from another device via a synced folder) refresh open notes in real time; save conflicts can be resolved by keeping both copies. |
+| **Note links & backlinks** | Link between notes (`⧉` in the editor); each note shows what links to it. Rich text also supports **tables** and **/slash commands**. |
+| **Pin / archive** | Pin notes to the top or archive them out of the active list; filter/sort the note list. |
+| **Agenda** | A dated view of all due to-dos across workspaces. Reminders support a time-of-day, an end date, and snooze. |
+| **Offline / installable** | Ships as a PWA — installable, with an offline app shell. |
 | **Security** | AES-256-GCM **envelope encryption at rest**, scrypt key derivation, **passphrase change + recovery key**, CSRF tokens, session auth with idle auto-lock, CSP + anti-clickjacking headers, login rate-limiting. |
 
 ---
@@ -79,6 +85,38 @@ encrypted before they touch disk, the cloud provider only ever sees ciphertext.
 Writes are atomic (write-then-rename) so sync clients never see half-written files.
 
 ---
+
+## Durable local domain & running multiple instances
+
+The port and address are **durable per instance** and never auto-change, so a
+hosts-file record or a `*.localhost` domain you set up stays valid forever.
+
+On first run, `start.sh` / `start.bat` offer to assign a durable local domain.
+You can also do it explicitly:
+
+```bash
+node server.js --set-domain notes      # -> http://notes.localhost:<stable-port>
+node server.js --print-config          # show the resolved name/domain/port
+```
+
+- A bare name becomes **`<name>.localhost`**, which resolves to `127.0.0.1`
+  automatically in modern browsers — **no hosts-file edit needed**. For a custom
+  domain (e.g. `notes.home.lan`) the command prints the exact `hosts` line to add.
+- The choice is stored in **`instance.json` inside the data directory**, so it
+  travels with your data — copy the directory to another machine and the same
+  domain/port come with it.
+
+**Multiple instances / other apps on the machine** are handled gracefully:
+
+- Each instance gets its **own stable port** (derived from its domain, or set
+  explicitly), so two instances don't fight over a port.
+- If you launch a second copy against the **same data directory**, it detects the
+  running instance (via a lock file) and points you to the existing URL instead
+  of starting a broken second server.
+- If the port is taken by **another app**, startup exits with a clear message
+  telling you how to pick a different domain/port — it never crashes with a raw
+  stack trace, and never silently grabs a random port (which would break your
+  durable URL).
 
 ## Portability
 

@@ -279,6 +279,39 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 .reminder-time { max-width: 92px; }
 .link-btn.danger { color: var(--danger); }
 
+/* ---- v1.2 additions ---- */
+.rte { font-size: var(--note-font, 14px); }
+.note-filter { width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); color: var(--ink); }
+.rte-table { border-collapse: collapse; width: 100%; margin: 6px 0; }
+.rte-table td { border: 1px solid var(--line); padding: 4px 6px; min-width: 40px; }
+.rte a[data-note-id] { color: var(--brand); text-decoration: none; border-bottom: 1px dotted var(--brand); cursor: pointer; }
+.rte blockquote { border-left: 3px solid var(--line); margin: 6px 0; padding-left: 10px; color: var(--muted); }
+.rte pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow: auto; }
+
+.slash-menu { position: absolute; z-index: 60; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 150px; }
+.slash-menu button { text-align: left; padding: 7px 12px; border: 0; background: none; color: var(--ink); }
+.slash-menu button:hover { background: var(--panel-2); }
+
+.todo-snooze { border: 0; background: none; cursor: pointer; opacity: .6; font-size: 12px; }
+.todo-snooze:hover { opacity: 1; }
+
+.backlinks { margin-top: 12px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.backlinks .bl-label { color: var(--muted); font-weight: 600; }
+.bl-item { border: 1px solid var(--line); background: var(--panel-2); color: var(--brand); border-radius: 12px; padding: 2px 10px; cursor: pointer; }
+
+.save-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.word-count { font-size: 12px; color: var(--muted); }
+
+.agenda-list { margin-top: 12px; }
+.agenda-day { margin-bottom: 14px; }
+.agenda-date { font-weight: 700; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.agenda-day.overdue .agenda-date { color: var(--danger); }
+.agenda-item { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; cursor: pointer; }
+.agenda-item:hover { border-color: var(--brand); }
+
+#instanceInfo code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.note-list .nl-tags { color: var(--brand); font-size: 11px; }
+
 /* ---- Print ---- */
 @media print {
   .topbar, .sidebar, .note-tools, .rte-toolbar, .add-row, .mode-toggle, .save-status, #reminderList, .attach-head label { display: none !important; }

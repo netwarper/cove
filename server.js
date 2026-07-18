@@ -23,22 +23,52 @@ const path = require('path');
 const url = require('url');
 const c = require('./lib/crypto');
 const store = require('./lib/store');
+const config = require('./lib/config');
 const { Store } = store;
 
-const PORT = parseInt(process.env.PORT, 10) || 3000;
-const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
+fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// Durable, non-drifting host/port/domain resolved from env + instance.json.
+const CFG = config.resolve(DATA_DIR);
+const PORT = CFG.port;
+const HOST = CFG.host;
 const MAX_BODY = parseInt(process.env.MAX_BODY, 10) || 32 * 1024 * 1024;
 const SESSION_TTL = (parseInt(process.env.SESSION_TTL, 10) || 240) * 60 * 1000;
 const COOKIE_SECURE = (process.env.COOKIE_SECURE || 'auto').toLowerCase();
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const VAULT_PATH = path.join(DATA_DIR, 'vault.json');
-
-fs.mkdirSync(DATA_DIR, { recursive: true });
+let APP_VERSION = '0.0.0';
+try { APP_VERSION = require('./package.json').version; } catch (_e) { /* ignore */ }
 
 // ---- session state (in-memory only; keys never touch disk) -------------
 const sessions = new Map(); // token -> { key, csrf, expires }
 const loginAttempts = new Map(); // ip -> { count, until }
+
+// ---- live-sync: broadcast note-file changes to connected clients -------
+const sseClients = new Set();
+let sseDebounce = null;
+function broadcast(noteId) {
+  clearTimeout(sseDebounce);
+  sseDebounce = setTimeout(() => {
+    const payload = `event: change\ndata: ${JSON.stringify({ noteId: noteId || null })}\n\n`;
+    for (const res of sseClients) { try { res.write(payload); } catch (_e) { sseClients.delete(res); } }
+  }, 250);
+}
+function startWatcher() {
+  try {
+    fs.watch(DATA_DIR, { recursive: true }, (_event, filename) => {
+      if (!filename) return broadcast(null);
+      const name = String(filename).replace(/\\/g, '/');
+      if (name.includes('/notes/') && name.endsWith('.json.enc')) {
+        broadcast(path.basename(name).replace('.json.enc', ''));
+      }
+    });
+  } catch (_e) {
+    // recursive watch may be unsupported on some platforms — live-sync simply
+    // stays off; the optimistic-concurrency guard still prevents lost writes.
+  }
+}
 
 function newSession(key) {
   const token = c.randomToken();
@@ -67,6 +97,7 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png',
+  '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2',
 };
 
 function send(res, status, body, headers = {}) {
@@ -155,13 +186,18 @@ const server = http.createServer(async (req, res) => {
 
     // ---- unauthenticated endpoints ----
     if (pathname === '/api/health' && req.method === 'GET') {
-      return sendJSON(res, 200, { ok: true, initialized: vaultExists() });
+      // `app` + `name` let another launch detect that THIS application (and
+      // which instance) is already serving this port, for a graceful start.
+      return sendJSON(res, 200, { ok: true, app: 'meeting-notes', name: CFG.name, version: APP_VERSION, initialized: vaultExists() });
     }
 
     if (pathname === '/api/status' && req.method === 'GET') {
       const cookies = parseCookies(req);
       const s = getSession(cookies.mn_session);
-      return sendJSON(res, 200, { initialized: vaultExists(), authenticated: !!s, csrf: s ? s.csrf : null });
+      return sendJSON(res, 200, {
+        initialized: vaultExists(), authenticated: !!s, csrf: s ? s.csrf : null,
+        instance: { name: CFG.name, url: CFG.url, domain: CFG.domain, version: APP_VERSION },
+      });
     }
 
     if (pathname === '/api/setup' && req.method === 'POST') {
@@ -235,6 +271,20 @@ const server = http.createServer(async (req, res) => {
       if (req.headers['x-csrf-token'] !== session.csrf) return sendJSON(res, 403, { error: 'bad or missing CSRF token' });
     }
 
+    // Server-Sent Events: notify the client when note files change on disk
+    // (e.g. another device wrote to a synced data directory).
+    if (pathname === '/api/events' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache',
+        Connection: 'keep-alive', 'X-Content-Type-Options': 'nosniff',
+      });
+      res.write('retry: 3000\n\n');
+      sseClients.add(res);
+      const ka = setInterval(() => { try { res.write(': ka\n\n'); } catch (_e) {} }, 25000);
+      req.on('close', () => { clearInterval(ka); sseClients.delete(res); });
+      return undefined;
+    }
+
     const s = new Store(DATA_DIR, session.key);
 
     if (pathname === '/api/logout' && req.method === 'POST') {
@@ -304,14 +354,20 @@ async function route(s, req, res, pathname, query) {
       return s.renameWorkspace(wsId, body.name);
     }
     if (seg.length === 3 && m === 'DELETE') return s.deleteWorkspace(wsId);
-    if (seg[3] === 'notes' && m === 'GET') return s.listNotes(wsId);
+    if (seg[3] === 'notes' && m === 'GET') return s.listNotes(wsId, { archived: query.archived, sort: query.sort });
     if (seg[3] === 'current' && m === 'GET') return s.currentNote(wsId);
     if (seg[3] === 'notes' && seg[4] === 'new' && m === 'POST') return s.createNote(wsId, await readBody(req));
-    if (seg[3] === 'reminders' && m === 'GET') return s.listReminders(wsId);
-    if (seg[3] === 'reminders' && m === 'POST') return s.addReminder(wsId, await readBody(req));
+    if (seg[3] === 'reminders' && seg.length === 4 && m === 'GET') return s.listReminders(wsId);
+    if (seg[3] === 'reminders' && seg.length === 4 && m === 'POST') return s.addReminder(wsId, await readBody(req));
+    if (seg[3] === 'reminders' && seg[4] && seg[5] === 'snooze' && m === 'POST') return s.snoozeReminder(wsId, safeId(seg[4]), (await readBody(req)).until);
     if (seg[3] === 'reminders' && seg[4] && m === 'PUT') return s.updateReminder(wsId, safeId(seg[4]), await readBody(req));
     if (seg[3] === 'reminders' && seg[4] && m === 'DELETE') return s.deleteReminder(wsId, safeId(seg[4]));
     if (seg[3] === 'import' && m === 'POST') return s.importNote(wsId, await readBody(req));
+    if (seg[3] === 'export' && m === 'GET') {
+      const out = s.exportWorkspaceZip(wsId, query.format);
+      send(res, 200, out.body, { 'Content-Type': out.mime, 'Content-Disposition': `attachment; filename="${out.filename}.zip"` });
+      return undefined;
+    }
   }
 
   // notes
@@ -323,6 +379,11 @@ async function route(s, req, res, pathname, query) {
     if (seg[3] === 'favorite' && m === 'POST') return s.setFavorite(noteId, (await readBody(req)).favorite);
     if (seg[3] === 'move' && m === 'POST') return s.moveNote(noteId, safeId((await readBody(req)).workspaceId));
     if (seg[3] === 'copy' && m === 'POST') return s.copyNote(noteId, (await readBody(req)).workspaceId || null);
+    if (seg[3] === 'fork' && m === 'POST') return s.forkNote(noteId, await readBody(req));
+    if (seg[3] === 'backlinks' && m === 'GET') return s.backlinks(noteId);
+    if (seg[3] === 'versions' && seg.length === 4 && m === 'GET') return s.listVersions(noteId);
+    if (seg[3] === 'versions' && seg[4] && seg[5] === 'restore' && m === 'POST') return s.restoreVersion(noteId, parseInt(seg[4], 10));
+    if (seg[3] === 'versions' && seg[4] && m === 'GET') return s.getVersion(noteId, parseInt(seg[4], 10));
     if (seg[3] === 'export' && m === 'GET') {
       const out = s.exportNote(noteId, query.format);
       send(res, 200, out.body, { 'Content-Type': out.mime, 'Content-Disposition': `attachment; filename="note-${noteId}.${out.ext}"` });
@@ -352,12 +413,118 @@ async function route(s, req, res, pathname, query) {
   throw Object.assign(new Error('not found'), { status: 404 });
 }
 
-if (require.main === module) {
+// ---- CLI: durable-domain setup & config inspection --------------------
+function runCli(argv) {
+  const args = argv.slice(2);
+  const has = (f) => args.includes(f);
+  const val = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : null; };
+
+  if (has('--help') || has('-h')) {
+    console.log(`Meeting Notes ${APP_VERSION}
+Usage: node server.js [options]
+
+  (no options)            Start the server (durable host/port from instance.json + env)
+  --set-domain <name>     Assign a durable local domain (bare name -> <name>.localhost)
+                          and a stable port for THIS data directory, then exit.
+  --port <n>              With --set-domain, pin an explicit port instead of a derived one.
+  --print-config          Print the resolved host/port/domain for this data directory.
+  --help                  Show this help.
+
+Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
+`);
+    return true;
+  }
+
+  if (has('--print-config')) {
+    const cfg = config.resolve(DATA_DIR);
+    console.log(JSON.stringify(cfg, null, 2));
+    return true;
+  }
+
+  if (has('--set-domain')) {
+    const domain = config.normalizeDomain(val('--set-domain'));
+    if (!domain) { console.error('Provide a name, e.g. --set-domain notes'); process.exitCode = 1; return true; }
+    const existing = config.readInstance(DATA_DIR) || {};
+    const port = parseInt(val('--port'), 10) || existing.port || config.derivePort(domain);
+    config.writeInstance(DATA_DIR, {
+      name: existing.name || 'Meeting Notes',
+      domain, host: existing.host || '127.0.0.1', port,
+      createdAt: existing.createdAt || new Date().toISOString(),
+    });
+    console.log(`\n  Durable domain set for this data directory:\n`);
+    console.log(`    URL:   http://${domain}:${port}`);
+    console.log(`    Port:  ${port}  (fixed — will not change between restarts)\n`);
+    if (domain.endsWith('.localhost')) {
+      console.log(`  ${domain} resolves to 127.0.0.1 automatically in modern browsers —`);
+      console.log(`  no hosts-file changes needed. Just run "node server.js" and open the URL.\n`);
+    } else {
+      console.log(`  Add this line to your hosts file so the domain resolves locally:`);
+      console.log(`    127.0.0.1   ${domain}`);
+      console.log(`  (/etc/hosts on macOS/Linux, C:\\Windows\\System32\\drivers\\etc\\hosts on Windows)\n`);
+    }
+    return true;
+  }
+  return false;
+}
+
+function startServer() {
+  // Refuse to run two instances against the SAME data directory.
+  const activeLock = config.readActiveLock(DATA_DIR);
+  if (activeLock) {
+    console.error(`\n  This data directory is already in use by a running instance`);
+    console.error(`  (pid ${activeLock.pid}, http://${CFG.displayHost}:${activeLock.port}).`);
+    console.error(`  Open that URL, or start a separate instance with its own DATA_DIR.\n`);
+    process.exit(0);
+  }
+
+  server.on('error', (err) => {
+    if (err.code !== 'EADDRINUSE') { console.error('server error:', err.message); process.exit(1); }
+    // Port taken — figure out gracefully whether it's us or another app.
+    const opts = { host: '127.0.0.1', port: PORT, path: '/api/health', timeout: 1500 };
+    const probe = http.get(opts, (r) => {
+      let body = '';
+      r.on('data', (d) => (body += d));
+      r.on('end', () => {
+        let info = null; try { info = JSON.parse(body); } catch (_e) {}
+        if (info && info.app === 'meeting-notes') {
+          console.error(`\n  Meeting Notes ("${info.name}") is already running at ${CFG.url}.`);
+          console.error(`  Open it in your browser, or give this instance its own durable domain:`);
+          console.error(`    node server.js --set-domain <another-name>\n`);
+          process.exit(0); // graceful: it's already up
+        } else {
+          reportPortBusy();
+        }
+      });
+    });
+    probe.on('error', reportPortBusy);
+    probe.on('timeout', () => { probe.destroy(); reportPortBusy(); });
+  });
+
+  function reportPortBusy() {
+    console.error(`\n  Port ${PORT} is already in use by another application.`);
+    console.error(`  Pick a durable local domain + stable port for this instance:`);
+    console.error(`    node server.js --set-domain meeting-notes    (uses <name>.localhost)`);
+    console.error(`  …or set a port explicitly:  PORT=3010 node server.js\n`);
+    process.exit(1);
+  }
+
   server.listen(PORT, HOST, () => {
-    console.log(`\n  Meeting Notes running at  http://${HOST}:${PORT}`);
+    config.writeLock(DATA_DIR, PORT);
+    startWatcher();
+    console.log(`\n  Meeting Notes ${APP_VERSION} running at  ${CFG.url}`);
+    if (CFG.domain) console.log(`  (also reachable at        http://${HOST}:${PORT})`);
     console.log(`  Data directory:           ${DATA_DIR}`);
     console.log(`  (encrypted at rest — set DATA_DIR to a Drive/Box/Dropbox folder to sync)\n`);
   });
+
+  const shutdown = () => { config.clearLock(DATA_DIR); try { server.close(); } catch (_e) {} process.exit(0); };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+  process.on('exit', () => config.clearLock(DATA_DIR));
 }
 
-module.exports = { server, DATA_DIR };
+if (require.main === module) {
+  if (!runCli(process.argv)) startServer();
+}
+
+module.exports = { server, DATA_DIR, CFG };
