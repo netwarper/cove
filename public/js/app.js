@@ -827,6 +827,14 @@
   // Backup / restore + bulk export
   $('downloadBackupBtn').addEventListener('click', function () { downloadUrl(API.backupUrl()); });
   $('bulkExportBtn').addEventListener('click', function () { downloadUrl(API.workspaceZipUrl(state.wsId, $('bulkFormat').value)); });
+  $('verifyBtn').addEventListener('click', async function () {
+    var msg = $('verifyMsg'); msg.textContent = 'Checking…'; msg.style.color = 'var(--muted)';
+    try {
+      var r = await API.verifyIntegrity();
+      if (r.ok) { msg.textContent = '✓ All ' + r.checked + ' files decrypt cleanly.'; msg.style.color = 'var(--muted)'; }
+      else { msg.style.color = 'var(--danger)'; msg.textContent = '⚠ ' + r.corrupt.length + ' of ' + r.checked + ' files are unreadable: ' + r.corrupt.map(function (x) { return x.path; }).join(', '); }
+    } catch (ex) { msg.style.color = 'var(--danger)'; msg.textContent = 'Check failed: ' + ex.message; }
+  });
   $('restoreBtn').addEventListener('click', async function () {
     var f = $('restoreFile').files[0]; if (!f) { $('restoreMsg').textContent = 'Choose a backup file.'; return; }
     try {

@@ -158,6 +158,9 @@ All optional, via environment variables (or a `.env` file):
 | `MAX_BODY` | `33554432` (32 MB) | Max request body (attachments travel as JSON) |
 | `SESSION_TTL` | `240` | Session lifetime in minutes |
 | `COOKIE_SECURE` | `auto` | `auto` adds the `Secure` cookie flag over TLS; `always` / `never` to force |
+| `AUTO_BACKUP_DIR` | _(off)_ | Enable scheduled encrypted backups to this directory (use a different disk/folder) |
+| `AUTO_BACKUP_HOURS` | `24` | Hours between automatic backups |
+| `AUTO_BACKUP_KEEP` | `7` | How many recent backups to retain |
 
 ---
 
@@ -183,6 +186,10 @@ All optional, via environment variables (or a `.env` file):
   `nosniff`, path-traversal-safe IDs, request size limits, and a small HTML
   sanitizer for imported/rendered content.
 - **Trash safety:** deletes are recoverable for 30 days rather than immediate.
+- **Backups & integrity:** optional scheduled encrypted backups (`AUTO_BACKUP_DIR`),
+  and a decrypt-check that finds corrupt files — `node server.js --verify`
+  (or the button in Backup & restore). A single damaged note is skipped rather
+  than breaking the app.
 
 If the endpoint (or a synced Drive/Box/Dropbox copy) is breached, the attacker
 gets only ciphertext.

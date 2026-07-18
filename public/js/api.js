@@ -94,6 +94,7 @@
     importNote: (wsId, payload) => req('POST', '/api/workspaces/' + wsId + '/import', payload),
     exportUrl: (noteId, fmt) => '/api/notes/' + noteId + '/export?format=' + fmt,
 
+    verifyIntegrity: () => req('GET', '/api/verify'),
     listTrash: () => req('GET', '/api/trash'),
     restoreTrash: (id) => req('POST', '/api/trash/' + id + '/restore', {}),
     purgeTrash: (id) => req('DELETE', '/api/trash/' + id),

@@ -24,6 +24,7 @@ const url = require('url');
 const c = require('./lib/crypto');
 const store = require('./lib/store');
 const config = require('./lib/config');
+const backup = require('./lib/backup');
 const { Store } = store;
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -36,6 +37,9 @@ const HOST = CFG.host;
 const MAX_BODY = parseInt(process.env.MAX_BODY, 10) || 32 * 1024 * 1024;
 const SESSION_TTL = (parseInt(process.env.SESSION_TTL, 10) || 240) * 60 * 1000;
 const COOKIE_SECURE = (process.env.COOKIE_SECURE || 'auto').toLowerCase();
+const AUTO_BACKUP_DIR = process.env.AUTO_BACKUP_DIR ? path.resolve(process.env.AUTO_BACKUP_DIR) : null;
+const AUTO_BACKUP_HOURS = parseFloat(process.env.AUTO_BACKUP_HOURS) || 24;
+const AUTO_BACKUP_KEEP = parseInt(process.env.AUTO_BACKUP_KEEP, 10) || 7;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const VAULT_PATH = path.join(DATA_DIR, 'vault.json');
 let APP_VERSION = '0.0.0';
@@ -404,11 +408,12 @@ async function route(s, req, res, pathname, query) {
   if (seg[1] === 'trash' && seg[2] && seg[3] === 'restore' && m === 'POST') return s.restoreNote(safeId(seg[2]));
   if (seg[1] === 'trash' && seg[2] && m === 'DELETE') return s.purgeNote(safeId(seg[2]));
 
-  // favorites, todos, reminders processing, search
+  // favorites, todos, reminders processing, search, integrity
   if (pathname === '/api/favorites' && m === 'GET') return s.listFavorites();
   if (pathname === '/api/todos' && m === 'GET') return s.globalTodos();
   if (pathname === '/api/reminders/process' && m === 'POST') return s.processReminders();
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);
+  if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
 
   throw Object.assign(new Error('not found'), { status: 404 });
 }
@@ -428,6 +433,8 @@ Usage: node server.js [options]
                           and a stable port for THIS data directory, then exit.
   --port <n>              With --set-domain, pin an explicit port instead of a derived one.
   --print-config          Print the resolved host/port/domain for this data directory.
+  --verify                Decrypt-check every file and report any corruption.
+                          Reads the passphrase from MN_PASSPHRASE, or from stdin.
   --help                  Show this help.
 
 Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
@@ -438,6 +445,19 @@ Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
   if (has('--print-config')) {
     const cfg = config.resolve(DATA_DIR);
     console.log(JSON.stringify(cfg, null, 2));
+    return true;
+  }
+
+  if (has('--verify')) {
+    if (!vaultExists()) { console.error('Not initialized — no vault in ' + DATA_DIR); process.exitCode = 1; return true; }
+    let pass = process.env.MN_PASSPHRASE;
+    if (!pass) { try { pass = fs.readFileSync(0, 'utf8').split('\n')[0].trim(); } catch (_e) { pass = ''; } }
+    const dek = c.unlockVault(readVault(), String(pass || ''));
+    if (!dek) { console.error('Could not unlock: set MN_PASSPHRASE or pipe the passphrase to --verify.'); process.exitCode = 1; return true; }
+    const report = new Store(DATA_DIR, dek).verifyIntegrity();
+    console.log(`Checked ${report.checked} encrypted files — ${report.ok ? 'all OK ✓' : report.corrupt.length + ' corrupt:'}`);
+    for (const c2 of report.corrupt) console.log(`  ✗ ${c2.path}: ${c2.error}`);
+    if (!report.ok) process.exitCode = 2;
     return true;
   }
 
@@ -511,11 +531,25 @@ function startServer() {
   server.listen(PORT, HOST, () => {
     config.writeLock(DATA_DIR, PORT);
     startWatcher();
+    startAutoBackup();
     console.log(`\n  Meeting Notes ${APP_VERSION} running at  ${CFG.url}`);
     if (CFG.domain) console.log(`  (also reachable at        http://${HOST}:${PORT})`);
     console.log(`  Data directory:           ${DATA_DIR}`);
+    if (AUTO_BACKUP_DIR) console.log(`  Auto-backup:              every ${AUTO_BACKUP_HOURS}h → ${AUTO_BACKUP_DIR} (keep ${AUTO_BACKUP_KEEP})`);
     console.log(`  (encrypted at rest — set DATA_DIR to a Drive/Box/Dropbox folder to sync)\n`);
   });
+
+  function startAutoBackup() {
+    if (!AUTO_BACKUP_DIR) return;
+    const run = () => {
+      try {
+        const r = backup.runAutoBackup(DATA_DIR, AUTO_BACKUP_DIR, AUTO_BACKUP_KEEP);
+        console.log(`auto-backup written: ${path.basename(r.file)}${r.removed.length ? ` (pruned ${r.removed.length})` : ''}`);
+      } catch (e) { console.error('auto-backup failed:', e.message); }
+    };
+    setTimeout(run, 5000).unref(); // first backup shortly after startup
+    setInterval(run, AUTO_BACKUP_HOURS * 3600 * 1000).unref();
+  }
 
   const shutdown = () => { config.clearLock(DATA_DIR); try { server.close(); } catch (_e) {} process.exit(0); };
   process.on('SIGINT', shutdown);

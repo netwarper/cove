@@ -3,8 +3,8 @@
 This file captures how to re-generate this application from a prompt, so the
 same app can be reproduced or evolved consistently.
 
-- **App version:** 1.2.0 (see `package.json`)
-- **Prompt version:** v3
+- **App version:** 1.3.0 (see `package.json`)
+- **Prompt version:** v4
 - **Date:** 2026-07-18
 - **Stack chosen:** Node.js standard library only (zero runtime dependencies) +
   vanilla HTML/CSS/JS frontend (no build step).
@@ -115,7 +115,7 @@ npm run check   # 0 issues
 npm test        # functional + security suites, 0 failures
 ```
 
-At the latest version: **quality 0 issues · functional 61/61 · security 21/21 · config 14/14.**
+At the latest version: **quality 0 issues · functional 64/64 · security 21/21 · config 14/14 · backup 10/10.**
 
 ---
 
@@ -187,8 +187,28 @@ Implemented:
    `/snooze` into an empty reminder, and reminder-sourced todos being both
    carried forward and re-injected (duplicates).
 
+## Follow-up prompt (v4 → 1.3.0) — data-safety batch
+
+Small, high-value hardening: scheduled backups, corruption resilience, CI.
+
+1. **Scheduled encrypted backups** (`lib/backup.js` + server timer): if
+   `AUTO_BACKUP_DIR` is set, write the portable encrypted bundle on an interval
+   (`AUTO_BACKUP_HOURS`) and keep the newest `AUTO_BACKUP_KEEP`. No key needed —
+   it copies already-encrypted files.
+2. **Corruption resilience**: a `_readEncSafe` reader lets every scanning loop
+   skip a damaged `.enc` file (partial cloud-sync write, disk error) instead of
+   throwing, so one bad note never breaks the app. `verifyIntegrity()` decrypt-
+   checks every file; exposed as `GET /api/verify`, a Backup-modal button, and a
+   `node server.js --verify` CLI (passphrase via `MN_PASSPHRASE` or stdin).
+3. **CI**: `.github/workflows/ci.yml` runs `npm run check` + `npm test` on Node
+   18/20/22 — no install step (zero dependencies).
+
 ## Changelog
 
+- **v4 (1.3.0, 2026-07-18):** Scheduled encrypted backups; corruption
+  resilience + `verifyIntegrity` (endpoint, UI, `--verify` CLI); GitHub Actions
+  CI. Verified: quality 0 · functional 64/64 · security 21/21 · config 14/14 ·
+  backup 10/10.
 - **v3 (1.2.0, 2026-07-18):** Durable per-instance domain/port + graceful
   multi-instance start; PWA/offline; live-sync (SSE) + keep-both conflict
   resolution; version history; encrypted search index; reminder time/end/snooze;

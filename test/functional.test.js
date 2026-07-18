@@ -249,6 +249,22 @@ const t = harness('functional');
     r = await c.request('GET', '/api/workspaces/general/export?format=md');
     t.ok(r.headers['content-type'].includes('application/zip'), 'workspace bulk export returns a zip');
     t.ok(r.raw.length > 22 && r.raw.subarray(0, 2).toString() === 'PK', 'zip has the PK signature');
+
+    // --- integrity: healthy vault verifies clean ---
+    r = await c.request('GET', '/api/verify');
+    t.ok(r.body.ok && r.body.checked > 0, 'verify reports a healthy vault as OK');
+
+    // --- corruption resilience: a damaged note is skipped, and reported ---
+    r = await c.request('POST', '/api/workspaces', { name: 'Resil' });
+    const resilWs = r.body.id;
+    r = await c.request('GET', '/api/workspaces/' + resilWs + '/current');
+    const resilNote = r.body.id;
+    const badPath = path.join(DATA_DIR, 'ws', resilWs, 'notes', resilNote + '.json.enc');
+    fs.writeFileSync(badPath, Buffer.from('MN1 this is not valid ciphertext at all')); // corrupt it
+    r = await c.request('GET', '/api/verify');
+    t.ok(!r.body.ok && r.body.corrupt.some((x) => x.path.includes(resilNote)), 'verify reports the corrupted note');
+    r = await c.request('GET', '/api/workspaces/' + resilWs + '/notes');
+    t.ok(r.status === 200 && !r.body.some((x) => x.id === resilNote), 'listing skips the corrupt note instead of failing');
   } catch (ex) {
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {

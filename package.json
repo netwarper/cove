@@ -1,15 +1,16 @@
 {
   "name": "meeting-notes",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Self-contained, encrypted meeting-notes application. Zero runtime dependencies, portable, works over cloud-sync folders (Google Drive, Box, Dropbox).",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "test": "node test/functional.test.js && node test/security.test.js && node test/config.test.js",
+    "test": "node test/functional.test.js && node test/security.test.js && node test/config.test.js && node test/backup.test.js",
     "test:functional": "node test/functional.test.js",
     "test:security": "node test/security.test.js",
     "test:config": "node test/config.test.js",
+    "test:backup": "node test/backup.test.js",
     "check": "node scripts/check-quality.js",
     "verify": "npm run check && npm test"
   },
