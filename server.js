@@ -25,6 +25,7 @@ const c = require('./lib/crypto');
 const store = require('./lib/store');
 const config = require('./lib/config');
 const backup = require('./lib/backup');
+const viewer = require('./lib/viewer');
 const { Store } = store;
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -320,6 +321,16 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    if (pathname === '/api/viewer' && req.method === 'GET') {
+      const data = new Store(DATA_DIR, session.key).buildViewerData();
+      const html = viewer.renderHTML(data);
+      try { viewer.writeViewer(DATA_DIR, data); } catch (_e) { /* also drop a copy in DATA_DIR to sync */ }
+      return send(res, 200, html, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${viewer.OUTPUT_NAME}"`,
+      });
+    }
+
     const result = await route(s, req, res, pathname, parsed.query);
     if (result !== undefined) sendJSON(res, 200, result);
   } catch (err) {
@@ -435,6 +446,9 @@ Usage: node server.js [options]
   --print-config          Print the resolved host/port/domain for this data directory.
   --verify                Decrypt-check every file and report any corruption.
                           Reads the passphrase from MN_PASSPHRASE, or from stdin.
+  --build-viewer          Write a standalone, read-only offline viewer HTML into
+                          the data directory (opens on a phone, no server needed).
+                          With MN_PASSPHRASE set it also embeds inline images.
   --help                  Show this help.
 
 Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
@@ -458,6 +472,21 @@ Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
     console.log(`Checked ${report.checked} encrypted files — ${report.ok ? 'all OK ✓' : report.corrupt.length + ' corrupt:'}`);
     for (const c2 of report.corrupt) console.log(`  ✗ ${c2.path}: ${c2.error}`);
     if (!report.ok) process.exitCode = 2;
+    return true;
+  }
+
+  if (has('--build-viewer')) {
+    if (!vaultExists()) { console.error('Not initialized — no vault in ' + DATA_DIR); process.exitCode = 1; return true; }
+    let data = null;
+    let pass = process.env.MN_PASSPHRASE;
+    if (!pass) { try { pass = fs.readFileSync(0, 'utf8').split('\n')[0].trim(); } catch (_e) { pass = ''; } }
+    if (pass) {
+      const dek = c.unlockVault(readVault(), String(pass));
+      if (dek) data = new Store(DATA_DIR, dek).buildViewerData();
+    }
+    if (!data) { data = viewer.collectData(DATA_DIR); console.log('(no/invalid passphrase — building without inline images)'); }
+    const out = viewer.writeViewer(DATA_DIR, data);
+    console.log('Offline viewer written: ' + out);
     return true;
   }
 
@@ -546,6 +575,9 @@ function startServer() {
         const r = backup.runAutoBackup(DATA_DIR, AUTO_BACKUP_DIR, AUTO_BACKUP_KEEP);
         console.log(`auto-backup written: ${path.basename(r.file)}${r.removed.length ? ` (pruned ${r.removed.length})` : ''}`);
       } catch (e) { console.error('auto-backup failed:', e.message); }
+      // Keep a fresh offline viewer in the (synced) data dir. Keyless build, so
+      // it omits inline attachment images; the in-app download includes them.
+      try { viewer.writeViewer(DATA_DIR, viewer.collectData(DATA_DIR)); } catch (_e) { /* best effort */ }
     };
     setTimeout(run, 5000).unref(); // first backup shortly after startup
     setInterval(run, AUTO_BACKUP_HOURS * 3600 * 1000).unref();

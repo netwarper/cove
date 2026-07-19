@@ -3,6 +3,7 @@
 data/
 *.enc
 vault.json
+meeting-notes-viewer.html
 
 # Local environment overrides
 .env

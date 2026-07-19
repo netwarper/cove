@@ -39,6 +39,7 @@
     changePassphrase: (oldPassphrase, newPassphrase) => req('POST', '/api/passphrase', { oldPassphrase, newPassphrase }),
     regenerateRecovery: () => req('POST', '/api/recovery/regenerate'),
     backupUrl: () => '/api/backup',
+    viewerUrl: () => '/api/viewer',
     restore: (bundle) => req('POST', '/api/restore', { bundle }),
 
     getSettings: () => req('GET', '/api/settings'),

@@ -3,8 +3,8 @@
 This file captures how to re-generate this application from a prompt, so the
 same app can be reproduced or evolved consistently.
 
-- **App version:** 1.4.0 (see `package.json`)
-- **Prompt version:** v5
+- **App version:** 1.5.0 (see `package.json`)
+- **Prompt version:** v6
 - **Date:** 2026-07-19
 - **Stack chosen:** Node.js standard library only (zero runtime dependencies) +
   vanilla HTML/CSS/JS frontend (no build step).
@@ -115,7 +115,7 @@ npm run check   # 0 issues
 npm test        # functional + security suites, 0 failures
 ```
 
-At the latest version: **quality 0 issues · functional 67/67 · security 21/21 · config 14/14 · backup 10/10.**
+At the latest version: **quality 0 issues · functional 67/67 · security 21/21 · config 14/14 · backup 10/10 · viewer 17/17.**
 
 ---
 
@@ -225,8 +225,34 @@ Small, high-value hardening: scheduled backups, corruption resilience, CI.
 8. **Layouts**: kept the stacked "rows" layout; the other is now To-Do +
    Reminders on one row, then Carryover (full width), then Meeting Notes (full).
 
+## Follow-up prompt (v6 → 1.5.0) — offline phone viewer
+
+Goal: read notes on an iPhone when the server only runs locally on a Mac but
+data syncs to Google Drive / Box. Chosen approach: a single self-contained,
+read-only `meeting-notes-viewer.html` that decrypts on-device.
+
+- `public/viewer/decrypt.js` reimplements the server's crypto for the browser:
+  scrypt (N=16384,r=8,p=1), AES-256-GCM (MN1 layout), envelope unwrap. Uses
+  WebCrypto when available, but ships a **pure-JS fallback** (SHA-256, HMAC,
+  PBKDF2, AES-256, GCM/GHASH) because **iOS Safari doesn't expose
+  `crypto.subtle` on `file://`** — the exact context when opening the file from
+  Files/Drive. Both paths are proven byte-identical to `lib/crypto.js` in tests.
+- `public/viewer/{viewer.js,viewer.css}` — mobile read-only UI (unlock, list,
+  search, note view, inline images decrypted to blob URLs).
+- `lib/viewer.js` — `collectData` (keyless: bundles vault key-slots + index +
+  note ciphertext) and `renderHTML` (inlines assets + escaped `MN_DATA`).
+  `Store.buildViewerData()` enriches with image-attachment ciphertext.
+  The embedded payload is all ciphertext — nothing readable without the passphrase.
+- Server: `GET /api/viewer` (also writes a copy into DATA_DIR to sync),
+  `--build-viewer` CLI, and auto-refresh on each scheduled-backup run.
+
 ## Changelog
 
+- **v6 (1.5.0, 2026-07-19):** Offline phone viewer — self-contained, read-only
+  `meeting-notes-viewer.html` that decrypts on-device (WebCrypto + pure-JS
+  fallback for iOS `file://`), with inline images; download button, `--build-viewer`
+  CLI, and auto-refresh with scheduled backups. Verified: quality 0 · functional
+  67/67 · security 21/21 · config 14/14 · backup 10/10 · viewer 17/17.
 - **v5 (1.4.0, 2026-07-19):** UX pass — in-app dialogs replace native popups;
   sidebar workspace picker + quick favorite/delete; removed pin and free-form;
   content-revision conflict detection (fixes single-tab false conflicts) with a

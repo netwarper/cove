@@ -874,6 +874,7 @@
   // Backup / restore + bulk export
   $('downloadBackupBtn').addEventListener('click', function () { downloadUrl(API.backupUrl()); });
   $('bulkExportBtn').addEventListener('click', function () { downloadUrl(API.workspaceZipUrl(state.wsId, $('bulkFormat').value)); });
+  $('viewerBtn').addEventListener('click', function () { downloadUrl(API.viewerUrl()); });
   $('verifyBtn').addEventListener('click', async function () {
     var msg = $('verifyMsg'); msg.textContent = 'Checking…'; msg.style.color = 'var(--muted)';
     try {

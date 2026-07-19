@@ -118,6 +118,32 @@ node server.js --print-config          # show the resolved name/domain/port
   stack trace, and never silently grabs a random port (which would break your
   durable URL).
 
+## View on your phone (offline viewer)
+
+Because your notes live encrypted in a synced folder (Google Drive / Box /
+Dropbox), you can read them on a phone **without the Mac running and without any
+network** — using the built-in offline viewer.
+
+It's a single self-contained HTML file, `meeting-notes-viewer.html`, that
+**decrypts on the device** with your passphrase (or recovery key). Everything —
+the decryptor, the UI, and your *encrypted* notes — is inlined into that one
+file, so it reveals nothing without your passphrase.
+
+**Get it:**
+- In the app: **⋮ → Backup / restore → Download offline viewer**, or
+- `node server.js --build-viewer` (set `MN_PASSPHRASE` to also embed inline images), or
+- automatically: whenever scheduled backups run (`AUTO_BACKUP_DIR`), a fresh copy
+  is written into your data folder so it syncs to your phone on its own.
+
+**Open it on iPhone/iPad:** in the Google Drive / Box / Files app, tap
+`meeting-notes-viewer.html` → open in Safari → enter your passphrase. It works
+as a local file with no server, because it ships a **pure-JavaScript crypto
+fallback** for the case where iOS Safari doesn't expose WebCrypto on `file://`.
+
+It's **read-only** (viewing, search, workspaces, inline images). To edit, use
+the full app. The snapshot is only as current as your folder last synced, so
+grab a fresh copy before you head offline.
+
 ## Portability
 
 The app is intentionally easy to relocate:
