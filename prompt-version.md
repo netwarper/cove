@@ -248,6 +248,8 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.5.1 (2026-07-19):** Replace deprecated `url.parse()` (DEP0169) with the
+  WHATWG `URL` API in the request router; path-traversal protection unchanged.
 - **v6 (1.5.0, 2026-07-19):** Offline phone viewer — self-contained, read-only
   `meeting-notes-viewer.html` that decrypts on-device (WebCrypto + pure-JS
   fallback for iOS `file://`), with inline images; download button, `--build-viewer`

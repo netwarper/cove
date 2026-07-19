@@ -20,7 +20,6 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const url = require('url');
 const c = require('./lib/crypto');
 const store = require('./lib/store');
 const config = require('./lib/config');
@@ -183,8 +182,13 @@ function serveStatic(req, res, pathname) {
 
 // ---- request router ----------------------------------------------------
 const server = http.createServer(async (req, res) => {
-  const parsed = url.parse(req.url, true);
-  const pathname = parsed.pathname;
+  // WHATWG URL API (url.parse is deprecated — DEP0169). The base is a dummy;
+  // only pathname + query are used.
+  let reqUrl;
+  try { reqUrl = new URL(req.url, 'http://localhost'); }
+  catch (_e) { return send(res, 400, 'bad request'); }
+  const pathname = reqUrl.pathname;
+  const query = Object.fromEntries(reqUrl.searchParams);
 
   try {
     if (!pathname.startsWith('/api/')) return serveStatic(req, res, pathname);
@@ -331,7 +335,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    const result = await route(s, req, res, pathname, parsed.query);
+    const result = await route(s, req, res, pathname, query);
     if (result !== undefined) sendJSON(res, 200, result);
   } catch (err) {
     const status = err.status || 500;
