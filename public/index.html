@@ -47,10 +47,6 @@
   <div id="app" class="app hidden">
     <header class="topbar">
       <div class="brand">🗒️ <span>Meeting Notes</span></div>
-      <div class="ws-picker">
-        <select id="workspaceSelect" title="Workspace" aria-label="Workspace"></select>
-        <button id="manageWs" class="icon-btn" title="Manage workspaces" aria-label="Manage workspaces">⚙︎</button>
-      </div>
       <div class="search-wrap">
         <input id="globalSearch" type="search" placeholder="Search all notes…  (try tag:planning)" aria-label="Search all notes">
       </div>
@@ -60,7 +56,7 @@
         <button id="navAgenda" class="tab" title="Agenda (due items &amp; reminders)">📅</button>
         <button id="navFavs" class="tab" title="Favorites">★</button>
         <button id="notifyBtn" class="icon-btn" title="Enable reminder notifications" aria-label="Enable notifications">🔔</button>
-        <button id="layoutToggle" class="icon-btn" title="Toggle columns / rows layout" aria-label="Toggle layout">☷</button>
+        <button id="layoutToggle" class="icon-btn" title="Toggle layout" aria-label="Toggle layout">☷</button>
         <div class="more-wrap">
           <button id="moreBtn" class="icon-btn" title="More" aria-label="More actions">⋮</button>
           <div id="moreMenu" class="menu hidden">
@@ -76,6 +72,13 @@
 
     <div class="body">
       <aside class="sidebar">
+        <div class="ws-bar">
+          <label for="workspaceSelect" class="ws-label">Workspace</label>
+          <div class="ws-row">
+            <select id="workspaceSelect" title="Switch workspace" aria-label="Workspace"></select>
+            <button id="manageWs" class="icon-btn" title="Add / rename / delete workspaces" aria-label="Manage workspaces">⚙︎</button>
+          </div>
+        </div>
         <div class="sidebar-head">
           <span>Notes</span>
           <div class="new-note-wrap">
@@ -123,7 +126,6 @@
               </div>
               <button id="noteMoreBtn" class="icon-btn" title="More note actions" aria-label="More note actions">⋯</button>
               <div id="noteMoreMenu" class="menu hidden">
-                <button data-note="pin">📌 Pin / unpin</button>
                 <button data-note="archive">🗄 Archive / unarchive</button>
                 <button data-note="history">🕐 Version history</button>
                 <button data-note="move">➜ Move to workspace…</button>
@@ -167,21 +169,9 @@
             </div>
 
             <div class="section" data-sec="meeting">
-              <div class="section-title-row">
-                <h2>📝 Meeting Notes</h2>
-                <div class="mode-toggle">
-                  <button id="modeFlow" class="mini active">Flow</button>
-                  <button id="modeFree" class="mini">Free-form</button>
-                </div>
-              </div>
-              <div id="flowWrap">
-                <div class="rte-toolbar" data-target="meetingEditor"></div>
-                <div id="meetingEditor" class="rte" contenteditable="true" aria-label="Meeting notes"></div>
-              </div>
-              <div id="freeWrap" class="hidden">
-                <p class="muted tiny">Double-click anywhere to add a text box. Drag to move.</p>
-                <div id="freeCanvas" class="free-canvas"></div>
-              </div>
+              <h2>📝 Meeting Notes</h2>
+              <div class="rte-toolbar" data-target="meetingEditor"></div>
+              <div id="meetingEditor" class="rte" contenteditable="true" aria-label="Meeting notes"></div>
               <div class="attachments">
                 <div class="attach-head">
                   <span>Attachments</span>
@@ -365,6 +355,16 @@
         <button id="copyRecoveryBtn" class="sm">Copy</button>
         <button class="modal-close primary">I’ve saved it</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ---------- In-app dialog (replaces browser alert/confirm/prompt) ---------- -->
+  <div id="dialogLayer" class="dialog-layer hidden">
+    <div class="dialog" role="dialog" aria-modal="true">
+      <h3 id="dialogTitle" class="hidden"></h3>
+      <div id="dialogMessage" class="dialog-message"></div>
+      <input id="dialogInput" class="dialog-input hidden">
+      <div id="dialogButtons" class="dialog-buttons"></div>
     </div>
   </div>
 

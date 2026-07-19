@@ -3,9 +3,9 @@
 This file captures how to re-generate this application from a prompt, so the
 same app can be reproduced or evolved consistently.
 
-- **App version:** 1.3.0 (see `package.json`)
-- **Prompt version:** v4
-- **Date:** 2026-07-18
+- **App version:** 1.4.0 (see `package.json`)
+- **Prompt version:** v5
+- **Date:** 2026-07-19
 - **Stack chosen:** Node.js standard library only (zero runtime dependencies) +
   vanilla HTML/CSS/JS frontend (no build step).
 
@@ -115,7 +115,7 @@ npm run check   # 0 issues
 npm test        # functional + security suites, 0 failures
 ```
 
-At the latest version: **quality 0 issues · functional 64/64 · security 21/21 · config 14/14 · backup 10/10.**
+At the latest version: **quality 0 issues · functional 67/67 · security 21/21 · config 14/14 · backup 10/10.**
 
 ---
 
@@ -203,8 +203,36 @@ Small, high-value hardening: scheduled backups, corruption resilience, CI.
 3. **CI**: `.github/workflows/ci.yml` runs `npm run check` + `npm test` on Node
    18/20/22 — no install step (zero dependencies).
 
+## Follow-up prompt (v5 → 1.4.0) — UX pass
+
+1. **In-app dialogs** replace every native `alert`/`confirm`/`prompt` (a
+   promise-based `dialog.alert/confirm/prompt/choose`, exposed on `window` so
+   `editor.js` uses it too). Editor insertions save/restore the caret Range so
+   they still land correctly after a modal takes focus.
+2. **Workspace picker** moved into the sidebar under a "WORKSPACE" label (clearer
+   than the unlabelled top-bar dropdown).
+3. **Sidebar quick actions**: hover a note to favorite (★) or delete (🗑) it.
+4. **Removed** pin/unpin and the free-form note mode + its Flow/Free-form toggle.
+5. **Conflict detection fixed** (the single-tab false 409): notes now carry a
+   `rev` that advances only on real content edits. Housekeeping writes
+   (reminder injection, favoriting) bump `updatedAt` but not `rev`, so they no
+   longer trigger a conflict; the save guard and SSE refresh compare `rev`. The
+   conflict dialog is now a 3-way choice (Keep both / Discard mine / Cancel).
+6. **Due-date affordance** clarified: 📅 hint reveals on hover when empty, shows
+   "📅 MM-DD" as a chip when set, with explanatory tooltips.
+7. **Active formatters**: toolbar buttons light up via `queryCommandState` as the
+   selection's bold/italic/underline/strike/list state changes.
+8. **Layouts**: kept the stacked "rows" layout; the other is now To-Do +
+   Reminders on one row, then Carryover (full width), then Meeting Notes (full).
+
 ## Changelog
 
+- **v5 (1.4.0, 2026-07-19):** UX pass — in-app dialogs replace native popups;
+  sidebar workspace picker + quick favorite/delete; removed pin and free-form;
+  content-revision conflict detection (fixes single-tab false conflicts) with a
+  3-way resolver; clearer due-date control; active formatter states; revised
+  two-row layout. Verified: quality 0 · functional 67/67 · security 21/21 ·
+  config 14/14 · backup 10/10.
 - **v4 (1.3.0, 2026-07-18):** Scheduled encrypted backups; corruption
   resilience + `verifyIntegrity` (endpoint, UI, `--verify` CLI); GitHub Actions
   CI. Verified: quality 0 · functional 64/64 · security 21/21 · config 14/14 ·

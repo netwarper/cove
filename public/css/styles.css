@@ -86,14 +86,22 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .link-btn { background: none; border: 0; color: var(--brand); font-weight: 600; padding: 4px 0; }
 .note-list { list-style: none; margin: 0; padding: 4px 8px; overflow: auto; flex: 1; }
 .note-list li {
-  padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
-  border: 1px solid transparent;
+  padding: 8px 10px; border-radius: 8px; margin-bottom: 2px; border: 1px solid transparent;
+  display: flex; align-items: center; gap: 6px;
 }
 .note-list li:hover { background: var(--panel-2); }
 .note-list li.active { background: var(--panel-2); border-color: var(--brand); }
-.note-list .nl-title { font-weight: 600; font-size: 13px; }
-.note-list .nl-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; }
+.note-list .nl-main { flex: 1; min-width: 0; cursor: pointer; }
+.note-list .nl-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.note-list .nl-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
 .note-list .nl-fav { color: #f5a623; }
+.nl-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.note-list li:hover .nl-actions, .nl-star.on { opacity: 1; }
+.nl-act { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 2px 3px; border-radius: 5px; line-height: 1; }
+.nl-act:hover { background: var(--line); }
+.nl-star { color: #f5a623; }
+.nl-star.on { opacity: 1; }
+.nl-del { color: var(--danger); }
 
 .main { flex: 1; overflow: auto; padding: 18px 22px; min-width: 0; }
 .view h1 { font-size: 20px; margin: 4px 0 6px; }
@@ -116,10 +124,15 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .menu button:hover { background: var(--panel-2); }
 
 /* ---- Sections ---- */
+/* Two layouts:
+   .rows    — every section stacked vertically.
+   .columns — To-Do + Reminders side by side on the first row, then Carryover
+              (full width), then Meeting Notes (full width). */
 .sections { display: grid; gap: 14px; }
-.sections.columns { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .sections.rows { grid-template-columns: 1fr; }
-@media (max-width: 1100px) { .sections.columns { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+.sections.columns { grid-template-columns: 1fr 1fr; }
+.sections.columns [data-sec="carryover"],
+.sections.columns [data-sec="meeting"] { grid-column: 1 / -1; }
 @media (max-width: 680px) { .sections.columns { grid-template-columns: 1fr; } }
 .section {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
@@ -164,6 +177,7 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
   background: var(--panel-2); color: var(--ink); font-size: 13px; padding: 0;
 }
 .rte-toolbar button:hover { border-color: var(--brand); }
+.rte-toolbar button.active { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .rte {
   flex: 1; min-height: 140px; border: 1px solid var(--line); border-radius: 8px; padding: 10px;
   background: var(--panel-2); color: var(--ink); overflow: auto;
@@ -244,8 +258,12 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .nl-tags, .sr-tags { color: var(--brand); }
 
 /* ---- To-do due + drag ---- */
-.todo-due { border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 0 2px; }
-.todo-list li.overdue .todo-due { color: var(--danger); font-weight: 700; }
+.todo-due { border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 1px 5px; border-radius: 10px; white-space: nowrap; }
+.todo-due.set { background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); }
+.todo-due.empty { opacity: 0; transition: opacity .12s; }
+.todo-list li:hover .todo-due.empty { opacity: .7; }
+.todo-due:hover { border-color: var(--brand); }
+.todo-list li.overdue .todo-due.set { color: var(--danger); font-weight: 700; border-color: var(--danger); }
 .todo-list li.overdue .todo-text { color: var(--danger); }
 .todo-list li.dragging { opacity: .5; }
 .todo-list li[draggable="true"] { cursor: grab; }
@@ -311,6 +329,28 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 
 #instanceInfo code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 .note-list .nl-tags { color: var(--brand); font-size: 11px; }
+
+/* ---- Sidebar workspace picker ---- */
+.ws-bar { padding: 12px 12px 4px; }
+.ws-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+.ws-row { display: flex; gap: 6px; }
+.ws-row #workspaceSelect {
+  flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--ink); font-weight: 600;
+}
+
+/* ---- In-app dialogs ---- */
+.dialog-layer { position: fixed; inset: 0; background: rgba(10,15,30,.5); display: grid; place-items: center; z-index: 70; }
+.dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(420px, 92vw); box-shadow: var(--shadow); }
+.dialog h3 { margin: 0 0 10px; font-size: 16px; }
+.dialog-message { color: var(--ink); font-size: 14px; white-space: pre-wrap; line-height: 1.5; }
+.dialog-input { width: 100%; margin-top: 12px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
+.dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.dlg-btn { padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); font-weight: 600; cursor: pointer; }
+.dlg-btn:hover { border-color: var(--brand); }
+.dlg-btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.dlg-btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.dlg-btn.danger.primary { background: var(--danger); }
 
 /* ---- Print ---- */
 @media print {

@@ -250,6 +250,21 @@ const t = harness('functional');
     t.ok(r.headers['content-type'].includes('application/zip'), 'workspace bulk export returns a zip');
     t.ok(r.raw.length > 22 && r.raw.subarray(0, 2).toString() === 'PK', 'zip has the PK signature');
 
+    // --- conflict detection uses content revision, not housekeeping writes ---
+    r = await c.request('GET', '/api/workspaces/general/current');
+    const revNote = r.body.id;
+    r = await c.request('PUT', '/api/notes/' + revNote, { meetingNotes: '<p>rev base</p>' });
+    const rev1 = r.body.rev;
+    // favoriting must NOT advance the content revision (so it won't cause a false conflict)
+    r = await c.request('POST', '/api/notes/' + revNote + '/favorite', { favorite: true });
+    t.eq(r.body.rev, rev1, 'favoriting does not bump the content revision');
+    // a save with the still-current baseRev succeeds even after the favorite write
+    r = await c.request('PUT', '/api/notes/' + revNote, { meetingNotes: '<p>after fav</p>', baseRev: rev1 });
+    t.ok(r.status === 200 && r.body.rev === rev1 + 1, 'save after favoriting is not a false conflict');
+    // a genuinely stale baseRev is rejected
+    r = await c.request('PUT', '/api/notes/' + revNote, { meetingNotes: '<p>stale</p>', baseRev: rev1 });
+    t.eq(r.status, 409, 'a stale content revision is detected as a conflict');
+
     // --- integrity: healthy vault verifies clean ---
     r = await c.request('GET', '/api/verify');
     t.ok(r.body.ok && r.body.checked > 0, 'verify reports a healthy vault as OK');

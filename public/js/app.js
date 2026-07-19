@@ -5,6 +5,58 @@
   var API = window.API;
   var IDLE_MS = 15 * 60 * 1000;
 
+  // ---------------- In-app dialogs (replace native alert/confirm/prompt) ----------------
+  function showDialog(opts) {
+    return new Promise(function (resolve) {
+      var layer = $('dialogLayer');
+      $('dialogTitle').textContent = opts.title || '';
+      $('dialogTitle').classList.toggle('hidden', !opts.title);
+      $('dialogMessage').textContent = opts.message || '';
+      var inp = $('dialogInput');
+      if (opts.input) { inp.classList.remove('hidden'); inp.value = opts.default || ''; inp.placeholder = opts.placeholder || ''; inp.type = opts.inputType || 'text'; }
+      else inp.classList.add('hidden');
+      var btnWrap = $('dialogButtons'); btnWrap.innerHTML = '';
+      function done(val) { layer.classList.add('hidden'); document.removeEventListener('keydown', onKey, true); resolve(val); }
+      (opts.buttons || []).forEach(function (b) {
+        var el = document.createElement('button');
+        el.textContent = b.label;
+        el.className = 'dlg-btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : '');
+        el.addEventListener('click', function () { done(b.returns === 'input' ? inp.value : b.returns); });
+        btnWrap.appendChild(el);
+      });
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); done(opts.cancelValue); }
+        else if (e.key === 'Enter' && opts.input) { e.preventDefault(); done(inp.value); }
+        else if (e.key === 'Enter' && !opts.input) { var p = (opts.buttons || []).filter(function (b) { return b.primary; })[0]; if (p) done(p.returns); }
+      }
+      document.addEventListener('keydown', onKey, true);
+      layer.classList.remove('hidden');
+      setTimeout(function () { if (opts.input) inp.focus(); else { var pb = btnWrap.querySelector('.primary') || btnWrap.querySelector('button'); if (pb) pb.focus(); } }, 30);
+    });
+  }
+  var dialog = {
+    alert: function (message, title) { return showDialog({ title: title, message: message, buttons: [{ label: 'OK', returns: true, primary: true }], cancelValue: true }); },
+    confirm: function (message, opts) {
+      opts = opts || {};
+      return showDialog({
+        title: opts.title, message: message, cancelValue: false,
+        buttons: [{ label: opts.cancelText || 'Cancel', returns: false }, { label: opts.okText || 'OK', returns: true, primary: true, danger: opts.danger }],
+      });
+    },
+    prompt: function (message, opts) {
+      opts = opts || {};
+      return showDialog({
+        title: opts.title, message: message, input: true, inputType: opts.inputType, default: opts.default, placeholder: opts.placeholder, cancelValue: null,
+        buttons: [{ label: 'Cancel', returns: null }, { label: opts.okText || 'OK', returns: 'input', primary: true }],
+      });
+    },
+    choose: function (message, buttons, opts) {
+      opts = opts || {};
+      return showDialog({ title: opts.title, message: message, cancelValue: opts.cancelValue !== undefined ? opts.cancelValue : null, buttons: buttons });
+    },
+  };
+  window.dialog = dialog; // so editor.js can use it too
+
   var state = {
     initialized: false,
     workspaces: [],
@@ -14,7 +66,6 @@
     settings: { layout: 'columns' },
     view: 'note',
     saveTimer: null,
-    freeMode: false,
     notify: false,
     dragTodoId: null,
   };
@@ -111,7 +162,9 @@
         if (state.saveTimer) return;
         if (state.view === 'note' && state.note && data.noteId && data.noteId === state.note.id) {
           API.getNote(state.note.id).then(function (fresh) {
-            if (fresh.updatedAt !== state.note.updatedAt) { state.note = fresh; renderNote(); setSaveStatus('Updated from another device'); }
+            // Only refresh on a genuine content change (rev), not housekeeping writes.
+            if ((fresh.rev || 0) !== (state.note.rev || 0)) { state.note = fresh; renderNote(); setSaveStatus('Updated from another device'); }
+            else { state.note.updatedAt = fresh.updatedAt; }
           }).catch(function () {});
         }
         if (state.view === 'note') renderNoteList();
@@ -159,8 +212,6 @@
     renderTodos();
     $('carryoverEditor').innerHTML = n.carryover || '';
     $('meetingEditor').innerHTML = n.meetingNotes || '';
-    setFreeMode(false);
-    renderFreeform();
     renderAttachments();
     setSaveStatus('');
     updateWordCount();
@@ -195,11 +246,35 @@
       var li = document.createElement('li');
       if (state.note && nm.id === state.note.id && state.view === 'note') li.classList.add('active');
       var tags = (nm.tags || []).length ? '<span class="nl-tags">' + nm.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</span>' : '';
-      li.innerHTML =
-        '<div class="nl-title">' + (nm.favorite ? '<span class="nl-fav">★</span> ' : '') + esc(nm.displayTitle) + '</div>' +
+      var main = document.createElement('div'); main.className = 'nl-main';
+      main.innerHTML =
+        '<div class="nl-title">' + esc(nm.displayTitle) + '</div>' +
         '<div class="nl-meta"><span>' + nm.openTodoCount + ' open</span>' +
         (nm.attachmentCount ? '<span>📎 ' + nm.attachmentCount + '</span>' : '') + tags + '</div>';
-      li.addEventListener('click', function () { openNote(nm.id); });
+      main.addEventListener('click', function () { openNote(nm.id); });
+
+      var actions = document.createElement('div'); actions.className = 'nl-actions';
+      var star = document.createElement('button');
+      star.className = 'nl-act nl-star' + (nm.favorite ? ' on' : '');
+      star.textContent = nm.favorite ? '★' : '☆';
+      star.title = nm.favorite ? 'Unfavorite' : 'Favorite';
+      star.addEventListener('click', async function (e) {
+        e.stopPropagation();
+        var s = await API.setFavorite(nm.id, !nm.favorite);
+        if (state.note && state.note.id === nm.id) { state.note.favorite = s.favorite; state.note.updatedAt = s.updatedAt; $('favBtn').textContent = s.favorite ? '★' : '☆'; }
+        renderNoteList();
+      });
+      var del = document.createElement('button');
+      del.className = 'nl-act nl-del'; del.textContent = '🗑'; del.title = 'Delete (to trash)';
+      del.addEventListener('click', async function (e) {
+        e.stopPropagation();
+        if (!(await dialog.confirm('Move “' + nm.displayTitle + '” to trash?', { okText: 'Move to trash', danger: true }))) return;
+        await API.deleteNote(nm.id);
+        if (state.note && state.note.id === nm.id) await loadCurrentNote(); else renderNoteList();
+      });
+      actions.appendChild(star); actions.appendChild(del);
+
+      li.appendChild(main); li.appendChild(actions);
       ul.appendChild(li);
     });
   }
@@ -244,8 +319,10 @@
       cb.addEventListener('change', function () { toggleTodo(t.id, cb.checked); });
       var span = document.createElement('span'); span.className = 'todo-text'; span.contentEditable = 'true'; span.textContent = t.text;
       span.addEventListener('blur', function () { t.text = span.textContent.trim(); scheduleSave(); });
-      var due = document.createElement('button'); due.className = 'todo-due'; due.title = 'Set due date';
-      due.textContent = t.due ? t.due.slice(5) : '📅';
+      var due = document.createElement('button');
+      due.className = 'todo-due' + (t.due ? ' set' : ' empty');
+      due.textContent = t.due ? '📅 ' + t.due.slice(5) : '📅';
+      due.title = t.due ? 'Due ' + t.due + ' — click to change' : 'Add a due date';
       due.addEventListener('click', function () { pickDue(t); });
       var del = document.createElement('button'); del.className = 'todo-del'; del.textContent = '✕';
       del.addEventListener('click', function () {
@@ -375,53 +452,12 @@
   $('meetingEditor').addEventListener('input', function () { state.note.meetingNotes = $('meetingEditor').innerHTML; scheduleSave(); updateWordCount(); });
   window.addEventListener('mn-open-note', function (e) { openNote(e.detail); });
 
-  // ---------------- Free-form ----------------
-  $('modeFlow').addEventListener('click', function () { setFreeMode(false); });
-  $('modeFree').addEventListener('click', function () { setFreeMode(true); });
-  function setFreeMode(on) {
-    state.freeMode = on;
-    $('modeFlow').classList.toggle('active', !on); $('modeFree').classList.toggle('active', on);
-    $('flowWrap').classList.toggle('hidden', on); $('freeWrap').classList.toggle('hidden', !on);
-  }
-  $('freeCanvas').addEventListener('dblclick', function (e) {
-    if (e.target !== $('freeCanvas')) return;
-    var rect = $('freeCanvas').getBoundingClientRect();
-    var box = { id: rid(), x: e.clientX - rect.left, y: e.clientY - rect.top, w: 160, html: '' };
-    state.note.freeform = state.note.freeform || []; state.note.freeform.push(box);
-    renderFreeform(); scheduleSave();
-    var el = $('freeCanvas').querySelector('[data-fb="' + box.id + '"] .fb-edit'); if (el) el.focus();
-  });
-  function renderFreeform() {
-    var canvas = $('freeCanvas'); canvas.innerHTML = '';
-    (state.note.freeform || []).forEach(function (box) {
-      var el = document.createElement('div'); el.className = 'free-box'; el.setAttribute('data-fb', box.id);
-      el.style.left = box.x + 'px'; el.style.top = box.y + 'px'; el.style.width = box.w + 'px';
-      el.innerHTML = '<div class="fb-edit" contenteditable="true"></div><button class="fb-del" aria-label="Delete box">✕</button>';
-      var edit = el.querySelector('.fb-edit'); edit.innerHTML = box.html || '';
-      edit.addEventListener('input', function () { box.html = edit.innerHTML; scheduleSave(); });
-      el.querySelector('.fb-del').addEventListener('click', function () {
-        state.note.freeform = state.note.freeform.filter(function (b) { return b.id !== box.id; }); renderFreeform(); scheduleSave();
-      });
-      enableBoxDrag(el, edit, box); canvas.appendChild(el);
-    });
-  }
-  function enableBoxDrag(el, edit, box) {
-    el.addEventListener('mousedown', function (e) {
-      if (e.target === edit || e.target.classList.contains('fb-del')) return;
-      e.preventDefault();
-      var sx = e.clientX, sy = e.clientY, ox = box.x, oy = box.y;
-      function move(ev) { box.x = Math.max(0, ox + ev.clientX - sx); box.y = Math.max(0, oy + ev.clientY - sy); el.style.left = box.x + 'px'; el.style.top = box.y + 'px'; }
-      function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); scheduleSave(); }
-      document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
-    });
-  }
-
   // ---------------- Attachments ----------------
   $('attachInput').addEventListener('change', async function () {
     var files = Array.prototype.slice.call($('attachInput').files);
     for (var i = 0; i < files.length; i++) {
       var f = files[i];
-      if (f.size > 20 * 1024 * 1024) { alert('“' + f.name + '” is too large (max 20 MB).'); continue; }
+      if (f.size > 20 * 1024 * 1024) { await dialog.alert('“' + f.name + '” is too large (max 20 MB).'); continue; }
       var b64 = await fileToBase64(f);
       var meta = await API.addAttachment(state.note.id, { name: f.name, mime: f.type, dataB64: b64 });
       state.note.attachments = state.note.attachments || []; state.note.attachments.push(meta);
@@ -451,7 +487,9 @@
   $('noteCustomTitle').addEventListener('input', function () { state.note.customTitle = $('noteCustomTitle').value; scheduleSave(); });
   $('favBtn').addEventListener('click', async function () {
     state.note.favorite = !state.note.favorite; $('favBtn').textContent = state.note.favorite ? '★' : '☆';
-    await API.setFavorite(state.note.id, state.note.favorite); renderNoteList();
+    var s = await API.setFavorite(state.note.id, state.note.favorite);
+    state.note.updatedAt = s.updatedAt; // adopt so the next content save isn't a false conflict
+    renderNoteList();
   });
   $('printBtn').addEventListener('click', function () { window.print(); });
 
@@ -482,26 +520,26 @@
     var act = e.target.getAttribute('data-note'); if (!act) return;
     $('noteMoreMenu').classList.add('hidden');
     if (act === 'delete') {
-      if (!confirm('Move this note to trash?')) return;
+      if (!(await dialog.confirm('Move this note to trash?', { okText: 'Move to trash', danger: true }))) return;
       await API.deleteNote(state.note.id); await loadCurrentNote();
     } else if (act === 'copy') {
       var copy = await API.copyNote(state.note.id, null); await loadWorkspaces(); await openNote(copy.id);
     } else if (act === 'move') { openMoveModal(); }
-    else if (act === 'pin') {
-      state.note.pinned = !state.note.pinned;
-      await API.saveNote(state.note.id, { pinned: state.note.pinned, baseUpdatedAt: state.note.updatedAt }).then(function (s) { state.note.updatedAt = s.updatedAt; });
-      renderNoteList();
-    } else if (act === 'archive') {
+    else if (act === 'archive') {
       state.note.archived = !state.note.archived;
-      await API.saveNote(state.note.id, { archived: state.note.archived, baseUpdatedAt: state.note.updatedAt }).then(function (s) { state.note.updatedAt = s.updatedAt; });
+      var s = await API.saveNote(state.note.id, { archived: state.note.archived, baseUpdatedAt: state.note.updatedAt });
+      state.note.updatedAt = s.updatedAt;
       renderNoteList();
     } else if (act === 'history') { openHistory(); }
   });
 
-  function snoozeReminderTodo(t) {
-    var hours = parseFloat(prompt('Snooze this reminder for how many hours?', '24')) || 24;
+  async function snoozeReminderTodo(t) {
+    var val = await dialog.prompt('Snooze this reminder for how many hours?', { title: 'Snooze reminder', default: '24', inputType: 'number' });
+    if (val === null) return;
+    var hours = parseFloat(val) || 24;
     var until = new Date(Date.now() + hours * 3600 * 1000).toISOString();
-    API.snoozeReminder(state.wsId, t.sourceReminderId, until).then(function () { return loadCurrentNote(); });
+    await API.snoozeReminder(state.wsId, t.sourceReminderId, until);
+    await loadCurrentNote();
   }
 
   // Note-link picker (for the editor's "link to a note" tool)
@@ -534,7 +572,7 @@
       var label = document.createElement('span'); label.style.flex = '1'; label.textContent = new Date(v.savedAt).toLocaleString();
       var restore = document.createElement('button'); restore.className = 'link-btn'; restore.textContent = 'restore';
       restore.addEventListener('click', async function () {
-        if (!confirm('Restore this version? The current content is snapshotted first.')) return;
+        if (!(await dialog.confirm('Restore this version? The current content is snapshotted first.', { okText: 'Restore' }))) return;
         state.note = await API.restoreVersion(state.note.id, v.ts); closeModals(); renderNote();
       });
       li.appendChild(label); li.appendChild(restore); ul.appendChild(li);
@@ -559,23 +597,32 @@
     try {
       var saved = await API.saveNote(state.note.id, {
         customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
-        meetingNotes: state.note.meetingNotes, freeform: state.note.freeform, favorite: state.note.favorite,
-        tags: state.note.tags, baseUpdatedAt: state.note.updatedAt,
+        meetingNotes: state.note.meetingNotes, favorite: state.note.favorite,
+        tags: state.note.tags, baseRev: state.note.rev,
       });
-      state.note.todos = saved.todos; state.note.updatedAt = saved.updatedAt;
+      state.note.todos = saved.todos; state.note.updatedAt = saved.updatedAt; state.note.rev = saved.rev;
       setSaveStatus('Saved ✓'); renderNoteList();
     } catch (ex) {
       if (ex.status === 409) {
         setSaveStatus('⚠ Changed elsewhere');
-        var keepBoth = confirm('This note was changed in another tab or device.\n\nOK = keep BOTH (save your version as a conflict copy).\nCancel = discard your changes and load the latest.');
-        if (keepBoth) {
+        var choice = await dialog.choose(
+          'This note was changed in another tab or device since you opened it.',
+          [
+            { label: 'Keep both', returns: 'fork', primary: true },
+            { label: 'Discard mine', returns: 'discard', danger: true },
+            { label: 'Cancel', returns: 'cancel' },
+          ], { title: 'Conflicting change', cancelValue: 'cancel' });
+        if (choice === 'fork') {
           var fork = await API.forkNote(state.note.id, {
             customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
             meetingNotes: state.note.meetingNotes, freeform: state.note.freeform, tags: state.note.tags,
           });
           await loadWorkspaces(); await openNote(fork.id); setSaveStatus('Saved as a conflict copy ✓');
-        } else if (ex.data && ex.data.current) { state.note = ex.data.current; renderNote(); }
-        else await loadCurrentNote();
+        } else if (choice === 'discard') {
+          if (ex.data && ex.data.current) { state.note = ex.data.current; renderNote(); }
+          else await loadCurrentNote();
+          setSaveStatus('Loaded the latest version');
+        } // cancel: leave the user's edits in place to retry
       } else { setSaveStatus('Save failed: ' + ex.message); }
     }
   }
@@ -675,7 +722,7 @@
       var restore = document.createElement('button'); restore.className = 'link-btn'; restore.textContent = 'restore';
       restore.addEventListener('click', async function () { await API.restoreTrash(f.id); await loadWorkspaces(); renderTrash(); });
       var purge = document.createElement('button'); purge.className = 'link-btn danger'; purge.textContent = 'delete forever';
-      purge.addEventListener('click', async function () { if (confirm('Permanently delete “' + f.displayTitle + '”?')) { await API.purgeTrash(f.id); renderTrash(); } });
+      purge.addEventListener('click', async function () { if (await dialog.confirm('Permanently delete “' + f.displayTitle + '”? This cannot be undone.', { okText: 'Delete forever', danger: true })) { await API.purgeTrash(f.id); renderTrash(); } });
       li.appendChild(restore); li.appendChild(purge); ul.appendChild(li);
     });
   }
@@ -712,7 +759,7 @@
       var edit = document.createElement('button'); edit.className = 'link-btn'; edit.textContent = 'edit';
       edit.addEventListener('click', function () { loadTplIntoEditor(t); });
       var del = document.createElement('button'); del.className = 'wm-del'; del.textContent = '🗑';
-      del.addEventListener('click', async function () { if (confirm('Delete template “' + t.name + '”?')) { await API.deleteTemplate(t.id); await loadTemplates(); renderTemplateList(); } });
+      del.addEventListener('click', async function () { if (await dialog.confirm('Delete template “' + t.name + '”?', { okText: 'Delete', danger: true })) { await API.deleteTemplate(t.id); await loadTemplates(); renderTemplateList(); } });
       li.appendChild(name); li.appendChild(edit); li.appendChild(del); ul.appendChild(li);
     });
   }
@@ -765,7 +812,7 @@
       if (w.id !== 'general') {
         var del = document.createElement('button'); del.className = 'wm-del'; del.textContent = '🗑';
         del.addEventListener('click', async function () {
-          if (!confirm('Delete workspace “' + w.name + '” and all its notes? (Not recoverable)')) return;
+          if (!(await dialog.confirm('Delete workspace “' + w.name + '” and all its notes? This cannot be undone.', { okText: 'Delete workspace', danger: true }))) return;
           await API.deleteWorkspace(w.id); if (state.wsId === w.id) state.wsId = 'general';
           await loadWorkspaces(); renderWsManage(); await loadCurrentNote();
         });
@@ -783,7 +830,7 @@
   // Import
   $('importBtn').addEventListener('click', function () { openModal('importModal'); });
   $('doImportBtn').addEventListener('click', async function () {
-    var file = $('importFile').files[0]; if (!file) { alert('Choose a file to import.'); return; }
+    var file = $('importFile').files[0]; if (!file) { await dialog.alert('Choose a file to import.'); return; }
     var text = await file.text();
     var ext = (file.name.split('.').pop() || '').toLowerCase();
     var fmt = ext === 'json' ? 'json' : (ext === 'md' || ext === 'markdown') ? 'md' : 'html';
@@ -797,7 +844,7 @@
     state.workspaces.filter(function (w) { return w.id !== state.note.workspaceId; }).forEach(function (w) {
       var o = document.createElement('option'); o.value = w.id; o.textContent = w.name; sel.appendChild(o);
     });
-    if (!sel.options.length) { alert('Create another workspace first.'); return; }
+    if (!sel.options.length) { dialog.alert('Create another workspace first.'); return; }
     openModal('moveModal');
   }
   $('doMoveBtn').addEventListener('click', async function () {
@@ -813,7 +860,7 @@
     } catch (ex) { acctMsg(ex.message, true); }
   });
   $('regenRecoveryBtn').addEventListener('click', async function () {
-    if (!confirm('Generate a new recovery key? The old one stops working.')) return;
+    if (!(await dialog.confirm('Generate a new recovery key? The old one stops working.', { okText: 'Regenerate' }))) return;
     try { var r = await API.regenerateRecovery(); closeModals(); showRecovery(r.recoveryKey); } catch (ex) { acctMsg(ex.message, true); }
   });
   function acctMsg(s, isErr) { var el = $('acctMsg'); el.textContent = s; el.style.color = isErr ? 'var(--danger)' : 'var(--muted)'; }
@@ -879,7 +926,7 @@
 
   // ---------------- Notifications + reminder polling ----------------
   $('notifyBtn').addEventListener('click', async function () {
-    if (!('Notification' in window)) { alert('Notifications are not supported in this browser.'); return; }
+    if (!('Notification' in window)) { await dialog.alert('Notifications are not supported in this browser.'); return; }
     var perm = await Notification.requestPermission();
     state.notify = perm === 'granted';
     $('notifyBtn').textContent = state.notify ? '🔔' : '🔕';
@@ -896,7 +943,11 @@
         }
         if (s.workspaceId === state.wsId) refreshCurrent = true;
       });
-      if (refreshCurrent && state.view === 'note') { state.note = await API.currentNote(state.wsId); renderTodos(); }
+      // Merge in newly-injected reminder todos without clobbering in-progress edits.
+      if (refreshCurrent && state.view === 'note' && !state.saveTimer) {
+        var fresh = await API.currentNote(state.wsId);
+        if (fresh.id === state.note.id) { state.note.todos = fresh.todos; state.note.updatedAt = fresh.updatedAt; state.note.rev = fresh.rev; renderTodos(); }
+      }
     } catch (e) { /* ignore transient poll errors */ }
   }
 
