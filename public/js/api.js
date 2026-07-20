@@ -97,6 +97,7 @@
 
     verifyIntegrity: () => req('GET', '/api/verify'),
     stats: () => req('GET', '/api/stats'),
+    transcribe: (audioB64, mime, filename, source) => req('POST', '/api/transcribe', { audioB64, mime, filename, source }),
     listTrash: () => req('GET', '/api/trash'),
     restoreTrash: (id) => req('POST', '/api/trash/' + id + '/restore', {}),
     purgeTrash: (id) => req('DELETE', '/api/trash/' + id),

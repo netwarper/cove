@@ -241,7 +241,7 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 
 /* ---- Modals ---- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(10,15,30,.45); display: grid; place-items: center; z-index: 40; }
-.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(440px, 92vw); box-shadow: var(--shadow); }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(440px, 92vw); box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
 .modal h3 { margin: 0 0 12px; }
 .modal input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); margin-bottom: 10px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
@@ -390,6 +390,22 @@ kbd { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: 
 mark { background: #ffe58a; color: #3a2f00; border-radius: 2px; padding: 0 1px; }
 :root[data-theme="dark"] mark, :root:not([data-theme="light"]) mark { background: #5b4b12; color: #ffe58a; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) mark { background: #5b4b12; color: #ffe58a; } }
+
+/* ---- Meeting recording + transcript ---- */
+.rec-controls { display: flex; align-items: center; gap: 8px; }
+#recordBtn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 7px; padding: 4px 9px; cursor: pointer; font-size: 12px; }
+#recordBtn:hover { border-color: var(--brand); }
+#recordBtn.recording { background: var(--danger); color: #fff; border-color: var(--danger); animation: recpulse 1.4s ease-in-out infinite; }
+@keyframes recpulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.rec-status { max-width: 320px; }
+.transcript { border: 1px solid var(--line); border-radius: 8px; margin: 6px 0 10px; background: var(--panel-2); overflow: hidden; }
+.transcript-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+.transcript-body { max-height: 180px; overflow: auto; padding: 8px 10px; font-size: 13px; }
+.transcript-body.collapsed { display: none; }
+.tr-line { padding: 2px 0; }
+.tr-who { font-weight: 700; font-size: 11px; border-radius: 4px; padding: 0 5px; margin-right: 6px; }
+.tr-you .tr-who { background: var(--brand); color: #fff; }
+.tr-them .tr-who { background: #7c5cff; color: #fff; }
 
 /* ---- Print ---- */
 @media print {

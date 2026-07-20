@@ -44,6 +44,7 @@ everything stays on your machine.
 | **Titles** | Auto-titled with the date, with an optional specific title. |
 | **Global search** | Search across every note in every workspace. |
 | **Global to-dos** | One view of all open to-dos across workspaces. Completing one there updates the source note, and vice-versa. |
+| **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) as two labeled streams, saved as encrypted attachments, with an optional near-live transcript that marks **You** vs **Them**. |
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
 | **Tags** | Tag notes and filter search with `tag:name`. |
 | **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carry-forward is unchanged — To-Do & Carryover still come from the previous note; a template's defaults fill them only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
@@ -117,6 +118,38 @@ node server.js --print-config          # show the resolved name/domain/port
   telling you how to pick a different domain/port — it never crashes with a raw
   stack trace, and never silently grabs a random port (which would break your
   durable URL).
+
+## Meeting recording & transcription
+
+Click **🔴 Record** in the Meeting Notes section to capture the meeting as two
+separate, labeled sources:
+
+- **You** — your microphone (`getUserMedia`).
+- **Them** — the other side, via a shared **tab/window with "Share audio"**
+  (`getDisplayMedia`). This works great for browser calls (Google Meet, Zoom on
+  the web). Capturing a *native* Zoom/Teams desktop app's system audio on macOS
+  needs a virtual-audio device (e.g. BlackHole) — the UI tells you when no shared
+  audio was included.
+
+Both streams are **saved as encrypted attachments** on stop. Nothing leaves your
+machine from recording alone.
+
+**Transcription is optional and off by default.** Enable it in **⋮ → Passphrase &
+recovery → Meeting transcription** by setting an **OpenAI-compatible STT
+endpoint**:
+
+- **Local (private):** point it at a Whisper server on your machine, e.g.
+  `http://127.0.0.1:8080/v1/audio/transcriptions` (whisper.cpp server,
+  faster-whisper, LocalAI, …). Audio never leaves the device.
+- **Cloud:** an external endpoint + API key (OpenAI, Deepgram, …). The app warns
+  you that audio is sent there for transcription.
+
+The browser records, chunks each source into ~6-second WAV segments, and the
+**local server proxies** them to your endpoint (so the API key stays server-side
+and the strict CSP is respected). Transcript lines stream into the note labeled
+**You**/**Them**.
+
+Config (all optional; stored encrypted in settings): endpoint, API key, model.
 
 ## View on your phone (offline viewer)
 

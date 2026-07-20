@@ -25,6 +25,7 @@ const store = require('./lib/store');
 const config = require('./lib/config');
 const backup = require('./lib/backup');
 const viewer = require('./lib/viewer');
+const transcribe = require('./lib/transcribe');
 const { Store } = store;
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -430,6 +431,12 @@ async function route(s, req, res, pathname, query) {
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);
   if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
   if (pathname === '/api/stats' && m === 'GET') return s.stats();
+  if (pathname === '/api/transcribe' && m === 'POST') {
+    const body = await readBody(req);
+    const cfg = (s.getSettings().transcription) || {};
+    const out = await transcribe.transcribe(cfg, { audio: Buffer.from(body.audioB64 || '', 'base64'), mime: body.mime, filename: body.filename });
+    return { text: out.text };
+  }
 
   throw Object.assign(new Error('not found'), { status: 404 });
 }

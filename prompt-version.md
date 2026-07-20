@@ -248,6 +248,17 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.7.0 (2026-07-20):** Granola-style meeting recording — dual-stream capture
+  (mic = "You" via getUserMedia, other side = "Them" via getDisplayMedia
+  tab/system audio), each saved as an encrypted attachment. Optional near-live
+  transcription via an OpenAI-compatible STT endpoint (local Whisper for privacy
+  or cloud), proxied through the local server (`/api/transcribe`, `lib/transcribe.js`)
+  so the API key stays server-side and the CSP is respected; transcript lines
+  labeled You/Them stream into the note. Off by default (recording never leaves
+  the device). Also: modals now scroll when tall. Verified: quality 0 ·
+  functional 69/69 · security 21/21 · config 14/14 · backup 10/10 · viewer 17/17
+  · transcribe 13/13; browser test drove real dual-stream capture (fake devices)
+  → 2 encrypted audio attachments + labeled transcript, zero console errors.
 - **1.6.0 (2026-07-19):** Discoverability + quality-of-life — command palette
   (⌘K/Ctrl-K) to jump to notes/workspaces/actions, a `?` help & shortcuts
   overlay, manual theme toggle (auto/light/dark), encrypted-footprint stats,

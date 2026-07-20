@@ -171,7 +171,17 @@
             </div>
 
             <div class="section" data-sec="meeting">
-              <h2>📝 Meeting Notes</h2>
+              <div class="section-title-row">
+                <h2>📝 Meeting Notes</h2>
+                <div class="rec-controls">
+                  <button id="recordBtn" class="mini" title="Record meeting audio">🔴 Record</button>
+                  <span id="recStatus" class="rec-status muted tiny"></span>
+                </div>
+              </div>
+              <div id="transcriptPanel" class="transcript hidden">
+                <div class="transcript-head"><span>🎙 Live transcript</span><button id="transcriptToggle" class="link-btn tiny">hide</button></div>
+                <div id="transcriptBody" class="transcript-body"></div>
+              </div>
               <div class="rte-toolbar" data-target="meetingEditor"></div>
               <div id="meetingEditor" class="rte" contenteditable="true" aria-label="Meeting notes"></div>
               <div class="attachments">
@@ -289,6 +299,18 @@
         <h4>Display</h4>
         <label class="tiny muted">Note text size</label>
         <input id="fontSize" type="range" min="13" max="20" step="1" value="14">
+      </div>
+      <div class="acct-block">
+        <h4>Meeting transcription</h4>
+        <p class="muted tiny">Recording always stays on this machine (saved as an encrypted attachment). Transcription is optional: point it at a <b>local</b> Whisper server to stay fully private, or a cloud provider (audio for transcription is then sent there). Leave the endpoint blank to record without transcribing.</p>
+        <label class="tiny muted">STT endpoint (OpenAI-compatible <code>/audio/transcriptions</code>)</label>
+        <input id="sttEndpoint" type="text" placeholder="http://127.0.0.1:8080/v1/audio/transcriptions">
+        <label class="tiny muted">API key (only for cloud providers)</label>
+        <input id="sttKey" type="password" placeholder="(blank for a local server)" autocomplete="off">
+        <label class="tiny muted">Model</label>
+        <input id="sttModel" type="text" placeholder="whisper-1">
+        <div id="sttWarn" class="tiny" style="color:var(--danger)"></div>
+        <button id="saveSttBtn" class="sm">Save transcription settings</button>
       </div>
       <div id="acctMsg" class="tiny" aria-live="polite"></div>
       <div class="modal-actions"><button class="modal-close">Close</button></div>
@@ -425,6 +447,7 @@
 
   <script src="/js/api.js"></script>
   <script src="/js/editor.js"></script>
+  <script src="/js/recorder.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

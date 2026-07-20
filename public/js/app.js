@@ -319,6 +319,7 @@
     setSaveStatus('');
     updateWordCount();
     renderBacklinks();
+    renderTranscript();
   }
 
   function updateWordCount() {
@@ -586,6 +587,85 @@
     });
   }
 
+  // ---------------- Meeting recording + live transcript ----------------
+  state.recording = null;
+
+  function renderTranscript() {
+    var panel = $('transcriptPanel'), body = $('transcriptBody');
+    var lines = state.note.transcript || [];
+    if (!lines.length && !state.recording) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    body.innerHTML = '';
+    lines.forEach(function (l) {
+      var div = document.createElement('div');
+      div.className = 'tr-line tr-' + (l.source === 'them' ? 'them' : 'you');
+      div.innerHTML = '<span class="tr-who">' + (l.source === 'them' ? 'Them' : 'You') + '</span> <span class="tr-text"></span>';
+      div.querySelector('.tr-text').textContent = l.text;
+      body.appendChild(div);
+    });
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function transcribeFnFor() {
+    var cfg = (state.settings.transcription) || {};
+    if (!cfg.endpoint) return null; // recording only — nothing leaves the device
+    return function (wavBlob, source) {
+      return fileToBase64(wavBlob).then(function (b64) {
+        return API.transcribe(b64, 'audio/wav', source + '.wav', source).then(function (r) { return r.text || ''; });
+      });
+    };
+  }
+
+  $('recordBtn').addEventListener('click', async function () {
+    if (state.recording) { await stopRecording(); return; }
+    if (!window.Recorder || !window.Recorder.supported()) { await dialog.alert('Audio recording is not supported in this browser.'); return; }
+    var noteId = state.note.id;
+    try {
+      $('recordBtn').disabled = true;
+      var session = await window.Recorder.start({
+        transcribeFn: transcribeFnFor(),
+        onStatus: function (m) { $('recStatus').textContent = m; },
+        onError: function (err) { $('recStatus').textContent = 'Transcription error: ' + err.message; },
+        onLine: function (line) {
+          if (!state.note || state.note.id !== noteId) return; // note switched — ignore
+          state.note.transcript = (state.note.transcript || []).concat(line);
+          renderTranscript(); scheduleSave();
+        },
+      });
+      state.recording = { session: session, noteId: noteId };
+      $('recordBtn').textContent = '⏹ Stop'; $('recordBtn').classList.add('recording');
+      renderTranscript();
+    } catch (ex) {
+      $('recStatus').textContent = '';
+      await dialog.alert('Could not start recording: ' + ex.message + '\n\n(Grant microphone access, and to capture the other side pick a tab/window with "Share audio" enabled.)');
+    } finally { $('recordBtn').disabled = false; }
+  });
+
+  async function stopRecording() {
+    if (!state.recording) return;
+    var rec = state.recording; state.recording = null;
+    $('recordBtn').disabled = true; $('recStatus').textContent = 'Saving recording…';
+    try {
+      var out = await rec.session.stop();
+      var stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+      for (var i = 0; i < ['you', 'them'].length; i++) {
+        var src = ['you', 'them'][i], blob = out[src];
+        if (!blob || !blob.size) continue;
+        var b64 = await fileToBase64(blob);
+        var meta = await API.addAttachment(rec.noteId, { name: (src === 'you' ? 'mic' : 'shared') + '-audio-' + stamp + '.webm', mime: blob.type || 'audio/webm', dataB64: b64 });
+        if (state.note && state.note.id === rec.noteId) { state.note.attachments = (state.note.attachments || []).concat(meta); }
+      }
+      if (state.note && state.note.id === rec.noteId) renderAttachments();
+      $('recStatus').textContent = 'Recording saved ✓';
+    } catch (ex) { $('recStatus').textContent = 'Save failed: ' + ex.message; }
+    finally { $('recordBtn').disabled = false; $('recordBtn').textContent = '🔴 Record'; $('recordBtn').classList.remove('recording'); }
+  }
+
+  $('transcriptToggle').addEventListener('click', function () {
+    var b = $('transcriptBody'); var hidden = b.classList.toggle('collapsed');
+    $('transcriptToggle').textContent = hidden ? 'show' : 'hide';
+  });
+
   // ---------------- Header actions ----------------
   $('noteCustomTitle').addEventListener('input', function () { state.note.customTitle = $('noteCustomTitle').value; scheduleSave(); });
   $('favBtn').addEventListener('click', async function () {
@@ -701,7 +781,7 @@
       var saved = await API.saveNote(state.note.id, {
         customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
         meetingNotes: state.note.meetingNotes, favorite: state.note.favorite,
-        tags: state.note.tags, baseRev: state.note.rev,
+        tags: state.note.tags, transcript: state.note.transcript, baseRev: state.note.rev,
       });
       state.note.todos = saved.todos; state.note.updatedAt = saved.updatedAt; state.note.rev = saved.rev;
       setSaveStatus('Saved ✓'); renderNoteList();
@@ -905,9 +985,25 @@
         '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
         (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
       $('fontSize').value = state.settings.fontSize || 14;
+      var tc = state.settings.transcription || {};
+      $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
+      updateSttWarn();
       loadStatsInto();
       openModal('accountModal');
     }
+  });
+  function isLocalEndpoint(url) { return /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0)(:|\/|$)/i.test(url || ''); }
+  function updateSttWarn() {
+    var ep = $('sttEndpoint').value.trim();
+    $('sttWarn').textContent = (ep && !isLocalEndpoint(ep))
+      ? '⚠ This is an external endpoint — meeting audio will be sent there for transcription.'
+      : '';
+  }
+  $('sttEndpoint').addEventListener('input', updateSttWarn);
+  $('saveSttBtn').addEventListener('click', async function () {
+    state.settings.transcription = { endpoint: $('sttEndpoint').value.trim(), apiKey: $('sttKey').value, model: $('sttModel').value.trim() || 'whisper-1' };
+    await API.saveSettings({ transcription: state.settings.transcription });
+    acctMsg('Transcription settings saved ✓', false);
   });
 
   // Workspaces modal
