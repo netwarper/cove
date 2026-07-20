@@ -56,7 +56,9 @@
         <button id="navAgenda" class="tab" title="Agenda (due items &amp; reminders)">📅</button>
         <button id="navFavs" class="tab" title="Favorites">★</button>
         <button id="notifyBtn" class="icon-btn" title="Enable reminder notifications" aria-label="Enable notifications">🔔</button>
+        <button id="themeBtn" class="icon-btn" title="Theme: auto / light / dark" aria-label="Toggle theme">🌓</button>
         <button id="layoutToggle" class="icon-btn" title="Toggle layout" aria-label="Toggle layout">☷</button>
+        <button id="helpBtn" class="icon-btn" title="Help &amp; shortcuts (press ?)" aria-label="Help">?</button>
         <div class="more-wrap">
           <button id="moreBtn" class="icon-btn" title="More" aria-label="More actions">⋮</button>
           <div id="moreMenu" class="menu hidden">
@@ -281,6 +283,7 @@
         <h4>This instance</h4>
         <p class="muted tiny">The durable local address is set at launch (<code>node server.js --set-domain &lt;name&gt;</code>) so it never drifts.</p>
         <div id="instanceInfo" class="tiny"></div>
+        <div id="statsInfo" class="tiny muted" style="margin-top:6px"></div>
       </div>
       <div class="acct-block">
         <h4>Display</h4>
@@ -359,6 +362,53 @@
       <div class="modal-actions">
         <button id="copyRecoveryBtn" class="sm">Copy</button>
         <button class="modal-close primary">I’ve saved it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Command palette (⌘K / Ctrl-K) ---------- -->
+  <div id="paletteLayer" class="palette-layer hidden">
+    <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+      <input id="paletteInput" type="text" placeholder="Search notes, jump to a workspace, run a command…" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <ul id="paletteList" class="palette-list"></ul>
+      <div class="palette-hint muted tiny">↑↓ to navigate · ↵ to select · esc to close</div>
+    </div>
+  </div>
+
+  <!-- ---------- Help / shortcuts ---------- -->
+  <div id="helpLayer" class="help-layer hidden">
+    <div class="help" role="dialog" aria-modal="true" aria-label="Help">
+      <div class="help-head"><h3>Help &amp; shortcuts</h3><button class="help-close icon-btn" aria-label="Close">✕</button></div>
+      <div class="help-body">
+        <section>
+          <h4>Keyboard</h4>
+          <ul class="kbd-list">
+            <li><kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd><span>Command palette — jump to any note, workspace, or action</span></li>
+            <li><kbd>/</kbd><span>Focus search</span></li>
+            <li><kbd>n</kbd><span>New note (carry forward)</span></li>
+            <li><kbd>l</kbd><span>Toggle layout</span></li>
+            <li><kbd>?</kbd><span>This help</span></li>
+            <li><kbd>Esc</kbd><span>Close menus / dialogs</span></li>
+          </ul>
+        </section>
+        <section>
+          <h4>In the editors</h4>
+          <ul class="kbd-list">
+            <li><kbd>/</kbd><span>Slash menu — heading, list, table, quote, code</span></li>
+            <li><span class="tool">⧉</span><span>Link to another note (creates a backlink)</span></li>
+            <li><span class="tool">▦</span><span>Insert a table · <span class="tool">🖼</span> image (paste works too)</span></li>
+          </ul>
+        </section>
+        <section>
+          <h4>Good to know</h4>
+          <ul class="kbd-list">
+            <li><span>📅</span><span>Give a to-do a due date → it shows in the Agenda</span></li>
+            <li><span>#tag</span><span>Tag notes; search with <code>tag:name</code></span></li>
+            <li><span>⏰</span><span>Reminders pop into the To-Do list when due; snooze with 💤</span></li>
+            <li><span>⋮</span><span>Templates · Trash · Backup &amp; offline viewer · Passphrase</span></li>
+            <li><span>★</span><span>Hover a note in the sidebar to favorite or delete it</span></li>
+          </ul>
+        </section>
       </div>
     </div>
   </div>

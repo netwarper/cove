@@ -265,6 +265,20 @@ const t = harness('functional');
     r = await c.request('PUT', '/api/notes/' + revNote, { meetingNotes: '<p>stale</p>', baseRev: rev1 });
     t.eq(r.status, 409, 'a stale content revision is detected as a conflict');
 
+    // --- stats ---
+    r = await c.request('GET', '/api/stats');
+    t.ok(r.body.notes > 0 && r.body.bytes > 0 && typeof r.body.workspaces === 'number', 'stats reports counts + encrypted footprint');
+
+    // --- search ranking: a title hit ranks above a body-only hit ---
+    r = await c.request('POST', '/api/workspaces/general/notes/new', {});
+    const rankTitle = r.body.id;
+    await c.request('PUT', '/api/notes/' + rankTitle, { customTitle: 'ZQTOKEN roadmap', meetingNotes: '<p>body</p>' });
+    r = await c.request('POST', '/api/workspaces/general/notes/new', {});
+    const rankBody = r.body.id;
+    await c.request('PUT', '/api/notes/' + rankBody, { meetingNotes: '<p>mentions ZQTOKEN in the body only</p>' });
+    r = await c.request('GET', '/api/search?q=ZQTOKEN');
+    t.ok(r.body.length >= 2 && r.body[0].noteId === rankTitle, 'title match ranks above body-only match');
+
     // --- integrity: healthy vault verifies clean ---
     r = await c.request('GET', '/api/verify');
     t.ok(r.body.ok && r.body.checked > 0, 'verify reports a healthy vault as OK');

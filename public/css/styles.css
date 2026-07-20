@@ -5,11 +5,20 @@
   --danger: #e5484d; --done: #98a0ad; --shadow: 0 1px 3px rgba(20,30,60,.08);
   --radius: 10px;
 }
+/* dark palette, shared by OS-auto (media query) and the explicit toggle */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #14161c; --panel: #1c1f27; --panel-2: #21252f; --ink: #e7eaf0;
     --muted: #9aa2b1; --line: #2c313d; --brand: #5b84f7; --shadow: 0 1px 3px rgba(0,0,0,.4);
   }
+}
+:root[data-theme="dark"] {
+  --bg: #14161c; --panel: #1c1f27; --panel-2: #21252f; --ink: #e7eaf0;
+  --muted: #9aa2b1; --line: #2c313d; --brand: #5b84f7; --shadow: 0 1px 3px rgba(0,0,0,.4);
+}
+:root[data-theme="light"] {
+  --bg: #f4f6fb; --panel: #ffffff; --panel-2: #fbfcfe; --ink: #1f2430;
+  --muted: #6b7280; --line: #e3e7ef; --brand: #3b6cf6; --shadow: 0 1px 3px rgba(20,30,60,.08);
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; }
@@ -351,6 +360,36 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 .dlg-btn.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .dlg-btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
 .dlg-btn.danger.primary { background: var(--danger); }
+
+/* ---- Command palette ---- */
+.palette-layer { position: fixed; inset: 0; background: rgba(10,15,30,.45); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; z-index: 80; }
+.palette { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: min(560px, 94vw); box-shadow: var(--shadow); overflow: hidden; }
+.palette input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 14px 16px; font-size: 16px; }
+.palette input:focus { outline: none; }
+.palette-list { list-style: none; margin: 0; padding: 6px; max-height: 52vh; overflow: auto; }
+.palette-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; }
+.palette-item.active { background: var(--brand); color: var(--brand-ink); }
+.palette-item .pi-sub { font-size: 12px; opacity: .7; }
+.palette-hint { padding: 8px 14px; border-top: 1px solid var(--line); }
+
+/* ---- Help overlay ---- */
+.help-layer { position: fixed; inset: 0; background: rgba(10,15,30,.45); display: grid; place-items: center; z-index: 80; padding: 16px; }
+.help { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: min(620px, 96vw); max-height: 86vh; overflow: auto; box-shadow: var(--shadow); }
+.help-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+.help-head h3 { margin: 0; }
+.help-body { padding: 8px 18px 18px; }
+.help-body section { margin-top: 14px; }
+.help-body h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.kbd-list { list-style: none; margin: 0; padding: 0; }
+.kbd-list li { display: flex; gap: 10px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.kbd-list li > span:last-child { flex: 1; }
+.kbd-list .tool { display: inline-block; min-width: 20px; text-align: center; }
+kbd { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; }
+
+/* ---- Search highlight ---- */
+mark { background: #ffe58a; color: #3a2f00; border-radius: 2px; padding: 0 1px; }
+:root[data-theme="dark"] mark, :root:not([data-theme="light"]) mark { background: #5b4b12; color: #ffe58a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) mark { background: #5b4b12; color: #ffe58a; } }
 
 /* ---- Print ---- */
 @media print {

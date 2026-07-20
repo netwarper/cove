@@ -248,6 +248,11 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.6.0 (2026-07-19):** Discoverability + quality-of-life — command palette
+  (⌘K/Ctrl-K) to jump to notes/workspaces/actions, a `?` help & shortcuts
+  overlay, manual theme toggle (auto/light/dark), encrypted-footprint stats,
+  and search-result ranking + match highlighting. Verified: quality 0 ·
+  functional 69/69 · security 21/21 · config 14/14 · backup 10/10 · viewer 17/17.
 - **1.5.1 (2026-07-19):** Replace deprecated `url.parse()` (DEP0169) with the
   WHATWG `URL` API in the request router; path-traversal protection unchanged.
 - **v6 (1.5.0, 2026-07-19):** Offline phone viewer — self-contained, read-only

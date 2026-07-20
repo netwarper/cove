@@ -429,6 +429,7 @@ async function route(s, req, res, pathname, query) {
   if (pathname === '/api/reminders/process' && m === 'POST') return s.processReminders();
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);
   if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
+  if (pathname === '/api/stats' && m === 'GET') return s.stats();
 
   throw Object.assign(new Error('not found'), { status: 404 });
 }

@@ -138,6 +138,7 @@
     state.settings = await API.getSettings();
     applyLayout();
     applyFontSize(state.settings.fontSize || 14);
+    applyTheme(state.settings.theme || 'auto');
     await loadTemplates();
     await loadWorkspaces();
     await loadCurrentNote();
@@ -175,6 +176,108 @@
 
   function applyFontSize(px) {
     document.documentElement.style.setProperty('--note-font', px + 'px');
+  }
+
+  // ---------------- Theme (auto / light / dark) ----------------
+  function applyTheme(theme) {
+    state.settings.theme = theme;
+    if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', theme);
+    $('themeBtn').textContent = theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '🌓';
+    $('themeBtn').title = 'Theme: ' + theme + ' (click to change)';
+  }
+  $('themeBtn').addEventListener('click', function () {
+    var order = { auto: 'light', light: 'dark', dark: 'auto' };
+    var next = order[state.settings.theme || 'auto'];
+    applyTheme(next); API.saveSettings({ theme: next });
+  });
+
+  // ---------------- Help / shortcuts overlay ----------------
+  function openHelp() { $('helpLayer').classList.remove('hidden'); }
+  function closeHelp() { $('helpLayer').classList.add('hidden'); }
+  $('helpBtn').addEventListener('click', openHelp);
+  $('helpLayer').addEventListener('click', function (e) { if (e.target === $('helpLayer')) closeHelp(); });
+  document.querySelector('.help-close').addEventListener('click', closeHelp);
+
+  // ---------------- Command palette (⌘K / Ctrl-K) ----------------
+  var palette = { open: false, items: [], active: 0 };
+  function paletteActions() {
+    return [
+      { label: '＋ New note (carry forward)', run: function () { createNewNote({}); } },
+      { label: '＋ New blank note', run: function () { createNewNote({ blank: true }); } },
+      { label: 'Go to: Current note', run: function () { showView('note'); renderNoteList(); } },
+      { label: 'Go to: All open to-dos', run: renderGlobalTodos },
+      { label: 'Go to: Agenda', run: renderAgenda },
+      { label: 'Go to: Favorites', run: renderFavorites },
+      { label: 'Open: Templates', run: openTemplateModal },
+      { label: 'Open: Trash', run: renderTrash },
+      { label: 'Open: Backup / offline viewer', run: function () { openModal('backupModal'); } },
+      { label: 'Open: Passphrase & recovery', run: function () { $('acctMsg').textContent = ''; loadStatsInto(); openModal('accountModal'); } },
+      { label: 'Toggle layout', run: function () { $('layoutToggle').click(); } },
+      { label: 'Toggle theme', run: function () { $('themeBtn').click(); } },
+      { label: 'Help & shortcuts', run: openHelp },
+      { label: 'Lock (log out)', run: function () { $('logoutBtn').click(); } },
+    ];
+  }
+  function openPalette() {
+    palette.open = true; palette.active = 0;
+    $('paletteLayer').classList.remove('hidden');
+    $('paletteInput').value = '';
+    buildPalette('');
+    setTimeout(function () { $('paletteInput').focus(); }, 20);
+  }
+  function closePalette() { palette.open = false; $('paletteLayer').classList.add('hidden'); }
+  async function buildPalette(q) {
+    q = (q || '').trim().toLowerCase();
+    var items = [];
+    // workspaces
+    state.workspaces.forEach(function (w) {
+      if (!q || w.name.toLowerCase().indexOf(q) >= 0) items.push({ label: 'Workspace: ' + w.name, run: function () { state.wsId = w.id; $('workspaceSelect').value = w.id; showView('note'); loadCurrentNote(); } });
+    });
+    // actions
+    paletteActions().forEach(function (a) { if (!q || a.label.toLowerCase().indexOf(q) >= 0) items.push(a); });
+    // notes (via search) when there's a query
+    if (q) {
+      try {
+        var results = await API.search(q);
+        results.slice(0, 8).forEach(function (r) { items.push({ label: '📄 ' + r.title, sub: r.workspaceName, run: function () { openNote(r.noteId); } }); });
+      } catch (e) { /* ignore */ }
+    }
+    palette.items = items;
+    if (palette.active >= items.length) palette.active = 0;
+    renderPalette();
+  }
+  function renderPalette() {
+    var ul = $('paletteList'); ul.innerHTML = '';
+    palette.items.forEach(function (it, i) {
+      var li = document.createElement('li');
+      li.className = 'palette-item' + (i === palette.active ? ' active' : '');
+      li.innerHTML = '<span>' + esc(it.label) + '</span>' + (it.sub ? '<span class="pi-sub">' + esc(it.sub) + '</span>' : '');
+      li.addEventListener('mousedown', function (e) { e.preventDefault(); runPalette(i); });
+      li.addEventListener('mousemove', function () { palette.active = i; highlightPalette(); });
+      ul.appendChild(li);
+    });
+  }
+  function highlightPalette() {
+    var lis = $('paletteList').children;
+    for (var i = 0; i < lis.length; i++) lis[i].classList.toggle('active', i === palette.active);
+    if (lis[palette.active]) lis[palette.active].scrollIntoView({ block: 'nearest' });
+  }
+  function runPalette(i) { var it = palette.items[i]; closePalette(); if (it && it.run) it.run(); }
+  $('paletteInput').addEventListener('input', function () { buildPalette($('paletteInput').value); });
+  $('paletteInput').addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); palette.active = Math.min(palette.items.length - 1, palette.active + 1); highlightPalette(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); palette.active = Math.max(0, palette.active - 1); highlightPalette(); }
+    else if (e.key === 'Enter') { e.preventDefault(); runPalette(palette.active); }
+    else if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+  });
+  $('paletteLayer').addEventListener('click', function (e) { if (e.target === $('paletteLayer')) closePalette(); });
+
+  async function loadStatsInto() {
+    try {
+      var s = await API.stats();
+      $('statsInfo').textContent = s.workspaces + ' workspaces · ' + s.notes + ' notes · ' + s.attachments + ' attachments · ' + fmtSize(s.bytes) + ' encrypted on disk';
+    } catch (e) { $('statsInfo').textContent = ''; }
   }
 
   // ---------------- Workspaces ----------------
@@ -742,10 +845,20 @@
     results.forEach(function (r) {
       var li = document.createElement('li');
       var tags = (r.tags || []).length ? ' <span class="sr-tags">' + r.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</span>' : '';
-      li.innerHTML = '<div class="sr-top"><span class="sr-title">' + esc(r.title) + '</span><span class="sr-ws">' + esc(r.workspaceName) + '</span></div>' +
-        '<div class="sr-snippet">' + esc(r.snippet) + tags + '</div>';
+      li.innerHTML = '<div class="sr-top"><span class="sr-title">' + hl(r.title, q) + '</span><span class="sr-ws">' + esc(r.workspaceName) + '</span></div>' +
+        '<div class="sr-snippet">' + hl(r.snippet, q) + tags + '</div>';
       li.addEventListener('click', function () { openNote(r.noteId); $('globalSearch').value = ''; }); ul.appendChild(li);
     });
+  }
+  // escape, then highlight occurrences of the query (ignoring a leading tag: filter)
+  function hl(text, q) {
+    var out = esc(text);
+    var term = String(q || '').replace(/tag:\S+/g, '').trim();
+    if (!term) return out;
+    try {
+      var re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+      return out.replace(re, '<mark>$1</mark>');
+    } catch (e) { return out; }
   }
 
   // ---------------- Templates ----------------
@@ -792,6 +905,7 @@
         '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
         (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
       $('fontSize').value = state.settings.fontSize || 14;
+      loadStatsInto();
       openModal('accountModal');
     }
   });
@@ -922,7 +1036,17 @@
     });
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeModals(); ['exportMenu', 'noteMoreMenu', 'moreMenu', 'newNoteMenu'].forEach(function (id) { $(id).classList.add('hidden'); }); }
+    // Command palette — works even while typing in a field.
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      if (palette.open) closePalette(); else openPalette();
+      return;
+    }
+    if (e.key === 'Escape') {
+      if (palette.open) { closePalette(); return; }
+      if (!$('helpLayer').classList.contains('hidden')) { closeHelp(); return; }
+      closeModals(); ['exportMenu', 'noteMoreMenu', 'moreMenu', 'newNoteMenu'].forEach(function (id) { $(id).classList.add('hidden'); });
+    }
   });
 
   // ---------------- Notifications + reminder polling ----------------
@@ -969,6 +1093,7 @@
     if (e.key === '/') { e.preventDefault(); $('globalSearch').focus(); }
     else if (e.key === 'n') { e.preventDefault(); createNewNote({}); }
     else if (e.key === 'l') { e.preventDefault(); $('layoutToggle').click(); }
+    else if (e.key === '?') { e.preventDefault(); openHelp(); }
   });
 
   // ---------------- Logout ----------------

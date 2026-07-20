@@ -96,6 +96,7 @@
     exportUrl: (noteId, fmt) => '/api/notes/' + noteId + '/export?format=' + fmt,
 
     verifyIntegrity: () => req('GET', '/api/verify'),
+    stats: () => req('GET', '/api/stats'),
     listTrash: () => req('GET', '/api/trash'),
     restoreTrash: (id) => req('POST', '/api/trash/' + id + '/restore', {}),
     purgeTrash: (id) => req('DELETE', '/api/trash/' + id),
