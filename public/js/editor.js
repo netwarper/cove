@@ -242,10 +242,13 @@
     editor.addEventListener('dragleave', function (e) { if (e.target === editor) editor.classList.remove('drop-hover'); });
     editor.addEventListener('drop', function (e) {
       var files = (e.dataTransfer && e.dataTransfer.files) || [];
-      var imgs = Array.prototype.filter.call(files, function (f) { return f.type.indexOf('image/') === 0; });
       editor.classList.remove('drop-hover');
-      if (!imgs.length) return;
+      if (!files.length) return; // plain text/HTML drop — let the browser handle it
+      // Any file drop is ours to handle: never let the browser navigate away from
+      // the app (and lose unsaved edits) to open a dropped file.
       e.preventDefault();
+      var imgs = Array.prototype.filter.call(files, function (f) { return f.type.indexOf('image/') === 0; });
+      if (!imgs.length) return; // non-image files: swallow the drop, nothing to insert
       editor.focus();
       // Drop at the cursor position under the pointer when the browser supports it.
       var range = null;
