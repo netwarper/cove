@@ -592,18 +592,39 @@
 
   function renderTranscript() {
     var panel = $('transcriptPanel'), body = $('transcriptBody');
-    var lines = state.note.transcript || [];
+    // Sort a copy by cut-time so the two streams (you/them) interleave in the
+    // order things were actually said, regardless of transcription latency.
+    var lines = (state.note.transcript || []).slice().sort(function (a, b) { return (a.t || 0) - (b.t || 0); });
     if (!lines.length && !state.recording) { panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
     body.innerHTML = '';
+    if (!lines.length && state.recording) {
+      var hint = document.createElement('div');
+      hint.className = 'tr-empty muted tiny';
+      hint.textContent = (state.settings.transcription || {}).endpoint
+        ? 'Listening… transcript lines will appear here as people speak.'
+        : 'Recording — transcription is off. Add an STT endpoint under 🔐 Passphrase & recovery to see live text here.';
+      body.appendChild(hint);
+      return;
+    }
     lines.forEach(function (l) {
       var div = document.createElement('div');
       div.className = 'tr-line tr-' + (l.source === 'them' ? 'them' : 'you');
-      div.innerHTML = '<span class="tr-who">' + (l.source === 'them' ? 'Them' : 'You') + '</span> <span class="tr-text"></span>';
+      div.innerHTML = '<span class="tr-time"></span> <span class="tr-who">' + (l.source === 'them' ? 'Them' : 'You') + '</span> <span class="tr-text"></span>';
+      div.querySelector('.tr-time').textContent = fmtTranscriptTime(l.t);
       div.querySelector('.tr-text').textContent = l.text;
       body.appendChild(div);
     });
     body.scrollTop = body.scrollHeight;
+  }
+
+  // Each line's `t` is epoch-ms captured when the audio chunk was cut (i.e. when
+  // it was spoken). Show it as a wall-clock time so the transcript reads like a
+  // real meeting log; blank for older lines saved before timestamps existed.
+  function fmtTranscriptTime(t) {
+    if (!t) return '';
+    try { return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+    catch (_e) { return ''; }
   }
 
   function transcribeFnFor() {

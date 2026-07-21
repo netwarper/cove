@@ -73,9 +73,15 @@
         var merged = new Float32Array(total), off = 0;
         pending.forEach(function (b) { merged.set(b, off); off += b.length; });
         pending = [];
+        // Timestamp the chunk when it is CUT (i.e. when the speech happened),
+        // not when transcription returns. STT latency differs per request and
+        // between the two streams, so stamping at resolve time would scramble
+        // the conversation order. Cut-time keeps the two speakers interleaved
+        // correctly once the transcript is sorted by t.
+        var cutAt = Date.now();
         var wav = encodeWav(downsample(merged, ctx.sampleRate, TARGET_RATE), TARGET_RATE);
         transcribeFn(wav, label).then(function (text) {
-          if (text && text.trim()) onLine({ source: label, text: text.trim(), t: Date.now() });
+          if (text && text.trim()) onLine({ source: label, text: text.trim(), t: cutAt });
         }).catch(function (err) { if (onError) onError(err); });
       }, CHUNK_MS);
     }

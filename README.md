@@ -146,8 +146,11 @@ endpoint**:
 
 The browser records, chunks each source into ~6-second WAV segments, and the
 **local server proxies** them to your endpoint (so the API key stays server-side
-and the strict CSP is respected). Transcript lines stream into the note labeled
-**You**/**Them**.
+and the strict CSP is respected). The transcript appears in its **own region
+below your notes** — so incoming lines never shift or disrupt what you're typing.
+Each line is **timestamped** (wall-clock time) and labeled **You**/**Them**, and
+lines from both sides are ordered by when they were actually spoken (captured at
+chunk time, so variable transcription latency can't scramble the order).
 
 Config (all optional; stored encrypted in settings): endpoint, API key, model.
 

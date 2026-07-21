@@ -13,3 +13,4 @@ meeting-notes-viewer.html
 Thumbs.db
 node_modules/
 *.log
+.screenshots/

@@ -178,10 +178,6 @@
                   <span id="recStatus" class="rec-status muted tiny"></span>
                 </div>
               </div>
-              <div id="transcriptPanel" class="transcript hidden">
-                <div class="transcript-head"><span>🎙 Live transcript</span><button id="transcriptToggle" class="link-btn tiny">hide</button></div>
-                <div id="transcriptBody" class="transcript-body"></div>
-              </div>
               <div class="rte-toolbar" data-target="meetingEditor"></div>
               <div id="meetingEditor" class="rte" contenteditable="true" aria-label="Meeting notes"></div>
               <div class="attachments">
@@ -193,6 +189,18 @@
               </div>
             </div>
           </div>
+
+          <!-- Live transcript lives in its own region below the notes so incoming
+               lines never shift or disrupt the editor while you're taking notes. -->
+          <section id="transcriptPanel" class="transcript-region hidden" aria-label="Meeting transcript">
+            <div class="transcript-head">
+              <span>🎙 Live transcript</span>
+              <span class="transcript-sub muted tiny">Separate from your notes — labels who spoke</span>
+              <button id="transcriptToggle" class="link-btn tiny">hide</button>
+            </div>
+            <div id="transcriptBody" class="transcript-body"></div>
+          </section>
+
           <div id="backlinks" class="backlinks hidden">
             <span class="bl-label">Linked from:</span>
             <span id="backlinksList"></span>

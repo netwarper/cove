@@ -248,6 +248,20 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.7.1 (2026-07-21):** Transcript refinements. Moved the live transcript into
+  its **own region below the note sections** so incoming lines no longer shift or
+  disrupt the editor while you take notes. Each line now shows a **wall-clock
+  timestamp**, and lines from both streams are **ordered by when they were spoken**
+  — the chunk cut-time is captured before the STT round-trip (previously stamped at
+  response time, so differing transcription latency between the two streams could
+  scramble the order). Added a record-only placeholder in the transcript region.
+  Verified: quality 0 · functional 69/69 · security 21/21 · config 14/14 · backup
+  10/10 · viewer 17/17 · transcribe 13/13; browser test confirmed the transcript
+  sits below the sections, renders chronologically ordered + timestamped, saved 2
+  encrypted audio attachments, zero console errors. Comprehensive security review of
+  the recording/transcription surface found no reportable vulnerabilities (route is
+  session+CSRF gated; transcript rendered via textContent; STT key stays server-side;
+  strict CSP intact).
 - **1.7.0 (2026-07-20):** Granola-style meeting recording — dual-stream capture
   (mic = "You" via getUserMedia, other side = "Them" via getDisplayMedia
   tab/system audio), each saved as an encrypted attachment. Optional near-live
