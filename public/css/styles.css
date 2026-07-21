@@ -328,7 +328,6 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 
 /* ---- v1.2 additions ---- */
 .rte { font-size: var(--note-font, 14px); }
-.note-filter { width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel-2); color: var(--ink); }
 .rte-table { border-collapse: collapse; width: 100%; margin: 6px 0; }
 .rte-table td { border: 1px solid var(--line); padding: 4px 6px; min-width: 40px; }
 .rte a[data-note-id] { color: var(--brand); text-decoration: none; border-bottom: 1px dotted var(--brand); cursor: pointer; }

@@ -136,7 +136,7 @@ encrypted attachment (`meeting-audio-<time>.wav`) — a universally-playable for
 tuned for meeting speech. Nothing leaves your machine from recording alone.
 
 **Transcription is optional and off by default.** Enable it from the **⚙ Transcription**
-button next to Record (or **⋮ → Passphrase & recovery → Meeting transcription**) by
+button next to Record (or **⋮ → Settings → Meeting transcription**) by
 setting an **OpenAI-compatible STT endpoint**:
 
 - **Local (private):** point it at a Whisper server on your machine, e.g.

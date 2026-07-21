@@ -63,8 +63,8 @@
           <div id="moreMenu" class="menu hidden">
             <button data-more="templates">🧩 Templates</button>
             <button data-more="trash">🗑 Trash</button>
-            <button data-more="backup">⭳ Backup / restore</button>
-            <button data-more="account">🔐 Passphrase &amp; recovery</button>
+            <button data-more="backup">💾 Backup &amp; restore</button>
+            <button data-more="account">⚙️ Settings</button>
           </div>
         </div>
         <button id="logoutBtn" class="icon-btn" title="Lock / log out" aria-label="Lock">⏻</button>
@@ -96,10 +96,6 @@
         </div>
         <div class="sidebar-actions">
           <button id="importBtn" class="link-btn">📥 Import a note</button>
-          <select id="noteFilter" class="note-filter" title="Filter / sort notes">
-            <option value="all">All notes</option>
-            <option value="open">Most open to-dos</option>
-          </select>
         </div>
         <ul id="noteList" class="note-list"></ul>
         <div class="sidebar-foot">
@@ -310,7 +306,7 @@
     </div>
 
     <div class="modal hidden" id="accountModal">
-      <h3>Passphrase &amp; recovery</h3>
+      <h3>⚙️ Settings</h3>
       <div class="acct-block">
         <h4>Change passphrase</h4>
         <input id="oldPass" type="password" placeholder="Current passphrase" autocomplete="current-password">
@@ -459,7 +455,7 @@
             <li><span>📅</span><span>Give a to-do a due date → it shows in the Agenda</span></li>
             <li><span>#tag</span><span>Tag notes; search with <code>tag:name</code></span></li>
             <li><span>⏰</span><span>Reminders pop into the To-Do list when due; snooze with 💤</span></li>
-            <li><span>⋮</span><span>Templates · Trash · Backup &amp; offline viewer · Passphrase</span></li>
+            <li><span>⋮</span><span>Templates · Trash · Backup &amp; offline viewer · Settings</span></li>
             <li><span>★</span><span>Hover a note in the sidebar to favorite or delete it</span></li>
           </ul>
         </section>

@@ -222,7 +222,7 @@
       { label: 'Open: Templates', run: openTemplateModal },
       { label: 'Open: Trash', run: renderTrash },
       { label: 'Open: Backup / offline viewer', run: function () { openModal('backupModal'); } },
-      { label: 'Open: Passphrase, recovery & transcription', run: function () { openAccount(); } },
+      { label: 'Open: Settings', run: function () { openAccount(); } },
       { label: 'Toggle theme', run: function () { $('themeBtn').click(); } },
       { label: 'Help & shortcuts', run: openHelp },
       { label: 'Lock (log out)', run: function () { $('logoutBtn').click(); } },
@@ -371,7 +371,7 @@
   }
 
   async function renderNoteList() {
-    var notes = await API.listNotes(state.wsId, $('noteFilter').value);
+    var notes = await API.listNotes(state.wsId);
     var ul = $('noteList'); ul.innerHTML = '';
     notes.forEach(function (nm) {
       var li = document.createElement('li');
@@ -631,7 +631,7 @@
       hint.className = 'tr-empty muted tiny';
       hint.textContent = (state.settings.transcription || {}).endpoint
         ? 'Listening… transcript lines will appear here as people speak.'
-        : 'Recording — transcription is off. Add an STT endpoint under 🔐 Passphrase & recovery to see live text here.';
+        : 'Recording — transcription is off. Add an STT endpoint under ⚙️ Settings → Meeting transcription to see live text here.';
       body.appendChild(hint);
       return;
     }
@@ -823,8 +823,6 @@
     });
   }
 
-  $('noteFilter').addEventListener('change', renderNoteList);
-
   // Export menu
   $('exportBtn').addEventListener('click', function (e) { e.stopPropagation(); $('exportMenu').classList.toggle('hidden'); });
   $('exportMenu').addEventListener('click', function (e) {
@@ -957,7 +955,12 @@
       var li = document.createElement('li');
       li.innerHTML = '<span class="fv-title">' + esc(f.displayTitle) + '</span><span class="gt-ws">' + esc(f.workspaceName) + '</span>';
       var restore = document.createElement('button'); restore.className = 'link-btn'; restore.textContent = 'restore';
-      restore.addEventListener('click', async function () { await API.restoreTrash(f.id); await loadWorkspaces(); renderTrash(); });
+      restore.addEventListener('click', async function () {
+        await API.restoreTrash(f.id);
+        await loadWorkspaces();
+        renderNoteList(); // reflect the restored note in the sidebar if it's in the current workspace
+        renderTrash();
+      });
       var purge = document.createElement('button'); purge.className = 'link-btn danger'; purge.textContent = 'delete forever';
       purge.addEventListener('click', async function () { if (await dialog.confirm('Permanently delete “' + f.displayTitle + '”? This cannot be undone.', { okText: 'Delete forever', danger: true })) { await API.purgeTrash(f.id); renderTrash(); } });
       li.appendChild(restore); li.appendChild(purge); ul.appendChild(li);
