@@ -1,25 +1,26 @@
 /* Meeting audio recorder.
  *
- * Captures TWO sources and keeps them separate so the transcript can label who
- * spoke:
- *   - "you"  = your microphone (getUserMedia)
- *   - "them" = the other side / what you hear (getDisplayMedia tab/system audio)
+ * Captures your microphone ("you", getUserMedia) and the other side / what you
+ * hear ("them", getDisplayMedia tab/system audio) and does two things:
  *
- * Each source is saved via MediaRecorder (encrypted attachment on stop) and,
- * in parallel, tapped through the Web Audio API to emit independent WAV chunks
- * every few seconds for near-live transcription. WAV chunks are self-contained
- * (unlike mid-stream webm), so each can be transcribed on its own.
+ *   1. Mixes BOTH sources into a single combined recording and, on stop, encodes
+ *      it as one WAV file (audio/wav — a universally-playable format, unlike the
+ *      webm MediaRecorder emits). Mono, 16 kHz: tuned for meeting speech and kept
+ *      small.
+ *   2. In parallel, taps each source separately (so the transcript can label who
+ *      spoke) and emits short self-contained WAV chunks for near-live transcription.
  *
  * Nothing is uploaded unless a transcribe function is supplied; the recording
- * itself always stays local.
+ * itself always stays local. Uses only the Web Audio API — no MediaRecorder, so
+ * the output format is the same everywhere.
  */
 (function () {
   'use strict';
   var CHUNK_MS = 6000;      // transcribe roughly every 6 seconds
-  var TARGET_RATE = 16000;  // Whisper-friendly sample rate
+  var TARGET_RATE = 16000;  // Whisper-friendly sample rate; also the saved-file rate
 
   function supported() {
-    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder && (window.AudioContext || window.webkitAudioContext));
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext || window.webkitAudioContext));
   }
 
   function encodeWav(samples, rate) {
@@ -47,87 +48,79 @@
     return out;
   }
 
-  // One capture source: MediaRecorder (save) + ScriptProcessor tap (transcribe chunks).
-  function makeSource(stream, label, ctxClass, transcribeFn, onLine, onError) {
-    var rec = null, recChunks = [];
-    try {
-      var mime = MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : '';
-      rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      rec.ondataavailable = function (e) { if (e.data && e.data.size) recChunks.push(e.data); };
-      rec.start();
-    } catch (e) { /* saving unavailable; transcription can still work */ }
-
-    var ctx = new ctxClass();
-    var src = ctx.createMediaStreamSource(stream);
-    var proc = ctx.createScriptProcessor(4096, 1, 1);
-    var sink = ctx.createGain(); sink.gain.value = 0; // silence — no echo/playback
-    src.connect(proc); proc.connect(sink); sink.connect(ctx.destination);
-    var pending = [];
-    proc.onaudioprocess = function (e) { pending.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
-
-    var timer = null;
-    if (transcribeFn) {
-      timer = setInterval(function () {
-        if (!pending.length) return;
-        var total = pending.reduce(function (a, b) { return a + b.length; }, 0);
-        var merged = new Float32Array(total), off = 0;
-        pending.forEach(function (b) { merged.set(b, off); off += b.length; });
-        pending = [];
-        // Timestamp the chunk when it is CUT (i.e. when the speech happened),
-        // not when transcription returns. STT latency differs per request and
-        // between the two streams, so stamping at resolve time would scramble
-        // the conversation order. Cut-time keeps the two speakers interleaved
-        // correctly once the transcript is sorted by t.
-        var cutAt = Date.now();
-        var wav = encodeWav(downsample(merged, ctx.sampleRate, TARGET_RATE), TARGET_RATE);
-        transcribeFn(wav, label).then(function (text) {
-          if (text && text.trim()) onLine({ source: label, text: text.trim(), t: cutAt });
-        }).catch(function (err) { if (onError) onError(err); });
-      }, CHUNK_MS);
-    }
-
-    return {
-      label: label,
-      stop: function () {
-        return new Promise(function (resolve) {
-          if (timer) clearInterval(timer);
-          try { proc.disconnect(); src.disconnect(); sink.disconnect(); } catch (e) {}
-          try { ctx.close(); } catch (e) {}
-          stream.getTracks().forEach(function (tr) { tr.stop(); });
-          if (rec && rec.state !== 'inactive') {
-            rec.onstop = function () { resolve(recChunks.length ? new Blob(recChunks, { type: recChunks[0].type || 'audio/webm' }) : null); };
-            rec.stop();
-          } else resolve(recChunks.length ? new Blob(recChunks) : null);
-        });
-      },
-    };
+  function concatFloat32(parts) {
+    var total = parts.reduce(function (a, b) { return a + b.length; }, 0);
+    var merged = new Float32Array(total), off = 0;
+    parts.forEach(function (b) { merged.set(b, off); off += b.length; });
+    return merged;
   }
 
   /**
    * Start recording. opts:
    *   transcribeFn(wavBlob, source) -> Promise<string>   (optional; enables transcription)
    *   onLine({source,text,t})   onStatus(msg)   onError(err)
-   * Returns a session with .stop() -> Promise<{ you: Blob|null, them: Blob|null }>.
+   * Returns a session with .stop() -> Promise<{ audio: Blob|null, themActive: bool }>.
    */
   async function start(opts) {
     opts = opts || {};
     var ctxClass = window.AudioContext || window.webkitAudioContext;
-    var sources = [];
+    var ctx = new ctxClass();
+    if (ctx.state === 'suspended' && ctx.resume) { try { await ctx.resume(); } catch (_e) {} }
     var status = opts.onStatus || function () {};
+
+    // Silent sink keeps the ScriptProcessors running without echoing to speakers.
+    var sink = ctx.createGain(); sink.gain.value = 0; sink.connect(ctx.destination);
+
+    // Combined recording bus: every source feeds this, tapped once for the file.
+    var mix = ctx.createGain(); mix.gain.value = 0.9; // slight headroom so two loud sources don't clip
+    var recParts = [];
+    var recProc = ctx.createScriptProcessor(4096, 1, 1);
+    mix.connect(recProc); recProc.connect(sink);
+    recProc.onaudioprocess = function (e) {
+      recParts.push(downsample(new Float32Array(e.inputBuffer.getChannelData(0)), ctx.sampleRate, TARGET_RATE));
+    };
+
+    var sources = []; // { stream, src, tproc, timer }
+
+    function addSource(stream, label) {
+      var src = ctx.createMediaStreamSource(stream);
+      src.connect(mix); // into the combined recording
+      var entry = { stream: stream, src: src, tproc: null, timer: null };
+      if (opts.transcribeFn) {
+        // Separate per-source tap so each speaker's audio is transcribed & labeled.
+        var tproc = ctx.createScriptProcessor(4096, 1, 1);
+        src.connect(tproc); tproc.connect(sink);
+        var pending = [];
+        tproc.onaudioprocess = function (e) { pending.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+        entry.tproc = tproc;
+        entry.timer = setInterval(function () {
+          if (!pending.length) return;
+          var merged = concatFloat32(pending); pending = [];
+          // Timestamp when the chunk is CUT (when it was spoken), not when STT
+          // returns — latency differs per request, which would scramble order.
+          var cutAt = Date.now();
+          var wav = encodeWav(downsample(merged, ctx.sampleRate, TARGET_RATE), TARGET_RATE);
+          opts.transcribeFn(wav, label).then(function (text) {
+            if (text && text.trim() && opts.onLine) opts.onLine({ source: label, text: text.trim(), t: cutAt });
+          }).catch(function (err) { if (opts.onError) opts.onError(err); });
+        }, CHUNK_MS);
+      }
+      sources.push(entry);
+    }
 
     // Microphone ("you")
     var mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-    sources.push(makeSource(mic, 'you', ctxClass, opts.transcribeFn, opts.onLine, opts.onError));
+    addSource(mic, 'you');
     status('Recording your mic…');
 
-    // System / other side ("them") — optional; needs a user pick of a tab/screen with audio.
+    // System / other side ("them") — optional; user picks a tab/window with audio.
     var themActive = false;
     if (navigator.mediaDevices.getDisplayMedia) {
       try {
         var disp = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
         if (disp.getAudioTracks().length) {
-          disp.getVideoTracks().forEach(function (v) { v.stop(); }); // we only want the audio
-          sources.push(makeSource(disp, 'them', ctxClass, opts.transcribeFn, opts.onLine, opts.onError));
+          disp.getVideoTracks().forEach(function (v) { v.stop(); }); // audio only
+          addSource(disp, 'them');
           themActive = true;
           status('Recording your mic + shared audio…');
         } else {
@@ -139,10 +132,19 @@
 
     return {
       themActive: themActive,
-      stop: async function () {
-        var out = { you: null, them: null };
-        for (var i = 0; i < sources.length; i++) { var b = await sources[i].stop(); out[sources[i].label] = b; }
-        return out;
+      stop: function () {
+        return new Promise(function (resolve) {
+          sources.forEach(function (s) {
+            if (s.timer) clearInterval(s.timer);
+            try { if (s.tproc) s.tproc.disconnect(); s.src.disconnect(); } catch (_e) {}
+            s.stream.getTracks().forEach(function (tr) { tr.stop(); });
+          });
+          try { recProc.disconnect(); mix.disconnect(); sink.disconnect(); } catch (_e) {}
+          var samples = concatFloat32(recParts);
+          var audio = samples.length ? encodeWav(samples, TARGET_RATE) : null;
+          try { ctx.close(); } catch (_e) {}
+          resolve({ audio: audio, themActive: themActive });
+        });
       },
     };
   }

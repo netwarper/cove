@@ -63,7 +63,7 @@
     templates: [],
     wsId: null,
     note: null,
-    settings: { layout: 'columns' },
+    settings: {},
     view: 'note',
     saveTimer: null,
     notify: false,
@@ -136,15 +136,25 @@
     $('authGate').classList.add('hidden');
     $('app').classList.remove('hidden');
     state.settings = await API.getSettings();
-    applyLayout();
     applyFontSize(state.settings.fontSize || 14);
     applyTheme(state.settings.theme || 'auto');
     await loadTemplates();
     await loadWorkspaces();
-    await loadCurrentNote();
+    await routeFromHash();
     startIdleTimer();
     startReminderPolling();
     startLiveSync();
+  }
+
+  // Deep-link to a note via the URL hash (#note/<id>) so a refresh reopens the
+  // same note instead of jumping to the newest one.
+  function routeFromHash() {
+    var m = /^#note\/([A-Za-z0-9_-]{1,64})$/.exec(location.hash || '');
+    if (m) return openNote(m[1]).catch(function () { return loadCurrentNote(); });
+    return loadCurrentNote();
+  }
+  function setNoteHash(id) {
+    try { history.replaceState(null, '', location.pathname + (id ? ('#note/' + id) : location.search)); } catch (_e) { /* ignore */ }
   }
 
   // Service worker (offline app shell + notifications)
@@ -203,17 +213,16 @@
   var palette = { open: false, items: [], active: 0 };
   function paletteActions() {
     return [
-      { label: '＋ New note (carry forward)', run: function () { createNewNote({}); } },
-      { label: '＋ New blank note', run: function () { createNewNote({ blank: true }); } },
-      { label: 'Go to: Current note', run: function () { showView('note'); renderNoteList(); } },
+      { label: '＋ New Daily note', run: function () { createNewNote({}); } },
+      { label: '✏️ New scratch note', run: function () { createNewNote({ scratch: true }); } },
+      { label: 'Go to: Current note', run: function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); } },
       { label: 'Go to: All open to-dos', run: renderGlobalTodos },
       { label: 'Go to: Agenda', run: renderAgenda },
       { label: 'Go to: Favorites', run: renderFavorites },
       { label: 'Open: Templates', run: openTemplateModal },
       { label: 'Open: Trash', run: renderTrash },
       { label: 'Open: Backup / offline viewer', run: function () { openModal('backupModal'); } },
-      { label: 'Open: Passphrase & recovery', run: function () { $('acctMsg').textContent = ''; loadStatsInto(); openModal('accountModal'); } },
-      { label: 'Toggle layout', run: function () { $('layoutToggle').click(); } },
+      { label: 'Open: Passphrase, recovery & transcription', run: function () { openAccount(); } },
       { label: 'Toggle theme', run: function () { $('themeBtn').click(); } },
       { label: 'Help & shortcuts', run: openHelp },
       { label: 'Lock (log out)', run: function () { $('logoutBtn').click(); } },
@@ -296,8 +305,10 @@
 
   // ---------------- Note load / render ----------------
   async function loadCurrentNote() {
-    state.note = await API.currentNote(state.wsId);
-    renderNote();
+    var n = await API.currentNote(state.wsId);
+    if (!n) { state.note = null; showLanding(); await renderNoteList(); return; }
+    state.note = n;
+    showView('note'); renderNote();
     await Promise.all([renderNoteList(), renderReminders()]);
   }
   async function openNote(id) {
@@ -306,9 +317,24 @@
     showView('note'); renderNote(); renderNoteList(); renderReminders();
   }
 
+  function showLanding() {
+    setNoteHash(null);
+    var w = state.workspaces.filter(function (x) { return x.id === state.wsId; })[0];
+    $('landingWs').textContent = w ? w.name : 'Meeting Notes';
+    showView('landing');
+  }
+  $('landingNewDaily').addEventListener('click', function () { createNewNote({}); });
+  $('landingNewScratch').addEventListener('click', function () { createNewNote({ scratch: true }); });
+
   function renderNote() {
     var n = state.note;
+    var scratch = n.kind === 'scratch';
     $('noteDate').textContent = n.title;
+    var kind = $('noteKind');
+    kind.textContent = scratch ? '✏️ Scratch' : '';
+    kind.classList.toggle('hidden', !scratch);
+    // Scratch notes are just a Meeting Notes page — hide the other sections.
+    $('sections').classList.toggle('scratch', scratch);
     $('noteCustomTitle').value = n.customTitle || '';
     $('favBtn').textContent = n.favorite ? '★' : '☆';
     renderTags();
@@ -320,6 +346,7 @@
     updateWordCount();
     renderBacklinks();
     renderTranscript();
+    setNoteHash(n.id);
   }
 
   function updateWordCount() {
@@ -351,9 +378,10 @@
       if (state.note && nm.id === state.note.id && state.view === 'note') li.classList.add('active');
       var tags = (nm.tags || []).length ? '<span class="nl-tags">' + nm.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</span>' : '';
       var main = document.createElement('div'); main.className = 'nl-main';
+      var scratch = nm.kind === 'scratch';
       main.innerHTML =
-        '<div class="nl-title">' + esc(nm.displayTitle) + '</div>' +
-        '<div class="nl-meta"><span>' + nm.openTodoCount + ' open</span>' +
+        '<div class="nl-title">' + (scratch ? '<span class="nl-scratch" title="Scratch note">✏️</span> ' : '') + esc(nm.displayTitle) + '</div>' +
+        '<div class="nl-meta">' + (scratch ? '<span>scratch</span>' : '<span>' + nm.openTodoCount + ' open</span>') +
         (nm.attachmentCount ? '<span>📎 ' + nm.attachmentCount + '</span>' : '') + tags + '</div>';
       main.addEventListener('click', function () { openNote(nm.id); });
 
@@ -667,17 +695,18 @@
     var rec = state.recording; state.recording = null;
     $('recordBtn').disabled = true; $('recStatus').textContent = 'Saving recording…';
     try {
+      // One combined WAV holding your mic + the shared audio, mixed accurately.
       var out = await rec.session.stop();
-      var stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
-      for (var i = 0; i < ['you', 'them'].length; i++) {
-        var src = ['you', 'them'][i], blob = out[src];
-        if (!blob || !blob.size) continue;
+      var blob = out.audio;
+      if (blob && blob.size) {
+        var stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
         var b64 = await fileToBase64(blob);
-        var meta = await API.addAttachment(rec.noteId, { name: (src === 'you' ? 'mic' : 'shared') + '-audio-' + stamp + '.webm', mime: blob.type || 'audio/webm', dataB64: b64 });
-        if (state.note && state.note.id === rec.noteId) { state.note.attachments = (state.note.attachments || []).concat(meta); }
+        var meta = await API.addAttachment(rec.noteId, { name: 'meeting-audio-' + stamp + '.wav', mime: 'audio/wav', dataB64: b64 });
+        if (state.note && state.note.id === rec.noteId) { state.note.attachments = (state.note.attachments || []).concat(meta); renderAttachments(); }
+        $('recStatus').textContent = 'Recording saved ✓' + (out.themActive ? ' (mic + shared audio)' : ' (mic only)');
+      } else {
+        $('recStatus').textContent = 'Nothing recorded.';
       }
-      if (state.note && state.note.id === rec.noteId) renderAttachments();
-      $('recStatus').textContent = 'Recording saved ✓';
     } catch (ex) { $('recStatus').textContent = 'Save failed: ' + ex.message; }
     finally { $('recordBtn').disabled = false; $('recordBtn').textContent = '🔴 Record'; $('recordBtn').classList.remove('recording'); }
   }
@@ -703,10 +732,16 @@
   $('newNoteMenu').addEventListener('click', function (e) {
     var kind = e.target.getAttribute('data-new'); if (!kind) return;
     $('newNoteMenu').classList.add('hidden');
-    createNewNote(kind === 'blank' ? { blank: true } : {});
+    createNewNote(kind === 'scratch' ? { scratch: true } : {});
   });
   async function createNewNote(opts) {
-    state.note = await API.newNote(state.wsId, opts); showView('note'); renderNote(); renderNoteList();
+    opts = opts || {};
+    var payload = {};
+    if (opts.scratch) payload.scratch = true;
+    if (opts.templateId) payload.templateId = opts.templateId;
+    state.note = await API.newNote(state.wsId, payload);
+    showView('note'); renderNote();
+    await Promise.all([renderNoteList(), renderReminders()]);
   }
   function renderTemplatePick() {
     var box = $('templatePickList'); box.innerHTML = '';
@@ -729,13 +764,18 @@
     } else if (act === 'copy') {
       var copy = await API.copyNote(state.note.id, null); await loadWorkspaces(); await openNote(copy.id);
     } else if (act === 'move') { openMoveModal(); }
-    else if (act === 'archive') {
-      state.note.archived = !state.note.archived;
-      var s = await API.saveNote(state.note.id, { archived: state.note.archived, baseUpdatedAt: state.note.updatedAt });
-      state.note.updatedAt = s.updatedAt;
-      renderNoteList();
-    } else if (act === 'history') { openHistory(); }
+    else if (act === 'link') { copyNoteLink(); }
+    else if (act === 'history') { openHistory(); }
   });
+
+  async function copyNoteLink() {
+    if (!state.note) return;
+    var url = location.origin + location.pathname + '#note/' + state.note.id;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(url); setSaveStatus('Link copied ✓'); }
+      else await dialog.alert(url, 'Link to this note');
+    } catch (_e) { await dialog.alert(url, 'Link to this note'); }
+  }
 
   async function snoozeReminderTodo(t) {
     var val = await dialog.prompt('Snooze this reminder for how many hours?', { title: 'Snooze reminder', default: '24', inputType: 'number' });
@@ -819,7 +859,7 @@
         if (choice === 'fork') {
           var fork = await API.forkNote(state.note.id, {
             customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
-            meetingNotes: state.note.meetingNotes, freeform: state.note.freeform, tags: state.note.tags,
+            meetingNotes: state.note.meetingNotes, tags: state.note.tags,
           });
           await loadWorkspaces(); await openNote(fork.id); setSaveStatus('Saved as a conflict copy ✓');
         } else if (choice === 'discard') {
@@ -833,25 +873,18 @@
   function setSaveStatus(s) { $('saveStatus').textContent = s; }
   window.addEventListener('beforeunload', function () { if (state.saveTimer) saveNow(); });
 
-  // ---------------- Layout ----------------
-  $('layoutToggle').addEventListener('click', async function () {
-    state.settings.layout = state.settings.layout === 'columns' ? 'rows' : 'columns';
-    applyLayout(); await API.saveSettings({ layout: state.settings.layout });
-  });
-  function applyLayout() { $('sections').className = 'sections ' + (state.settings.layout || 'columns'); }
-
   // ---------------- Views ----------------
   function showView(v) {
     state.view = v;
-    ['noteView', 'todosView', 'favsView', 'trashView', 'searchView', 'agendaView'].forEach(function (id) { $(id).classList.add('hidden'); });
-    $('navNote').classList.toggle('active', v === 'note');
+    ['noteView', 'landingView', 'todosView', 'favsView', 'trashView', 'searchView', 'agendaView'].forEach(function (id) { $(id).classList.add('hidden'); });
+    $('navNote').classList.toggle('active', v === 'note' || v === 'landing');
     $('navTodos').classList.toggle('active', v === 'todos');
     $('navFavs').classList.toggle('active', v === 'favs');
     $('navAgenda').classList.toggle('active', v === 'agenda');
-    var map = { note: 'noteView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', agenda: 'agendaView' };
+    var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', agenda: 'agendaView' };
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
-  $('navNote').addEventListener('click', function () { showView('note'); renderNoteList(); });
+  $('navNote').addEventListener('click', function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); });
   $('navTodos').addEventListener('click', renderGlobalTodos);
   $('navFavs').addEventListener('click', renderFavorites);
   $('navAgenda').addEventListener('click', renderAgenda);
@@ -999,20 +1032,23 @@
     if (m === 'templates') openTemplateModal();
     else if (m === 'trash') renderTrash();
     else if (m === 'backup') openModal('backupModal');
-    else if (m === 'account') {
-      $('acctMsg').textContent = '';
-      var inst = state.instance || {};
-      $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Meeting Notes') + '</b> · v' + esc(inst.version || '') +
-        '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
-        (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
-      $('fontSize').value = state.settings.fontSize || 14;
-      var tc = state.settings.transcription || {};
-      $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
-      updateSttWarn();
-      loadStatsInto();
-      openModal('accountModal');
-    }
+    else if (m === 'account') openAccount();
   });
+  function openAccount(focusStt) {
+    $('acctMsg').textContent = '';
+    var inst = state.instance || {};
+    $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Meeting Notes') + '</b> · v' + esc(inst.version || '') +
+      '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
+      (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
+    $('fontSize').value = state.settings.fontSize || 14;
+    var tc = state.settings.transcription || {};
+    $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
+    updateSttWarn();
+    loadStatsInto();
+    openModal('accountModal');
+    if (focusStt) setTimeout(function () { var el = $('sttEndpoint'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 40);
+  }
+  $('sttSettingsBtn').addEventListener('click', function () { openAccount(true); });
   function isLocalEndpoint(url) { return /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0)(:|\/|$)/i.test(url || ''); }
   function updateSttWarn() {
     var ep = $('sttEndpoint').value.trim();
@@ -1033,22 +1069,32 @@
   function renderWsManage() {
     var ul = $('wsManageList'); ul.innerHTML = '';
     state.workspaces.forEach(function (w) {
-      var li = document.createElement('li');
-      var inp = document.createElement('input'); inp.value = w.name; inp.style.flex = '1';
-      inp.addEventListener('change', function () { API.renameWorkspace(w.id, inp.value).then(loadWorkspaces); });
-      var tsel = document.createElement('select'); tsel.className = 'ws-tpl';
-      tsel.innerHTML = '<option value="">No default template</option>' + state.templates.map(function (t) { return '<option value="' + t.id + '"' + (w.defaultTemplateId === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>'; }).join('');
-      tsel.addEventListener('change', function () { API.setWorkspaceTemplate(w.id, tsel.value || null).then(loadWorkspaces); });
-      li.appendChild(inp); li.appendChild(tsel);
-      if (w.id !== 'general') {
-        var del = document.createElement('button'); del.className = 'wm-del'; del.textContent = '🗑';
+      var li = document.createElement('li'); li.className = 'wm-row';
+
+      var top = document.createElement('div'); top.className = 'wm-top';
+      var inp = document.createElement('input'); inp.className = 'wm-name-input'; inp.value = w.name; inp.setAttribute('aria-label', 'Workspace name');
+      inp.addEventListener('change', function () { API.renameWorkspace(w.id, inp.value.trim() || w.name).then(loadWorkspaces); });
+      top.appendChild(inp);
+      if (w.id === 'general') {
+        var badge = document.createElement('span'); badge.className = 'wm-badge'; badge.textContent = 'default'; top.appendChild(badge);
+      } else {
+        var del = document.createElement('button'); del.className = 'wm-del icon-btn'; del.textContent = '🗑'; del.title = 'Delete workspace';
         del.addEventListener('click', async function () {
           if (!(await dialog.confirm('Delete workspace “' + w.name + '” and all its notes? This cannot be undone.', { okText: 'Delete workspace', danger: true }))) return;
           await API.deleteWorkspace(w.id); if (state.wsId === w.id) state.wsId = 'general';
           await loadWorkspaces(); renderWsManage(); await loadCurrentNote();
         });
-        li.appendChild(del);
+        top.appendChild(del);
       }
+
+      var tplRow = document.createElement('div'); tplRow.className = 'wm-tpl-row';
+      var lbl = document.createElement('label'); lbl.className = 'tiny muted'; lbl.textContent = 'Default template';
+      var tsel = document.createElement('select'); tsel.className = 'ws-tpl';
+      tsel.innerHTML = '<option value="">None</option>' + state.templates.map(function (t) { return '<option value="' + t.id + '"' + (w.defaultTemplateId === t.id ? ' selected' : '') + '>' + esc(t.name) + '</option>'; }).join('');
+      tsel.addEventListener('change', function () { API.setWorkspaceTemplate(w.id, tsel.value || null).then(loadWorkspaces); });
+      tplRow.appendChild(lbl); tplRow.appendChild(tsel);
+
+      li.appendChild(top); li.appendChild(tplRow);
       ul.appendChild(li);
     });
   }
@@ -1186,9 +1232,9 @@
         if (s.workspaceId === state.wsId) refreshCurrent = true;
       });
       // Merge in newly-injected reminder todos without clobbering in-progress edits.
-      if (refreshCurrent && state.view === 'note' && !state.saveTimer) {
+      if (refreshCurrent && state.view === 'note' && state.note && !state.saveTimer) {
         var fresh = await API.currentNote(state.wsId);
-        if (fresh.id === state.note.id) { state.note.todos = fresh.todos; state.note.updatedAt = fresh.updatedAt; state.note.rev = fresh.rev; renderTodos(); }
+        if (fresh && fresh.id === state.note.id) { state.note.todos = fresh.todos; state.note.updatedAt = fresh.updatedAt; state.note.rev = fresh.rev; renderTodos(); }
       }
     } catch (e) { /* ignore transient poll errors */ }
   }
@@ -1209,7 +1255,6 @@
     if (editable || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === '/') { e.preventDefault(); $('globalSearch').focus(); }
     else if (e.key === 'n') { e.preventDefault(); createNewNote({}); }
-    else if (e.key === 'l') { e.preventDefault(); $('layoutToggle').click(); }
     else if (e.key === '?') { e.preventDefault(); openHelp(); }
   });
 

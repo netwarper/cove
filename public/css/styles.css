@@ -133,16 +133,16 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .menu button:hover { background: var(--panel-2); }
 
 /* ---- Sections ---- */
-/* Two layouts:
-   .rows    — every section stacked vertically.
-   .columns — To-Do + Reminders side by side on the first row, then Carryover
-              (full width), then Meeting Notes (full width). */
-.sections { display: grid; gap: 14px; }
-.sections.rows { grid-template-columns: 1fr; }
-.sections.columns { grid-template-columns: 1fr 1fr; }
-.sections.columns [data-sec="carryover"],
-.sections.columns [data-sec="meeting"] { grid-column: 1 / -1; }
-@media (max-width: 680px) { .sections.columns { grid-template-columns: 1fr; } }
+/* To-Do + Reminders side by side on the first row, then Carryover (full width),
+   then Meeting Notes (full width). Scratch notes show only Meeting Notes. */
+.sections { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+.sections [data-sec="carryover"],
+.sections [data-sec="meeting"] { grid-column: 1 / -1; }
+.sections.scratch { grid-template-columns: 1fr; }
+.sections.scratch [data-sec="todos"],
+.sections.scratch [data-sec="reminders"],
+.sections.scratch [data-sec="carryover"] { display: none; }
+@media (max-width: 680px) { .sections { grid-template-columns: 1fr; } }
 .section {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 12px; box-shadow: var(--shadow); min-height: 160px; display: flex; flex-direction: column;
@@ -196,20 +196,6 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .rte img.selected { outline: 2px solid var(--brand); }
 .rte ul, .rte ol { padding-left: 22px; }
 
-/* ---- Free-form canvas ---- */
-.free-canvas {
-  position: relative; min-height: 300px; border: 1px dashed var(--line); border-radius: 8px;
-  background: var(--panel-2); overflow: hidden;
-}
-.free-box {
-  position: absolute; min-width: 80px; min-height: 24px; padding: 4px 6px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow); cursor: move;
-}
-.free-box .fb-edit { outline: none; min-width: 60px; cursor: text; }
-.free-box .fb-del { position: absolute; top: -8px; right: -8px; border: 0; border-radius: 50%; width: 18px; height: 18px;
-  background: var(--danger); color: #fff; font-size: 11px; line-height: 1; display: none; }
-.free-box:hover .fb-del { display: block; }
-
 /* ---- Attachments ---- */
 .attachments { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
 .attach-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -237,7 +223,28 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .fav-list li { cursor: pointer; }
 .fav-list .fv-title { flex: 1; font-weight: 600; }
 
-.save-status { margin-top: 12px; font-size: 12px; color: var(--muted); height: 16px; }
+/* Save indicator pinned to the bottom of the sidebar (always visible). */
+.sidebar-foot { border-top: 1px solid var(--line); padding: 8px 14px; min-height: 34px; display: flex; align-items: center; background: var(--panel); }
+.save-status { font-size: 12px; color: var(--muted); transition: color .2s; }
+
+/* Scratch / kind badge in the note header */
+.title-row { display: flex; align-items: center; gap: 8px; }
+.note-kind { font-size: 11px; font-weight: 700; color: var(--brand); background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 1px 9px; }
+
+/* ---- Landing / empty workspace ---- */
+.landing { max-width: 640px; margin: 6vh auto 0; }
+.landing h1 { font-size: 26px; margin: 0 0 6px; }
+.landing > p { font-size: 15px; margin: 0 0 18px; }
+.landing-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 22px; }
+.landing-actions button { padding: 10px 16px; border-radius: 9px; font-size: 14px; }
+.landing-tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.landing-tips li { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--muted); box-shadow: var(--shadow); }
+.landing-tips b { color: var(--ink); }
+.landing-tips code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---- Inline image resize handle + drop target ---- */
+.img-resize-handle { position: absolute; width: 14px; height: 14px; background: var(--brand); border: 2px solid #fff; border-radius: 3px; cursor: nwse-resize; z-index: 60; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.rte.drop-hover { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand) inset; }
 
 /* ---- Modals ---- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(10,15,30,.45); display: grid; place-items: center; z-index: 40; }
@@ -246,10 +253,23 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .modal input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); margin-bottom: 10px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 .modal-actions button { padding: 8px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
-.ws-manage-list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 260px; overflow: auto; }
+.ws-manage-list { list-style: none; margin: 8px 0 14px; padding: 0; max-height: 320px; overflow: auto; display: grid; gap: 8px; }
 .ws-manage-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .ws-manage-list input { flex: 1; margin: 0; }
 .ws-manage-list .wm-del { border: 0; background: none; color: var(--danger); }
+
+/* Workspace manage rows (card style) — override the generic flex list row */
+.ws-manage-list li.wm-row { display: block; border: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel-2); }
+.wm-top { display: flex; align-items: center; gap: 8px; }
+.wm-name-input { flex: 1; margin: 0; font-weight: 600; }
+.wm-badge { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 2px 8px; }
+.wm-row .wm-del { color: var(--danger); padding: 5px 8px; }
+.wm-tpl-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.wm-tpl-row .ws-tpl { flex: 1; max-width: none; }
+.ws-create { border-top: 1px solid var(--line); padding-top: 12px; }
+.ws-create-row { display: flex; gap: 8px; margin-top: 6px; }
+.ws-create-row input { flex: 1; margin: 0; }
+.ws-create-row button { white-space: nowrap; }
 
 /* ---- Auth extras ---- */
 .auth-link { display: block; margin-top: 12px; text-align: center; }
@@ -392,8 +412,11 @@ mark { background: #ffe58a; color: #3a2f00; border-radius: 2px; padding: 0 1px; 
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) mark { background: #5b4b12; color: #ffe58a; } }
 
 /* ---- Meeting recording + transcript ---- */
-.rec-controls { display: flex; align-items: center; gap: 8px; }
-#recordBtn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 7px; padding: 4px 9px; cursor: pointer; font-size: 12px; }
+.rec-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+button.mini { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 7px; padding: 4px 9px; cursor: pointer; font-size: 12px; }
+button.mini:hover { border-color: var(--brand); }
+button.mini.ghost { color: var(--muted); }
+button.mini.ghost:hover { color: var(--ink); }
 #recordBtn:hover { border-color: var(--brand); }
 #recordBtn.recording { background: var(--danger); color: #fff; border-color: var(--danger); animation: recpulse 1.4s ease-in-out infinite; }
 @keyframes recpulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
@@ -415,9 +438,9 @@ mark { background: #ffe58a; color: #3a2f00; border-radius: 2px; padding: 0 1px; 
 
 /* ---- Print ---- */
 @media print {
-  .topbar, .sidebar, .note-tools, .rte-toolbar, .add-row, .mode-toggle, .save-status, #reminderList, .attach-head label { display: none !important; }
+  .topbar, .sidebar, .note-tools, .rte-toolbar, .add-row, .rec-controls, .transcript-region, #reminderList, .attach-head label { display: none !important; }
   .app, .body, .main { display: block; height: auto; overflow: visible; }
-  .sections.columns { grid-template-columns: 1fr 1fr; }
+  .sections { grid-template-columns: 1fr 1fr; }
   .section { break-inside: avoid; box-shadow: none; }
   body { background: #fff; }
 }

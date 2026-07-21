@@ -116,7 +116,10 @@
       b.setAttribute('data-cmd', t.cmd);
       if (t.style) b.setAttribute('style', t.style);
       b.addEventListener('mousedown', function (e) { e.preventDefault(); }); // keep editor focus/selection
-      b.addEventListener('click', function () { exec(t.cmd, editor, opts); });
+      // Update the button's active state right after the command runs, so a
+      // second toggle (off→on) reflects immediately instead of waiting for the
+      // next keystroke/selection change.
+      b.addEventListener('click', function () { Promise.resolve(exec(t.cmd, editor, opts)).then(function () { updateActiveStates(toolbarEl); }); });
       toolbarEl.appendChild(b);
     });
   }
@@ -170,33 +173,53 @@
     });
   }
 
-  /* Click an inline image to select it; drag its corner (or use +/-) to resize. */
+  /* Click an inline image to select it; a visible corner handle (or +/-) resizes it. */
   function enableImageResize(editor) {
-    editor.addEventListener('click', function (e) {
-      editor.querySelectorAll('img.selected').forEach(function (i) { i.classList.remove('selected'); });
-      if (e.target.tagName === 'IMG') e.target.classList.add('selected');
-    });
+    var handle = document.createElement('div');
+    handle.className = 'img-resize-handle';
+    handle.style.display = 'none';
+    handle.title = 'Drag to resize';
+    document.body.appendChild(handle);
+    var selImg = null;
+
+    function place() {
+      if (!selImg || !editor.contains(selImg)) { handle.style.display = 'none'; return; }
+      var r = selImg.getBoundingClientRect();
+      handle.style.display = 'block';
+      handle.style.left = (r.right + window.scrollX - 7) + 'px';
+      handle.style.top = (r.bottom + window.scrollY - 7) + 'px';
+    }
+    function select(img) {
+      if (selImg && selImg !== img) selImg.classList.remove('selected');
+      selImg = img || null;
+      if (selImg) { selImg.classList.add('selected'); place(); } else handle.style.display = 'none';
+    }
+
+    editor.addEventListener('click', function (e) { select(e.target.tagName === 'IMG' ? e.target : null); });
     editor.addEventListener('keydown', function (e) {
-      var img = editor.querySelector('img.selected');
-      if (!img) return;
-      if (e.key === '+' || e.key === '=') { resizeImg(img, 1.1); e.preventDefault(); }
-      if (e.key === '-') { resizeImg(img, 0.9); e.preventDefault(); }
-      if (e.key === 'Delete' || e.key === 'Backspace') { img.remove(); e.preventDefault(); fireInput(editor); }
+      if (!selImg) return;
+      if (e.key === '+' || e.key === '=') { resizeImg(selImg, 1.1); place(); e.preventDefault(); }
+      else if (e.key === '-') { resizeImg(selImg, 0.9); place(); e.preventDefault(); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') { var i = selImg; select(null); i.remove(); e.preventDefault(); fireInput(editor); }
     });
-    editor.addEventListener('mousedown', function (e) {
-      if (e.target.tagName !== 'IMG') return;
-      var img = e.target;
-      var rect = img.getBoundingClientRect();
-      if (e.clientX < rect.right - 16 || e.clientY < rect.bottom - 16) return;
+    // Drag the handle to resize (keeps aspect ratio via width only).
+    handle.addEventListener('mousedown', function (e) {
+      if (!selImg) return;
       e.preventDefault();
-      var startX = e.clientX, startW = rect.width;
-      function move(ev) { img.style.width = Math.max(40, startW + (ev.clientX - startX)) + 'px'; }
+      var startX = e.clientX, startW = selImg.getBoundingClientRect().width;
+      function move(ev) { selImg.style.width = Math.max(40, startW + (ev.clientX - startX)) + 'px'; selImg.style.height = 'auto'; place(); }
       function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); fireInput(editor); }
       document.addEventListener('mousemove', move);
       document.addEventListener('mouseup', up);
     });
+    // Keep the handle glued to the image as things move/scroll/reflow.
+    document.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    editor.addEventListener('input', function () { setTimeout(place, 0); });
+    // Deselect when clicking outside the editor (but not on the handle itself).
+    document.addEventListener('mousedown', function (e) { if (e.target !== handle && !editor.contains(e.target)) select(null); });
   }
-  function resizeImg(img, factor) { var w = img.getBoundingClientRect().width; img.style.width = Math.max(40, w * factor) + 'px'; img.dispatchEvent(new Event('input', { bubbles: true })); }
+  function resizeImg(img, factor) { var w = img.getBoundingClientRect().width; img.style.width = Math.max(40, w * factor) + 'px'; img.style.height = 'auto'; img.dispatchEvent(new Event('input', { bubbles: true })); }
 
   /* Paste images inline (OneNote-like). */
   function enablePasteImages(editor, uploader) {
@@ -208,6 +231,32 @@
     });
   }
 
+  /* Drag & drop images / screenshots straight into a note. */
+  function enableDropImages(editor, uploader) {
+    function hasFiles(e) {
+      var dt = e.dataTransfer; if (!dt) return false;
+      if (dt.items && dt.items.length) { for (var i = 0; i < dt.items.length; i++) if (dt.items[i].kind === 'file') return true; return false; }
+      return (dt.types || []).indexOf && Array.prototype.indexOf.call(dt.types, 'Files') >= 0;
+    }
+    editor.addEventListener('dragover', function (e) { if (hasFiles(e)) { e.preventDefault(); editor.classList.add('drop-hover'); } });
+    editor.addEventListener('dragleave', function (e) { if (e.target === editor) editor.classList.remove('drop-hover'); });
+    editor.addEventListener('drop', function (e) {
+      var files = (e.dataTransfer && e.dataTransfer.files) || [];
+      var imgs = Array.prototype.filter.call(files, function (f) { return f.type.indexOf('image/') === 0; });
+      editor.classList.remove('drop-hover');
+      if (!imgs.length) return;
+      e.preventDefault();
+      editor.focus();
+      // Drop at the cursor position under the pointer when the browser supports it.
+      var range = null;
+      if (document.caretRangeFromPoint) range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      else if (document.caretPositionFromPoint) { var pos = document.caretPositionFromPoint(e.clientX, e.clientY); if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); } }
+      if (range && editor.contains(range.startContainer)) { var s = window.getSelection(); s.removeAllRanges(); s.addRange(range); }
+      var saved = saveRange(editor);
+      imgs.forEach(function (f) { insertImageFile(editor, f, uploader, saved); });
+    });
+  }
+
   window.Editor = {
     // opts.uploader(file) -> Promise<url>: inserted images become attachments.
     // opts.noteLinkPicker(insertFn): lets the app supply a note to link to.
@@ -216,6 +265,7 @@
       buildToolbar(toolbarEl, editor, opts);
       enableImageResize(editor);
       enablePasteImages(editor, opts.uploader || null);
+      enableDropImages(editor, opts.uploader || null);
       enableSlashMenu(editor, opts);
       enableNoteLinks(editor);
       // Reflect the active formatter on the toolbar buttons.

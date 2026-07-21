@@ -60,7 +60,7 @@ const fake = http.createServer((req, res) => {
     t.ok(r.status === 200 && r.body.text === 'hello from stt', 'POST /api/transcribe proxies to the STT endpoint');
 
     // ---- transcript persists on the note ----
-    r = await c.request('GET', '/api/workspaces/general/current');
+    r = await c.request('POST', '/api/workspaces/general/notes/new', {});
     const noteId = r.body.id;
     r = await c.request('PUT', '/api/notes/' + noteId, { transcript: [{ t: 1, source: 'you', text: 'hi' }, { t: 2, source: 'them', text: 'hello' }] });
     t.eq(r.body.transcript.length, 2, 'transcript is stored on the note');

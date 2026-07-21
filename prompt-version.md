@@ -248,6 +248,35 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.8.0 (2026-07-21):** Notes model + UX overhaul.
+  - **Daily vs scratch notes.** The sidebar button is now **New Daily** (carries
+    open to-dos + carryover forward from the last *daily* note). **New scratch
+    note** is a clean Meeting-Notes-only page that never affects the carryover
+    thread. Removed the old "carry forward"/"blank" note items.
+  - **Landing page.** Workspaces no longer auto-create a note; an empty workspace
+    shows a landing page with tips + New Daily / New scratch shortcuts.
+  - **Deep links.** Notes carry a `#note/<id>` URL hash — a refresh reopens the
+    same note, and **⋯ → Copy link to note** copies a shareable link.
+  - **Recording is one common file.** Mic + shared audio are now **mixed into a
+    single `.wav`** (Web Audio, mono 16 kHz) instead of two `.webm` files.
+  - **Transcription discoverability.** A **⚙ Transcription** button sits next to
+    Record; the transcript region shows a clear record-only placeholder when no
+    STT endpoint is set. AudioContext is resumed on start so live chunks flow.
+  - **Editor fixes.** Toolbar toggle buttons reflect state immediately on
+    re-toggle (no stray keystroke needed); inline images have a **visible resize
+    handle**; images can be **dragged & dropped** into a note.
+  - **Save indicator** moved to a pinned footer at the bottom of the sidebar.
+  - **Removed** the layout toggle (single columns layout), the archive feature,
+    and dead code (free-form notes, pin/archive fields, `settings.layout`).
+  - **Service worker** now serves the app shell **network-first** (cache bumped
+    to v3) so updates take effect on reload instead of being pinned to a stale
+    cached version.
+  - **Workspace modal** redesigned (card rows, DEFAULT badge, clearer create).
+  - Verified: quality 0 · functional 76/76 · security 21/21 · config 14/14 ·
+    backup 10/10 · viewer 17/17 · transcribe 13/13; a 24-check browser test drove
+    the landing page, daily/scratch flow, combined `.wav` recording, live
+    transcription (stub STT), decorator re-toggle, image handle, hash persistence,
+    and the redesigned workspace modal — zero console errors.
 - **1.7.1 (2026-07-21):** Transcript refinements. Moved the live transcript into
   its **own region below the note sections** so incoming lines no longer shift or
   disrupt the editor while you take notes. Each line now shows a **wall-clock

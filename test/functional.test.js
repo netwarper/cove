@@ -36,10 +36,13 @@ const t = harness('functional');
     const teamWs = r.body.id;
     t.ok(!!teamWs, 'created custom workspace');
 
-    // --- current note ---
+    // --- first daily note (workspaces start empty; nothing is auto-created) ---
     r = await c.request('GET', '/api/workspaces/general/current');
+    t.eq(r.body, null, 'empty workspace has no current note (client shows a landing page)');
+    r = await c.request('POST', '/api/workspaces/general/notes/new', {});
     const note1 = r.body;
-    t.ok(/^\d{4}-\d{2}-\d{2}$/.test(note1.title), 'note auto-titled with date');
+    t.ok(/^\d{4}-\d{2}-\d{2}$/.test(note1.title), 'new daily note titled with date');
+    t.eq(note1.kind, 'daily', 'new note defaults to daily');
 
     // --- edit note: todos + carryover + meeting notes ---
     r = await c.request('PUT', '/api/notes/' + note1.id, {
@@ -117,13 +120,24 @@ const t = harness('functional');
     r = await c.request('GET', '/api/notes/' + note1.id + '/export?format=md');
     t.ok(r.raw.toString().startsWith('# '), 'markdown export renders heading');
 
-    // --- settings (layout) ---
-    r = await c.request('PUT', '/api/settings', { layout: 'rows' });
-    t.eq(r.body.layout, 'rows', 'layout setting persisted');
+    // --- settings persist ---
+    r = await c.request('PUT', '/api/settings', { theme: 'dark' });
+    t.eq(r.body.theme, 'dark', 'setting persisted');
 
-    // --- free-form boxes persist ---
-    r = await c.request('PUT', '/api/notes/' + note2.id, { freeform: [{ id: 'x1', x: 10, y: 20, w: 160, html: 'anywhere' }] });
-    t.eq(r.body.freeform[0].html, 'anywhere', 'free-form box saved');
+    // --- scratch notes vs daily carryover (isolated workspace) ---
+    r = await c.request('POST', '/api/workspaces', { name: 'ScratchWS' });
+    const sws = r.body.id;
+    r = await c.request('POST', '/api/workspaces/' + sws + '/notes/new', {});
+    const sd1 = r.body.id;
+    await c.request('PUT', '/api/notes/' + sd1, { carryover: '<p>daily thread</p>', todos: [{ id: 'k1', text: 'keep me', done: false, doneAt: null, sourceReminderId: null }] });
+    r = await c.request('POST', '/api/workspaces/' + sws + '/notes/new', { scratch: true });
+    t.eq(r.body.kind, 'scratch', 'scratch note has kind=scratch');
+    t.eq(r.body.carryover, '', 'scratch note has no carryover');
+    t.eq((r.body.todos || []).length, 0, 'scratch note carries no todos');
+    r = await c.request('POST', '/api/workspaces/' + sws + '/notes/new', {});
+    t.eq(r.body.kind, 'daily', 'new note defaults to daily');
+    t.ok(r.body.carryover.includes('daily thread'), 'daily note pulls carryover from the last DAILY note, skipping scratch');
+    t.ok(r.body.todos.some((x) => x.text === 'keep me'), 'daily note carries open todos from the last daily note');
 
     // --- tags + tag search ---
     r = await c.request('PUT', '/api/notes/' + note1.id, { tags: ['planning', 'q3'], baseUpdatedAt: undefined });
@@ -208,13 +222,11 @@ const t = harness('functional');
     r = await c.request('GET', '/api/notes/' + note3.id + '/backlinks');
     t.ok(r.body.some((x) => x.id === linker), 'backlinks finds the linking note');
 
-    // --- pin/archive affect listing ---
-    await c.request('PUT', '/api/notes/' + note3.id, { archived: true });
+    // --- note listing ---
     r = await c.request('GET', '/api/workspaces/general/notes');
-    t.ok(!r.body.some((x) => x.id === note3.id), 'archived note hidden from active list');
-    r = await c.request('GET', '/api/workspaces/general/notes?archived=archived');
-    t.ok(r.body.some((x) => x.id === note3.id), 'archived note shows in archived list');
-    await c.request('PUT', '/api/notes/' + note3.id, { archived: false });
+    t.ok(Array.isArray(r.body) && r.body.some((x) => x.id === note3.id), 'note listing includes notes');
+    r = await c.request('GET', '/api/workspaces/general/notes?sort=open');
+    t.ok(Array.isArray(r.body), 'note listing supports open-todo sort');
 
     // --- search index reflects edits + deletes ---
     r = await c.request('PUT', '/api/notes/' + linker, { meetingNotes: '<p>ZEBRACODE unique token</p>' });
@@ -286,7 +298,7 @@ const t = harness('functional');
     // --- corruption resilience: a damaged note is skipped, and reported ---
     r = await c.request('POST', '/api/workspaces', { name: 'Resil' });
     const resilWs = r.body.id;
-    r = await c.request('GET', '/api/workspaces/' + resilWs + '/current');
+    r = await c.request('POST', '/api/workspaces/' + resilWs + '/notes/new', {});
     const resilNote = r.body.id;
     const badPath = path.join(DATA_DIR, 'ws', resilWs, 'notes', resilNote + '.json.enc');
     fs.writeFileSync(badPath, Buffer.from('MN1 this is not valid ciphertext at all')); // corrupt it

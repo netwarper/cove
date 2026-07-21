@@ -57,7 +57,6 @@
         <button id="navFavs" class="tab" title="Favorites">★</button>
         <button id="notifyBtn" class="icon-btn" title="Enable reminder notifications" aria-label="Enable notifications">🔔</button>
         <button id="themeBtn" class="icon-btn" title="Theme: auto / light / dark" aria-label="Toggle theme">🌓</button>
-        <button id="layoutToggle" class="icon-btn" title="Toggle layout" aria-label="Toggle layout">☷</button>
         <button id="helpBtn" class="icon-btn" title="Help &amp; shortcuts (press ?)" aria-label="Help">?</button>
         <div class="more-wrap">
           <button id="moreBtn" class="icon-btn" title="More" aria-label="More actions">⋮</button>
@@ -84,11 +83,11 @@
         <div class="sidebar-head">
           <span>Notes</span>
           <div class="new-note-wrap">
-            <button id="newNoteBtn" class="primary sm" title="New note from most recent">+ New</button>
+            <button id="newNoteBtn" class="primary sm" title="New daily note — carries forward to-dos &amp; carryover from the last daily note">＋ New Daily</button>
             <button id="newNoteCaret" class="primary sm caret" title="New note options" aria-label="New note options">▾</button>
             <div id="newNoteMenu" class="menu hidden">
-              <button data-new="carry">New (carry forward)</button>
-              <button data-new="blank">New blank note</button>
+              <button data-new="daily">New daily note</button>
+              <button data-new="scratch">New scratch note</button>
               <div class="menu-sep"></div>
               <div class="menu-label">From template</div>
               <div id="templatePickList"></div>
@@ -96,15 +95,16 @@
           </div>
         </div>
         <div class="sidebar-actions">
-          <button id="importBtn" class="link-btn">⭳ Import</button>
+          <button id="importBtn" class="link-btn">📥 Import a note</button>
           <select id="noteFilter" class="note-filter" title="Filter / sort notes">
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="all">All</option>
+            <option value="all">All notes</option>
             <option value="open">Most open to-dos</option>
           </select>
         </div>
         <ul id="noteList" class="note-list"></ul>
+        <div class="sidebar-foot">
+          <span id="saveStatus" class="save-status" aria-live="polite"></span>
+        </div>
       </aside>
 
       <main id="main" class="main">
@@ -112,7 +112,10 @@
         <section id="noteView" class="view">
           <div class="note-header">
             <div class="title-block">
-              <span id="noteDate" class="note-date"></span>
+              <div class="title-row">
+                <span id="noteDate" class="note-date"></span>
+                <span id="noteKind" class="note-kind hidden"></span>
+              </div>
               <input id="noteCustomTitle" class="custom-title" placeholder="Add a specific title…">
               <div id="tagBar" class="tag-bar"></div>
             </div>
@@ -128,7 +131,7 @@
               </div>
               <button id="noteMoreBtn" class="icon-btn" title="More note actions" aria-label="More note actions">⋯</button>
               <div id="noteMoreMenu" class="menu hidden">
-                <button data-note="archive">🗄 Archive / unarchive</button>
+                <button data-note="link">🔗 Copy link to note</button>
                 <button data-note="history">🕐 Version history</button>
                 <button data-note="move">➜ Move to workspace…</button>
                 <button data-note="copy">⧉ Duplicate</button>
@@ -137,7 +140,7 @@
             </div>
           </div>
 
-          <div id="sections" class="sections columns">
+          <div id="sections" class="sections">
             <div class="section" data-sec="todos">
               <h2>✔ To-Do</h2>
               <div class="add-row"><input id="todoInput" placeholder="Add a to-do…"></div>
@@ -175,6 +178,7 @@
                 <h2>📝 Meeting Notes</h2>
                 <div class="rec-controls">
                   <button id="recordBtn" class="mini" title="Record meeting audio">🔴 Record</button>
+                  <button id="sttSettingsBtn" class="mini ghost" title="Transcription settings">⚙ Transcription</button>
                   <span id="recStatus" class="rec-status muted tiny"></span>
                 </div>
               </div>
@@ -206,8 +210,25 @@
             <span id="backlinksList"></span>
           </div>
           <div class="save-row">
-            <div id="saveStatus" class="save-status" aria-live="polite"></div>
             <div id="wordCount" class="word-count"></div>
+          </div>
+        </section>
+
+        <section id="landingView" class="view hidden">
+          <div class="landing">
+            <h1>🗒️ <span id="landingWs">Meeting Notes</span></h1>
+            <p class="muted">This workspace has no notes yet. Start one:</p>
+            <div class="landing-actions">
+              <button id="landingNewDaily" class="primary">＋ New Daily note</button>
+              <button id="landingNewScratch" class="sm">✏️ New scratch note</button>
+            </div>
+            <ul class="landing-tips">
+              <li><b>Daily notes</b> carry your open to-dos and carryover forward from the previous daily note — your running thread.</li>
+              <li><b>Scratch notes</b> are a clean Meeting Notes page for a quick jot; they don’t affect carryover.</li>
+              <li>Record meeting audio with <b>🔴 Record</b>; the transcript appears in its own area below your notes.</li>
+              <li>Press <kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd> for the command palette, or <kbd>?</kbd> for help &amp; shortcuts.</li>
+              <li>Tag notes with <code>#tag</code> and search anywhere with <code>tag:name</code>.</li>
+            </ul>
           </div>
         </section>
 
@@ -245,13 +266,17 @@
   <!-- ---------- Modals ---------- -->
   <div id="modalBackdrop" class="modal-backdrop hidden">
     <div class="modal" id="wsModal">
-      <h3>Manage workspaces</h3>
+      <h3>Workspaces</h3>
+      <p class="muted tiny">Separate streams of notes — a project, a team, or personal. Each keeps its own notes, reminders, and default template.</p>
       <ul id="wsManageList" class="ws-manage-list"></ul>
-      <div class="add-row">
-        <input id="newWsName" placeholder="New workspace name">
-        <button id="createWsBtn" class="sm primary">Create</button>
+      <div class="ws-create">
+        <label class="tiny muted" for="newWsName">Add a workspace</label>
+        <div class="ws-create-row">
+          <input id="newWsName" placeholder="e.g. Product, Personal, Team sync">
+          <button id="createWsBtn" class="sm primary">＋ Create</button>
+        </div>
       </div>
-      <div class="modal-actions"><button class="modal-close">Close</button></div>
+      <div class="modal-actions"><button class="modal-close primary">Done</button></div>
     </div>
 
     <div class="modal hidden" id="importModal">
@@ -415,8 +440,7 @@
           <ul class="kbd-list">
             <li><kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd><span>Command palette — jump to any note, workspace, or action</span></li>
             <li><kbd>/</kbd><span>Focus search</span></li>
-            <li><kbd>n</kbd><span>New note (carry forward)</span></li>
-            <li><kbd>l</kbd><span>Toggle layout</span></li>
+            <li><kbd>n</kbd><span>New daily note</span></li>
             <li><kbd>?</kbd><span>This help</span></li>
             <li><kbd>Esc</kbd><span>Close menus / dialogs</span></li>
           </ul>

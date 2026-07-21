@@ -374,7 +374,7 @@ async function route(s, req, res, pathname, query) {
       return s.renameWorkspace(wsId, body.name);
     }
     if (seg.length === 3 && m === 'DELETE') return s.deleteWorkspace(wsId);
-    if (seg[3] === 'notes' && m === 'GET') return s.listNotes(wsId, { archived: query.archived, sort: query.sort });
+    if (seg[3] === 'notes' && m === 'GET') return s.listNotes(wsId, { sort: query.sort });
     if (seg[3] === 'current' && m === 'GET') return s.currentNote(wsId);
     if (seg[3] === 'notes' && seg[4] === 'new' && m === 'POST') return s.createNote(wsId, await readBody(req));
     if (seg[3] === 'reminders' && seg.length === 4 && m === 'GET') return s.listReminders(wsId);

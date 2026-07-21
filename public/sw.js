@@ -1,15 +1,18 @@
 /* Service worker: offline app shell + notification handling.
  *
- * Caches the static app shell so the app opens offline. API requests are never
- * cached (they need the live, authenticated server). Note data is not stored
- * here — it stays encrypted on the server. */
+ * The app shell is served NETWORK-FIRST: because this app normally runs against
+ * its own local server, we always want the freshest HTML/CSS/JS on reload and
+ * only fall back to the cache when offline. (A cache-first strategy previously
+ * pinned users to a stale version until the cache name changed.) API requests
+ * are never cached — they need the live, authenticated server. Note data is not
+ * stored here; it stays encrypted on the server. */
 'use strict';
 
-const CACHE = 'meeting-notes-shell-v1';
+const CACHE = 'meeting-notes-shell-v3';
 const SHELL = [
   '/', '/index.html',
   '/css/styles.css',
-  '/js/api.js', '/js/editor.js', '/js/app.js',
+  '/js/api.js', '/js/editor.js', '/js/recorder.js', '/js/app.js',
   '/manifest.webmanifest', '/icon.svg',
 ];
 
@@ -27,15 +30,13 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.pathname.startsWith('/api/')) return; // live server only
+  if (url.origin !== self.location.origin) return; // don't touch cross-origin
+  // Network-first: fetch fresh, update the cache, fall back to cache offline.
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request).then((res) => {
-      // runtime-cache same-origin shell assets
-      if (res.ok && url.origin === self.location.origin) {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
-      }
+    fetch(e.request).then((res) => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
       return res;
-    }).catch(() => cached))
+    }).catch(() => caches.match(e.request).then((cached) => cached || caches.match('/index.html')))
   );
 });
 

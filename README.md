@@ -32,19 +32,19 @@ everything stays on your machine.
 
 | Area | What it does |
 |------|--------------|
-| **Workspaces** | Notes are grouped into **General** plus any workspaces you create. |
-| **New from latest** | “+ New” seeds the note from the workspace's most recent note. |
-| **Four sections** | To-Do · Reminders · Carryover Notes · Meeting Notes — shown as **4 columns or 4 rows** (toggle in the top bar). |
-| **To-Do** | Completed items strike through and sink to the bottom. **Incomplete items copy into the next new note.** |
+| **Workspaces** | Notes are grouped into **General** plus any workspaces you create. Empty workspaces show a landing page with tips instead of an auto-created note. |
+| **Daily & scratch notes** | **New Daily** starts a note that carries your open to-dos and carryover forward from the last **daily** note. **New scratch note** is a clean Meeting Notes page for a quick jot — it never affects the carryover thread. |
+| **Sections** | To-Do · Reminders · Carryover Notes · Meeting Notes. Scratch notes show only Meeting Notes. |
+| **To-Do** | Completed items strike through and sink to the bottom. **Incomplete items copy into the next daily note.** |
 | **Reminders** | Once / daily / weekly / monthly / every-N-days. When due, a reminder **pops into the to-do list**. |
-| **Carryover Notes** | Rich text that **copies into the next new note**. |
-| **Meeting Notes** | Rich text that is **not** copied over. Supports a **free-form mode** (double-click anywhere to drop a text box, OneNote-style). |
-| **Rich text** | Bold, italic, underline, strikethrough, bullet & numbered lists, headings, links, and **inline images you can resize** (drag the corner, or `+`/`-`). |
+| **Carryover Notes** | Rich text that **copies into the next daily note**. |
+| **Meeting Notes** | Rich text that is **not** copied over. |
+| **Rich text** | Bold, italic, underline, strikethrough, bullet & numbered lists, headings, links, and **inline images** you can **resize** (drag the corner handle, or `+`/`-`) and **paste or drag-and-drop** straight in. |
 | **Attachments** | Attach files (up to 20 MB) to a note; stored encrypted. |
 | **Titles** | Auto-titled with the date, with an optional specific title. |
 | **Global search** | Search across every note in every workspace. |
 | **Global to-dos** | One view of all open to-dos across workspaces. Completing one there updates the source note, and vice-versa. |
-| **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) as two labeled streams, saved as encrypted attachments, with an optional near-live transcript that marks **You** vs **Them**. |
+| **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) mixed into **one `.wav` file** (encrypted like any attachment), with an optional near-live transcript — timestamped and labeled **You** vs **Them** — in its own area below your notes. |
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
 | **Tags** | Tag notes and filter search with `tag:name`. |
 | **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carry-forward is unchanged — To-Do & Carryover still come from the previous note; a template's defaults fill them only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
@@ -57,7 +57,7 @@ everything stays on your machine.
 | **Version history** | Every note keeps automatic snapshots (up to 20); view and restore any earlier version. |
 | **Live sync** | Changes to the data directory (e.g. from another device via a synced folder) refresh open notes in real time; save conflicts can be resolved by keeping both copies. |
 | **Note links & backlinks** | Link between notes (`⧉` in the editor); each note shows what links to it. Rich text also supports **tables** and **/slash commands**. |
-| **Pin / archive** | Pin notes to the top or archive them out of the active list; filter/sort the note list. |
+| **Deep links** | Each note has a shareable `#note/<id>` link (**⋯ → Copy link to note**); a page refresh reopens the same note instead of jumping to the newest. |
 | **Agenda** | A dated view of all due to-dos across workspaces. Reminders support a time-of-day, an end date, and snooze. |
 | **Offline / installable** | Ships as a PWA — installable, with an offline app shell. |
 | **Security** | AES-256-GCM **envelope encryption at rest**, scrypt key derivation, **passphrase change + recovery key**, CSRF tokens, session auth with idle auto-lock, CSP + anti-clickjacking headers, login rate-limiting. |
@@ -131,12 +131,13 @@ separate, labeled sources:
   needs a virtual-audio device (e.g. BlackHole) — the UI tells you when no shared
   audio was included.
 
-Both streams are **saved as encrypted attachments** on stop. Nothing leaves your
-machine from recording alone.
+On stop, both sides are **mixed into a single `.wav` file** and saved as one
+encrypted attachment (`meeting-audio-<time>.wav`) — a universally-playable format,
+tuned for meeting speech. Nothing leaves your machine from recording alone.
 
-**Transcription is optional and off by default.** Enable it in **⋮ → Passphrase &
-recovery → Meeting transcription** by setting an **OpenAI-compatible STT
-endpoint**:
+**Transcription is optional and off by default.** Enable it from the **⚙ Transcription**
+button next to Record (or **⋮ → Passphrase & recovery → Meeting transcription**) by
+setting an **OpenAI-compatible STT endpoint**:
 
 - **Local (private):** point it at a Whisper server on your machine, e.g.
   `http://127.0.0.1:8080/v1/audio/transcriptions` (whisper.cpp server,

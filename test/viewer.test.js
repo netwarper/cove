@@ -23,10 +23,10 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
     store.ensureInitialized();
     const ws = store.createWorkspace('Product');
 
-    const note = store.currentNote('general');
+    const note = store.createNote('general', {});
     store.saveNote(note.id, { customTitle: 'Kickoff', meetingNotes: '<p>UNIQUE-VIEW-TOKEN</p>', tags: ['demo'], todos: [{ id: 't1', text: 'ship it', done: false, doneAt: null, due: null, sourceReminderId: null }] });
     const att = store.addAttachment(note.id, { name: 'pic.png', mime: 'image/png', dataB64: PNG.toString('base64') });
-    const n2 = store.currentNote(ws.id);
+    const n2 = store.createNote(ws.id, {});
     store.saveNote(n2.id, { meetingNotes: '<p>second workspace note</p>' });
 
     // --- build data + HTML ---

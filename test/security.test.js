@@ -39,7 +39,7 @@ function walk(dir, out) {
     t.eq(r.status, 200, 'setup ok');
     t.ok(typeof r.body.recoveryKey === 'string' && r.body.recoveryKey.length >= 16, 'setup returns a one-time recovery key');
     const RECOVERY_KEY = r.body.recoveryKey;
-    r = await c.request('GET', '/api/workspaces/general/current');
+    r = await c.request('POST', '/api/workspaces/general/notes/new', {});
     const noteId = r.body.id;
     await c.request('PUT', '/api/notes/' + noteId, {
       todos: [{ id: 'z', text: SECRET_TODO, done: false, doneAt: null, sourceReminderId: null }],

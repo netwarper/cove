@@ -57,10 +57,7 @@
     deleteWorkspace: (id) => req('DELETE', '/api/workspaces/' + id),
 
     listNotes: (wsId, filter) => {
-      var qs = '';
-      if (filter === 'open') qs = '?archived=active&sort=open';
-      else if (filter === 'archived') qs = '?archived=archived';
-      else if (filter === 'all') qs = '?archived=all';
+      var qs = filter === 'open' ? '?sort=open' : '';
       return req('GET', '/api/workspaces/' + wsId + '/notes' + qs);
     },
     backlinks: (id) => req('GET', '/api/notes/' + id + '/backlinks'),
