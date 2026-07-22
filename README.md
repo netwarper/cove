@@ -45,6 +45,9 @@ everything stays on your machine.
 | **Global search** | Search across every note in every workspace. |
 | **Global to-dos** | One view of all open to-dos across workspaces. Completing one there updates the source note, and vice-versa. |
 | **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) mixed into **one `.wav` file** (encrypted like any attachment), with an optional near-live transcript — timestamped and labeled **You** vs **Them** — in its own area below your notes. |
+| **Screen recording** | **🖥 Screen** records the shared screen/window/tab video with its system audio (+ your mic) to one `.webm` video, saved as an encrypted attachment. |
+| **Sort notes** | Sort the sidebar by **Created / Modified / Name**, ascending or descending (persisted). |
+| **Biometric unlock** | Optionally re-unlock with **Touch ID / Windows Hello / a device passkey** after your session times out, instead of retyping your passphrase (per-device, opt-in; passphrase still required elsewhere). |
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
 | **Tags** | Tag notes and filter search with `tag:name`. |
 | **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carry-forward is unchanged — To-Do & Carryover still come from the previous note; a template's defaults fill them only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
@@ -241,6 +244,16 @@ All optional, via environment variables (or a `.env` file):
   you forget it.
 - **Key handling:** the DEK lives **only in server memory** while a session is
   unlocked; it is never written to disk.
+- **Biometric unlock (optional, per-device):** enroll in **⚙️ Settings** to
+  re-unlock with Touch ID / Windows Hello / a device passkey after your session
+  times out. It adds a **key slot wrapping the DEK with a secret produced by the
+  platform authenticator via the WebAuthn PRF extension** — that secret is only
+  released by the authenticator after a biometric check and is never stored, so a
+  copied data folder still can't unlock without your device. Your passphrase
+  remains primary and is required on any un-enrolled device. Requires a
+  PRF-capable browser (recent Chrome/Edge/Safari) served over **`localhost`, a
+  `<name>.localhost` domain, or HTTPS** — WebAuthn refuses a bare `127.0.0.1` IP,
+  so use `node server.js --set-domain notes` (→ `notes.localhost`) or `localhost`.
 - **Auth:** HttpOnly, SameSite=Strict session cookie (`Secure` added
   automatically over TLS — see `COOKIE_SECURE`), **CSRF token** on every
   state-changing request, per-IP login rate-limiting, and **client-side idle

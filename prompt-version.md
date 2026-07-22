@@ -248,6 +248,31 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.9.0 (2026-07-22):** Sorting, screen recording, biometric unlock.
+  - **Note sorting** — sidebar control for Created / Modified / Name in either
+    direction, persisted in settings; server `listNotes` sorts accordingly.
+  - **Screen + audio recording** — a 🖥 Screen button captures the shared
+    screen/window video + system audio, mixed with the mic, to one encrypted
+    `.webm` (meeting-screen-<time>.webm); auto-stops with the browser's share bar
+    and disables/ is disabled by the audio recorder.
+  - **Biometric unlock (opt-in, per-device)** — a new vault `bio` key-slot wraps
+    the DEK with a secret produced by the platform authenticator via the WebAuthn
+    **PRF** extension (Touch ID / Windows Hello / device passkey). On idle lock the
+    auth screen offers “Unlock with biometrics”; the passphrase stays primary and
+    required on un-enrolled devices. The PRF secret is never stored — a copied data
+    dir still can't unlock without the device. New endpoints: `/api/webauthn/{enroll,
+    unlock,remove}` + bio info in `/api/status`; `lib/crypto` gains `addBioSlot/
+    openBioSlot/listBioSlots/removeBioSlot`. Requires a PRF-capable browser over
+    localhost / a `.localhost` domain / HTTPS (WebAuthn rejects bare 127.0.0.1).
+  - **Also:** renamed “Passphrase & recovery” → “Settings”, refreshed the sidebar
+    on trash-restore, 💾 backup icon, PWA PNG icons, removed the low-value note
+    filter.
+  - Verified: quality 0 · functional 76/76 · security 34/34 (incl. bio crypto +
+    enroll/unlock/decrypt/remove endpoint flow) · config 14/14 · backup 10/10 ·
+    viewer 17/17 · transcribe 13/13. Browser tests drove name-sort asc/desc +
+    persistence, a saved screen `.webm`, and the **full biometric ceremony**
+    (enroll → simulated timeout → PRF unlock → decrypts notes → remove) with a
+    virtual PRF authenticator over localhost.
 - **1.8.0 (2026-07-21):** Notes model + UX overhaul.
   - **Daily vs scratch notes.** The sidebar button is now **New Daily** (carries
     open to-dos + carryover forward from the last *daily* note). **New scratch

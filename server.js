@@ -204,10 +204,37 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/status' && req.method === 'GET') {
       const cookies = parseCookies(req);
       const s = getSession(cookies.mn_session);
+      let bio = { enrolled: false, credentials: [] };
+      if (vaultExists()) { try { const v = readVault(); bio = { enrolled: (v.bio || []).length > 0, credentials: c.listBioSlots(v) }; } catch (_e) { /* ignore */ } }
       return sendJSON(res, 200, {
         initialized: vaultExists(), authenticated: !!s, csrf: s ? s.csrf : null,
+        bio,
         instance: { name: CFG.name, url: CFG.url, domain: CFG.domain, version: APP_VERSION },
       });
+    }
+
+    // Biometric unlock (WebAuthn PRF): the client proves a biometric check by
+    // supplying the PRF secret only its authenticator can reproduce; the server
+    // unwraps the DEK from the matching bio slot and starts a session. Rate-
+    // limited like the passphrase login.
+    if (pathname === '/api/webauthn/unlock' && req.method === 'POST') {
+      const ip = clientIp(req);
+      const att = loginAttempts.get(ip);
+      if (att && att.until > Date.now()) return sendJSON(res, 429, { error: 'too many attempts, try again shortly' });
+      if (!vaultExists()) return sendJSON(res, 400, { error: 'not initialized' });
+      const body = await readBody(req);
+      const dek = c.openBioSlot(readVault(), String(body.credentialId || ''), String(body.prfSecret || ''));
+      if (!dek) {
+        const rec = att || { count: 0, until: 0 };
+        rec.count += 1;
+        if (rec.count >= 5) { rec.until = Date.now() + 30 * 1000; rec.count = 0; }
+        loginAttempts.set(ip, rec);
+        return sendJSON(res, 401, { error: 'biometric unlock failed' });
+      }
+      loginAttempts.delete(ip);
+      new Store(DATA_DIR, dek).ensureInitialized();
+      const token = newSession(dek);
+      return sendJSON(res, 200, { ok: true, csrf: sessions.get(token).csrf }, { 'Set-Cookie': sessionCookie(token, req) });
     }
 
     if (pathname === '/api/setup' && req.method === 'POST') {
@@ -316,6 +343,26 @@ const server = http.createServer(async (req, res) => {
       const rot = c.rotateRecovery(readVault(), session.key);
       writeVault(rot.vault);
       return sendJSON(res, 200, { ok: true, recoveryKey: rot.recoveryKey });
+    }
+
+    // Enroll a biometric slot for this device (wraps the current session's DEK
+    // with the authenticator's PRF secret). Requires an unlocked session.
+    if (pathname === '/api/webauthn/enroll' && req.method === 'POST') {
+      const body = await readBody(req);
+      if (!body.credentialId || !body.prfSecret) return sendJSON(res, 400, { error: 'missing credential or PRF secret' });
+      const vault = c.addBioSlot(readVault(), session.key, {
+        credentialId: String(body.credentialId), prfSecret: String(body.prfSecret),
+        prfSalt: String(body.prfSalt || ''), label: String(body.label || 'This device'),
+      });
+      writeVault(vault);
+      return sendJSON(res, 200, { ok: true, credentials: c.listBioSlots(vault) });
+    }
+
+    if (pathname === '/api/webauthn/remove' && req.method === 'POST') {
+      const body = await readBody(req);
+      const vault = c.removeBioSlot(readVault(), String(body.id || ''));
+      writeVault(vault);
+      return sendJSON(res, 200, { ok: true, credentials: c.listBioSlots(vault) });
     }
 
     if (pathname === '/api/backup' && req.method === 'GET') {

@@ -75,6 +75,7 @@
     var st = await API.status();
     state.initialized = st.initialized;
     state.instance = st.instance || null;
+    state.bio = st.bio || { enrolled: false, credentials: [] };
     if (st.csrf) API.setCsrf(st.csrf);
     if (st.authenticated) return startApp();
     showAuth(st.initialized);
@@ -93,6 +94,8 @@
     $('passphrase2').classList.toggle('hidden', initialized);
     $('toggleRecover').classList.toggle('hidden', !initialized);
     $('passphrase').value = ''; $('passphrase2').value = '';
+    var canBio = !!(state.bio && state.bio.enrolled) && initialized && !!window.PublicKeyCredential;
+    $('bioUnlockBtn').classList.toggle('hidden', !canBio);
   }
 
   $('authForm').addEventListener('submit', async function (e) {
@@ -128,6 +131,67 @@
       if (r.csrf) API.setCsrf(r.csrf);
       await startApp();
     } catch (ex) { err.textContent = ex.message; err.classList.remove('hidden'); }
+  });
+
+  // ---------------- Biometric unlock (WebAuthn PRF) ----------------
+  // A fixed, non-secret salt fed to the authenticator's PRF; the same salt at
+  // enroll and unlock yields the same per-credential secret, which wraps the DEK.
+  var PRF_SALT = new TextEncoder().encode('meeting-notes/webauthn-prf/v1');
+  function bufToB64(buf) { var b = new Uint8Array(buf), s = ''; for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s); }
+  function b64ToBuf(s) { var bin = atob(s), b = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b.buffer; }
+  function bufToB64url(buf) { return bufToB64(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function b64urlToBuf(s) { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return b64ToBuf(s); }
+  function bioDeviceLabel() { try { return (navigator.platform || 'This device'); } catch (_e) { return 'This device'; } }
+
+  // One biometric assertion → { credentialId, secret } (the PRF output as base64).
+  async function bioAssert(credentialIds) {
+    var allow = (credentialIds || []).map(function (id) { return { id: b64urlToBuf(id), type: 'public-key' }; });
+    var assertion = await navigator.credentials.get({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      allowCredentials: allow.length ? allow : undefined,
+      userVerification: 'required', timeout: 60000,
+      extensions: { prf: { eval: { first: PRF_SALT } } },
+    } });
+    var ext = assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {};
+    var first = ext && ext.prf && ext.prf.results && ext.prf.results.first;
+    if (!first) return null;
+    return { credentialId: bufToB64url(assertion.rawId), secret: bufToB64(first) };
+  }
+
+  async function bioEnroll() {
+    if (!window.PublicKeyCredential) throw new Error('WebAuthn is not available in this browser.');
+    var cred = await navigator.credentials.create({ publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rp: { name: 'Meeting Notes' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'meeting-notes', displayName: 'Meeting Notes' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
+      timeout: 60000, extensions: { prf: {} },
+    } });
+    var credId = bufToB64url(cred.rawId);
+    // A follow-up assertion is the reliable cross-platform way to read the PRF output.
+    var got = await bioAssert([credId]);
+    if (!got || !got.secret) throw new Error('This browser/device did not return a PRF secret. Biometric unlock needs a platform passkey on a PRF-capable browser (recent Chrome/Edge/Safari) over localhost or HTTPS.');
+    await API.webauthnEnroll({ credentialId: credId, prfSecret: got.secret, prfSalt: 'v1', label: bioDeviceLabel() });
+  }
+
+  async function bioUnlock(creds) {
+    var got = await bioAssert((creds || []).map(function (c) { return c.credentialId; }));
+    if (!got) throw new Error('no biometric secret returned');
+    var r = await API.webauthnUnlock(got.credentialId, got.secret);
+    if (r.csrf) API.setCsrf(r.csrf);
+    await startApp();
+  }
+
+  $('bioUnlockBtn').addEventListener('click', async function () {
+    var err = $('authError'); err.classList.add('hidden');
+    $('bioUnlockBtn').disabled = true;
+    try {
+      var creds = (state.bio && state.bio.credentials) || [];
+      if (!creds.length) throw new Error('no biometric credential is enrolled');
+      await bioUnlock(creds);
+    } catch (ex) { err.textContent = 'Biometric unlock failed: ' + ex.message; err.classList.remove('hidden'); }
+    finally { $('bioUnlockBtn').disabled = false; }
   });
 
   window.addEventListener('mn-unauthorized', function () { location.reload(); });
@@ -1106,10 +1170,41 @@
     var tc = state.settings.transcription || {};
     $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
     updateSttWarn();
+    renderBioSettings();
     loadStatsInto();
     openModal('accountModal');
     if (focusStt) setTimeout(function () { var el = $('sttEndpoint'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 40);
   }
+
+  function renderBioSettings() {
+    var supported = !!window.PublicKeyCredential;
+    var enrolled = !!(state.bio && state.bio.enrolled);
+    $('bioStatus').textContent = !supported
+      ? 'Not supported in this browser.'
+      : enrolled ? ('Enabled — ' + (((state.bio.credentials || [])[0] || {}).label || 'this device') + '.') : 'Not enabled on this device.';
+    $('bioEnableBtn').classList.toggle('hidden', !supported || enrolled);
+    $('bioRemoveBtn').classList.toggle('hidden', !enrolled);
+    $('bioMsg').textContent = '';
+  }
+  function bioMsg(s, isErr) { var el = $('bioMsg'); el.textContent = s; el.style.color = isErr ? 'var(--danger)' : 'var(--muted)'; }
+  $('bioEnableBtn').addEventListener('click', async function () {
+    bioMsg('Follow your device’s prompt…', false); $('bioEnableBtn').disabled = true;
+    try {
+      await bioEnroll();
+      var st = await API.status(); state.bio = st.bio || state.bio;
+      renderBioSettings(); bioMsg('Biometric unlock enabled ✓', false);
+    } catch (ex) { bioMsg(ex.message, true); }
+    finally { $('bioEnableBtn').disabled = false; }
+  });
+  $('bioRemoveBtn').addEventListener('click', async function () {
+    if (!(await dialog.confirm('Remove biometric unlock from this vault? Your passphrase still works.', { okText: 'Remove', danger: true }))) return;
+    try {
+      var creds = (state.bio && state.bio.credentials) || [];
+      for (var i = 0; i < creds.length; i++) await API.webauthnRemove(creds[i].id);
+      var st = await API.status(); state.bio = st.bio || { enrolled: false, credentials: [] };
+      renderBioSettings(); bioMsg('Removed.', false);
+    } catch (ex) { bioMsg(ex.message, true); }
+  });
   $('sttSettingsBtn').addEventListener('click', function () { openAccount(true); });
   function isLocalEndpoint(url) { return /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\]|0\.0\.0\.0)(:|\/|$)/i.test(url || ''); }
   function updateSttWarn() {

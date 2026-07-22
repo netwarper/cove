@@ -28,6 +28,8 @@
         <button id="authSubmit" type="submit">Unlock</button>
       </form>
 
+      <button id="bioUnlockBtn" class="bio-unlock hidden" type="button">🔒 Unlock with biometrics</button>
+
       <form id="recoverForm" class="hidden">
         <label for="recoveryKeyInput">Recovery key</label>
         <input id="recoveryKeyInput" type="text" placeholder="xxxx-xxxx-xxxx-xxxx-…" autocomplete="off">
@@ -329,6 +331,14 @@
         <h4>Recovery key</h4>
         <p class="muted tiny">If you lose your passphrase, a recovery key is the only way back in. Regenerating invalidates the old one.</p>
         <button id="regenRecoveryBtn" class="sm">Regenerate recovery key</button>
+      </div>
+      <div class="acct-block">
+        <h4>Biometric unlock (this device)</h4>
+        <p class="muted tiny">Re-unlock with Touch ID / Windows Hello / a device passkey after your session times out — no retyping your passphrase. Your passphrase still works and stays required on any device that isn't enrolled. This stores a device-bound wrapped key; the key only leaves the authenticator after a biometric check, so a copied data folder still can't unlock without your device.</p>
+        <div id="bioStatus" class="tiny muted"></div>
+        <button id="bioEnableBtn" class="sm">Enable biometric unlock</button>
+        <button id="bioRemoveBtn" class="sm hidden">Remove biometric unlock</button>
+        <div id="bioMsg" class="tiny" aria-live="polite"></div>
       </div>
       <div class="acct-block">
         <h4>This instance</h4>

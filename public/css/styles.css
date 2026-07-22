@@ -50,6 +50,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   color: var(--brand-ink); font-weight: 600;
 }
 .auth-error { color: var(--danger); font-size: 13px; }
+.bio-unlock { width: 100%; margin-top: 12px; padding: 11px; border: 1px solid var(--brand); border-radius: 8px; background: var(--panel-2); color: var(--brand); font-weight: 600; cursor: pointer; }
+.bio-unlock:hover { background: var(--brand); color: var(--brand-ink); }
 .auth-note { font-size: 12px; margin-top: 18px; }
 .auth-card label { font-weight: 600; font-size: 13px; }
 

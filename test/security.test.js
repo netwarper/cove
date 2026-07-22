@@ -83,6 +83,40 @@ function walk(dir, out) {
     r = await cr.request('POST', '/api/recover', { recoveryKey: RECOVERY_KEY, newPassphrase: PASS });
     t.eq(r.status, 200, 'valid recovery key unlocks and resets passphrase');
 
+    // --- biometric unlock (WebAuthn PRF key slot) ---
+    // crypto-level round-trip
+    const cryptoLib = require('../lib/crypto');
+    {
+      const dek = require('crypto').randomBytes(32);
+      const v1 = cryptoLib.addBioSlot({ bio: [] }, dek, { credentialId: 'c1', prfSecret: 'sekret', prfSalt: 'v1', label: 'x' });
+      t.ok(cryptoLib.openBioSlot(v1, 'c1', 'sekret').equals(dek), 'bio slot unwraps the DEK with the right PRF secret');
+      t.eq(cryptoLib.openBioSlot(v1, 'c1', 'nope'), null, 'bio slot rejects a wrong PRF secret');
+      t.eq(cryptoLib.openBioSlot(v1, 'other', 'sekret'), null, 'bio slot rejects an unknown credential');
+      t.eq((cryptoLib.removeBioSlot(v1, v1.bio[0].id).bio || []).length, 0, 'removeBioSlot deletes the slot');
+    }
+    // endpoint flow: enroll (authenticated) → unlock (fresh client) → decrypts → remove
+    const CRED = 'test-credential-id';
+    const PRF = require('crypto').randomBytes(32).toString('base64');
+    r = await c.request('POST', '/api/webauthn/enroll', { credentialId: CRED, prfSecret: PRF, prfSalt: 'v1', label: 'Test device' });
+    t.eq(r.status, 200, 'biometric enroll (authenticated) succeeds');
+    const bioSlotId = (r.body.credentials.find((x) => x.credentialId === CRED) || {}).id;
+    r = await c.request('GET', '/api/status');
+    t.ok(r.body.bio && r.body.bio.enrolled && r.body.bio.credentials.some((x) => x.credentialId === CRED), 'status reports biometric enrolled');
+    const cb = makeClient(port);
+    r = await cb.request('POST', '/api/webauthn/unlock', { credentialId: CRED, prfSecret: 'the-wrong-secret' });
+    t.eq(r.status, 401, 'biometric unlock with a wrong PRF secret is rejected');
+    r = await cb.request('POST', '/api/webauthn/unlock', { credentialId: CRED, prfSecret: PRF });
+    t.eq(r.status, 200, 'biometric unlock with the correct PRF secret succeeds');
+    r = await cb.request('GET', '/api/notes/' + noteId);
+    t.ok(r.status === 200 && (r.body.meetingNotes || '').includes(SECRET_TODO), 'biometric session recovered the DEK and decrypts notes');
+    const vaultBio = fs.readFileSync(path.join(DATA_DIR, 'vault.json'));
+    t.ok(!vaultBio.includes(Buffer.from(PRF, 'base64')), 'vault.json does not store the raw PRF secret');
+    t.ok(JSON.parse(vaultBio.toString()).vault.bio[0].wrapped, 'vault has a wrapped biometric slot');
+    r = await c.request('POST', '/api/webauthn/remove', { id: bioSlotId });
+    t.eq(r.status, 200, 'biometric slot removed (authenticated)');
+    r = await makeClient(port).request('POST', '/api/webauthn/unlock', { credentialId: CRED, prfSecret: PRF });
+    t.eq(r.status, 401, 'biometric unlock fails after the slot is removed');
+
     // --- wrong passphrase rejected ---
     const c2 = makeClient(port);
     r = await c2.request('POST', '/api/login', { passphrase: 'wrong passphrase!!' });
