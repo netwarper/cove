@@ -20,6 +20,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const c = require('./lib/crypto');
 const store = require('./lib/store');
 const config = require('./lib/config');
@@ -156,6 +157,35 @@ function safeId(id) {
     throw Object.assign(new Error('invalid id'), { status: 400 });
   }
   return id;
+}
+// Raw request body (for the token-gated inbox endpoint, which accepts JSON,
+// form-encoded, or plain text — Slack/relays vary).
+function readRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let size = 0; const chunks = [];
+    req.on('data', (ch) => { size += ch.length; if (size > 65536) { reject(Object.assign(new Error('payload too large'), { status: 413 })); return; } chunks.push(ch); });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+function safeEqual(a, b) {
+  const x = Buffer.from(String(a || '')); const y = Buffer.from(String(b || ''));
+  if (x.length !== y.length || x.length === 0) return false;
+  try { return crypto.timingSafeEqual(x, y); } catch (_e) { return false; }
+}
+function parseInboundText(raw) {
+  raw = String(raw || '').trim();
+  if (!raw) return '';
+  try { const j = JSON.parse(raw); if (j && typeof j.text === 'string') return j.text; if (typeof j === 'string') return j; } catch (_e) { /* not json */ }
+  const m = /(?:^|&)text=([^&]*)/.exec(raw); // form-encoded, e.g. a Slack slash command
+  if (m) return decodeURIComponent(m[1].replace(/\+/g, '%20'));
+  return raw; // plain text
+}
+function inboundToken(req, raw) {
+  const h = req.headers['x-inbox-token'] || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  if (h) return h;
+  try { const j = JSON.parse(raw); if (j && j.token) return String(j.token); } catch (_e) { /* ignore */ }
+  const m = /(?:^|&)token=([^&]*)/.exec(String(raw || '')); return m ? decodeURIComponent(m[1]) : '';
 }
 function clientIp(req) { return (req.socket && req.socket.remoteAddress) || 'unknown'; }
 
@@ -296,6 +326,24 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const out = store.restoreBundle(DATA_DIR, body.bundle);
       return sendJSON(res, 200, out);
+    }
+
+    // Token-gated inbox drop (external → to-do queue). Requires the INBOX_TOKEN
+    // env var; writes a plaintext queue file into DATA_DIR/inbox that the
+    // authenticated client drains into an encrypted to-do. Cannot read or write
+    // any encrypted data (no DEK), so a leaked token only lets someone add a
+    // to-do, never read your notes.
+    if (pathname === '/api/inbox' && req.method === 'POST') {
+      if (!process.env.INBOX_TOKEN) return sendJSON(res, 404, { error: 'inbox HTTP endpoint is disabled (set INBOX_TOKEN to enable)' });
+      const raw = await readRawBody(req);
+      if (!safeEqual(inboundToken(req, raw), process.env.INBOX_TOKEN)) return sendJSON(res, 401, { error: 'bad inbox token' });
+      const text = parseInboundText(raw);
+      if (!text) return sendJSON(res, 400, { error: 'no text' });
+      const dir = path.join(DATA_DIR, 'inbox');
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, Date.now() + '-' + crypto.randomBytes(4).toString('hex') + '.json');
+      fs.writeFileSync(file, JSON.stringify({ text: String(text).slice(0, 2000), via: 'http', ts: new Date().toISOString() }));
+      return sendJSON(res, 200, { ok: true });
     }
 
     // ---- everything below requires an unlocked session ----
@@ -475,6 +523,7 @@ async function route(s, req, res, pathname, query) {
   if (pathname === '/api/favorites' && m === 'GET') return s.listFavorites();
   if (pathname === '/api/todos' && m === 'GET') return s.globalTodos();
   if (pathname === '/api/reminders/process' && m === 'POST') return s.processReminders();
+  if (pathname === '/api/inbox/process' && m === 'POST') return s.processInbox();
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);
   if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
   if (pathname === '/api/stats' && m === 'GET') return s.stats();

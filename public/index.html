@@ -363,6 +363,13 @@
         <div id="sttWarn" class="tiny" style="color:var(--danger)"></div>
         <button id="saveSttBtn" class="sm">Save transcription settings</button>
       </div>
+      <div class="acct-block">
+        <h4>Inbox — send yourself to-dos (Slack, etc.)</h4>
+        <p class="muted tiny">Drop a <code>.txt</code>/<code>.md</code>/<code>.json</code> file into the inbox folder — via Zapier, Make, or a Cloudflare Worker — and each line becomes a to-do on the latest daily note, even if this Mac was asleep (it lands next time you unlock). Full setup in <code>docs/slack-inbox.md</code>.</p>
+        <label class="tiny muted">Add inbox to-dos to workspace</label>
+        <select id="inboxWs" class="ws-tpl"></select>
+        <div id="inboxInfo" class="tiny muted" style="margin-top:6px"></div>
+      </div>
       <div id="acctMsg" class="tiny" aria-live="polite"></div>
       <div class="modal-actions"><button class="modal-close">Close</button></div>
     </div>

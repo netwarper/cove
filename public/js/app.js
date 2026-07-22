@@ -351,8 +351,22 @@
     try {
       var s = await API.stats();
       $('statsInfo').textContent = s.workspaces + ' workspaces · ' + s.notes + ' notes · ' + s.attachments + ' attachments · ' + fmtSize(s.bytes) + ' encrypted on disk';
+      if (s.inboxDir) $('inboxInfo').textContent = 'Inbox folder: ' + s.inboxDir;
     } catch (e) { $('statsInfo').textContent = ''; }
   }
+
+  function renderInboxSettings() {
+    var sel = $('inboxWs'); sel.innerHTML = '';
+    var cur = state.settings.inboxWorkspace || 'general';
+    state.workspaces.forEach(function (w) {
+      var o = document.createElement('option'); o.value = w.id; o.textContent = w.name;
+      if (w.id === cur) o.selected = true; sel.appendChild(o);
+    });
+  }
+  $('inboxWs').addEventListener('change', function () {
+    state.settings.inboxWorkspace = $('inboxWs').value;
+    API.saveSettings({ inboxWorkspace: state.settings.inboxWorkspace });
+  });
 
   // ---------------- Workspaces ----------------
   async function loadWorkspaces() {
@@ -1171,6 +1185,7 @@
     $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
     updateSttWarn();
     renderBioSettings();
+    renderInboxSettings();
     loadStatsInto();
     openModal('accountModal');
     if (focusStt) setTimeout(function () { var el = $('sttEndpoint'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 40);
@@ -1388,10 +1403,15 @@
         }
         if (s.workspaceId === state.wsId) refreshCurrent = true;
       });
-      // Merge in newly-injected reminder todos without clobbering in-progress edits.
+      // Drain the inbox (Slack etc. → to-dos) into the target workspace.
+      try {
+        var inbox = await API.processInbox();
+        if (inbox && inbox.added && inbox.workspaceId === state.wsId) refreshCurrent = true;
+      } catch (_e) { /* ignore */ }
+      // Merge in newly-injected reminder/inbox todos without clobbering edits.
       if (refreshCurrent && state.view === 'note' && state.note && !state.saveTimer) {
         var fresh = await API.currentNote(state.wsId);
-        if (fresh && fresh.id === state.note.id) { state.note.todos = fresh.todos; state.note.updatedAt = fresh.updatedAt; state.note.rev = fresh.rev; renderTodos(); }
+        if (fresh && fresh.id === state.note.id) { state.note.todos = fresh.todos; state.note.updatedAt = fresh.updatedAt; state.note.rev = fresh.rev; renderTodos(); renderNoteList(); }
       }
     } catch (e) { /* ignore transient poll errors */ }
   }

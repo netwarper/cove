@@ -87,6 +87,7 @@
     updateReminder: (wsId, id, patch) => req('PUT', '/api/workspaces/' + wsId + '/reminders/' + id, patch),
     deleteReminder: (wsId, id) => req('DELETE', '/api/workspaces/' + wsId + '/reminders/' + id),
     processReminders: () => req('POST', '/api/reminders/process', {}),
+    processInbox: () => req('POST', '/api/inbox/process', {}),
 
     addAttachment: (noteId, data) => req('POST', '/api/notes/' + noteId + '/attachments', data),
     deleteAttachment: (noteId, attId) => req('DELETE', '/api/notes/' + noteId + '/attachments/' + attId),

@@ -248,6 +248,21 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.10.0 (2026-07-22):** Inbox — send yourself to-dos (e.g. from Slack).
+  The app drains a `DATA_DIR/inbox/` folder (`.txt`/`.md` one-per-line, or
+  `.json` `{text}|[...]|{items}`) into to-dos on the latest daily note of a
+  workspace chosen in Settings, about once a minute while unlocked (and on
+  unlock) — so a to-do sent while the Mac was asleep lands on next unlock,
+  buffered by the cloud-sync folder. Any glue works: Zapier/Make (no-code, write
+  a file to the synced inbox folder) or a Cloudflare Worker. Optional token-gated
+  `POST /api/inbox` (`INBOX_TOKEN` env) for a relay/tunnel push — off by default,
+  constant-time token compare, and it can only queue a to-do (no DEK, so it can
+  never read/modify encrypted data). New: `store.processInbox()`, `stats().inboxDir`,
+  `POST /api/inbox` + `POST /api/inbox/process`, a Settings “Inbox” block, and
+  `docs/slack-inbox.md` with a recipe per service. Verified: quality 0 · functional
+  83/83 (adds token-push + folder-drop → drain → to-do) · security 35/35 (adds
+  “endpoint off without INBOX_TOKEN”) · config 14/14 · backup 10/10 · viewer 17/17
+  · transcribe 13/13; browser test drove a token push → drain → visible to-do.
 - **1.9.1 (2026-07-22):** Name sort — within the same date, named notes rank
   above un-named (date-only) notes, which now sink to the bottom of that date
   group instead of sorting above by the shorter date prefix.

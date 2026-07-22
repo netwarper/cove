@@ -8,6 +8,7 @@ const { makeClient, harness } = require('./helpers');
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-func-'));
 process.env.DATA_DIR = DATA_DIR;
 process.env.HOST = '127.0.0.1';
+process.env.INBOX_TOKEN = 'test-inbox-token';
 
 const { server } = require('../server');
 const t = harness('functional');
@@ -238,6 +239,22 @@ const t = harness('functional');
     const order = r.body.map((n) => n.id);
     t.eq(order[order.length - 1], sU, 'name sort: the un-named note sinks to the bottom of its date');
     t.ok(order.indexOf(sA) < order.indexOf(sB) && order.indexOf(sB) < order.indexOf(sU), 'name sort: named notes (A→Z) rank above the un-named note');
+
+    // --- inbox: token HTTP push + folder drop → drained into to-dos ---
+    let ir = await c.request('POST', '/api/inbox', { text: 'ignored', token: 'wrong-token' });
+    t.eq(ir.status, 401, 'inbox HTTP push with a wrong token is rejected');
+    ir = await c.request('POST', '/api/inbox', { text: 'buy milk via http', token: 'test-inbox-token' });
+    t.eq(ir.status, 200, 'inbox HTTP push with the right token is accepted');
+    const inboxDir = path.join(DATA_DIR, 'inbox');
+    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(path.join(inboxDir, 'zapier.txt'), 'call the dentist\nsubmit expenses\n'); // simulate a no-code file drop
+    r = await c.request('POST', '/api/inbox/process', {});
+    t.ok(r.body.added >= 3, 'inbox drain turned queued items into to-dos');
+    r = await c.request('GET', '/api/todos');
+    t.ok(r.body.some((x) => x.text === 'buy milk via http') && r.body.some((x) => x.text === 'call the dentist'), 'inbox to-dos land in the global open list');
+    t.eq(fs.readdirSync(inboxDir).filter((f) => /\.(txt|md|json)$/i.test(f)).length, 0, 'inbox files are consumed after draining');
+    r = await c.request('POST', '/api/inbox/process', {});
+    t.eq(r.body.added, 0, 'draining an empty inbox is a no-op');
 
     // --- search index reflects edits + deletes ---
     r = await c.request('PUT', '/api/notes/' + linker, { meetingNotes: '<p>ZEBRACODE unique token</p>' });

@@ -126,6 +126,10 @@ function walk(dir, out) {
     r = await c.request('GET', '/api/notes/' + encodeURIComponent('../../etc/passwd'));
     t.eq(r.status, 400, 'path-traversal note id rejected (400)');
 
+    // --- inbox HTTP endpoint is disabled unless INBOX_TOKEN is set ---
+    r = await c.request('POST', '/api/inbox', { text: 'x' });
+    t.eq(r.status, 404, 'inbox HTTP push is off by default (no INBOX_TOKEN configured)');
+
     // --- oversized body rejected (413) ---
     const big = Buffer.concat([Buffer.from('{"x":"'), Buffer.alloc(8192, 65), Buffer.from('"}')]);
     r = await c.request('PUT', '/api/notes/' + noteId, undefined, big);
