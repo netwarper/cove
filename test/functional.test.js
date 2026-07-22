@@ -225,8 +225,19 @@ const t = harness('functional');
     // --- note listing ---
     r = await c.request('GET', '/api/workspaces/general/notes');
     t.ok(Array.isArray(r.body) && r.body.some((x) => x.id === note3.id), 'note listing includes notes');
-    r = await c.request('GET', '/api/workspaces/general/notes?sort=open');
-    t.ok(Array.isArray(r.body), 'note listing supports open-todo sort');
+
+    // --- name sort: un-named notes sink below same-date named notes ---
+    r = await c.request('POST', '/api/workspaces', { name: 'SortWS' });
+    const sortWs = r.body.id;
+    r = await c.request('POST', '/api/workspaces/' + sortWs + '/notes/new', {}); const sA = r.body.id;
+    await c.request('PUT', '/api/notes/' + sA, { customTitle: 'Apple' });
+    r = await c.request('POST', '/api/workspaces/' + sortWs + '/notes/new', {}); const sU = r.body.id; // stays un-named
+    r = await c.request('POST', '/api/workspaces/' + sortWs + '/notes/new', {}); const sB = r.body.id;
+    await c.request('PUT', '/api/notes/' + sB, { customTitle: 'Banana' });
+    r = await c.request('GET', '/api/workspaces/' + sortWs + '/notes?sort=name&dir=asc');
+    const order = r.body.map((n) => n.id);
+    t.eq(order[order.length - 1], sU, 'name sort: the un-named note sinks to the bottom of its date');
+    t.ok(order.indexOf(sA) < order.indexOf(sB) && order.indexOf(sB) < order.indexOf(sU), 'name sort: named notes (A→Z) rank above the un-named note');
 
     // --- search index reflects edits + deletes ---
     r = await c.request('PUT', '/api/notes/' + linker, { meetingNotes: '<p>ZEBRACODE unique token</p>' });

@@ -248,6 +248,9 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.9.1 (2026-07-22):** Name sort — within the same date, named notes rank
+  above un-named (date-only) notes, which now sink to the bottom of that date
+  group instead of sorting above by the shorter date prefix.
 - **1.9.0 (2026-07-22):** Sorting, screen recording, biometric unlock.
   - **Note sorting** — sidebar control for Created / Modified / Name in either
     direction, persisted in settings; server `listNotes` sorts accordingly.
