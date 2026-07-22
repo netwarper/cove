@@ -878,13 +878,16 @@
     $('screenBtn').disabled = true; $('recStatus').textContent = 'Saving screen recording…';
     try {
       var blob = await rec.session.stop();
-      if (blob && blob.size) {
+      // A valid recording is well over a few hundred bytes; anything tiny means the
+      // capture produced no frames (e.g. the share was cancelled instantly).
+      if (blob && blob.size > 512) {
         var stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+        var ext = /mp4/.test(blob.type || '') ? 'mp4' : 'webm';
         var b64 = await fileToBase64(blob);
-        var meta = await API.addAttachment(rec.noteId, { name: 'meeting-screen-' + stamp + '.webm', mime: blob.type || 'video/webm', dataB64: b64 });
+        var meta = await API.addAttachment(rec.noteId, { name: 'meeting-screen-' + stamp + '.' + ext, mime: blob.type || 'video/webm', dataB64: b64 });
         if (state.note && state.note.id === rec.noteId) { state.note.attachments = (state.note.attachments || []).concat(meta); renderAttachments(); }
         $('recStatus').textContent = 'Screen recording saved ✓ (' + fmtSize(blob.size) + ')';
-      } else { $('recStatus').textContent = 'Nothing recorded.'; }
+      } else { $('recStatus').textContent = 'Nothing was captured — try again and choose a screen/window (and “Share audio” for sound).'; }
     } catch (ex) {
       $('recStatus').textContent = 'Save failed: ' + (ex.status === 413 ? 'recording too large — raise MAX_BODY or record a shorter clip' : ex.message);
     } finally { $('screenBtn').disabled = false; $('screenBtn').textContent = '🖥 Screen'; $('screenBtn').classList.remove('recording'); $('recordBtn').disabled = false; }
@@ -1488,7 +1491,17 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; }); }
   function rid() { return Math.random().toString(36).slice(2, 10); }
   function fmtSize(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
-  function fileToBase64(file) { return new Promise(function (resolve, reject) { var r = new FileReader(); r.onload = function () { resolve(String(r.result).split(',')[1]); }; r.onerror = reject; r.readAsDataURL(file); }); }
+  // Extract the base64 payload from a data URL. Must key off the ";base64,"
+  // marker, NOT the first comma — a MIME type can itself contain a comma
+  // (e.g. video/webm;codecs=vp9,opus), which would otherwise truncate the data.
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { var s = String(r.result); var m = s.indexOf(';base64,'); resolve(m >= 0 ? s.slice(m + 8) : s.slice(s.indexOf(',') + 1)); };
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+  }
   function downloadUrl(u) { var a = document.createElement('a'); a.href = u; a.download = ''; document.body.appendChild(a); a.click(); a.remove(); }
 
   boot().catch(function (e) { console.error(e); });

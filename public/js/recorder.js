@@ -156,7 +156,8 @@
   }
 
   function pickVideoMime() {
-    var cands = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+    // Prefer webm (Chrome/Firefox); fall back to mp4 (Safari, which can't record webm).
+    var cands = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=h264,aac', 'video/mp4'];
     for (var i = 0; i < cands.length; i++) {
       if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cands[i])) return cands[i];
     }
@@ -165,8 +166,8 @@
 
   /**
    * Record the screen (or a window/tab) with audio. Captures the shared video +
-   * its system audio and mixes in your mic, recording to a single webm video.
-   * Returns a session with .stop() -> Promise<Blob|null>.
+   * its system audio, mixes in your mic, and records to a single video file
+   * (webm, or mp4 on Safari). Returns a session with .stop() -> Promise<Blob|null>.
    */
   async function startScreen(opts) {
     opts = opts || {};
@@ -180,11 +181,14 @@
     try { mic = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (_e) { mic = null; }
     var micAudio = mic ? mic.getAudioTracks() : [];
 
-    // Mix any system audio + mic into one track via Web Audio.
+    // Mix any system audio + mic into one track via Web Audio. Resume the context
+    // first — a suspended context yields a muted track that can stall the muxer
+    // (near-empty output).
     var ctxClass = window.AudioContext || window.webkitAudioContext;
     var ctx = null, mixedAudioTrack = null;
     if ((dispAudio.length || micAudio.length) && ctxClass) {
       ctx = new ctxClass();
+      if (ctx.state === 'suspended' && ctx.resume) { try { await ctx.resume(); } catch (_e) {} }
       var dest = ctx.createMediaStreamDestination();
       if (dispAudio.length) ctx.createMediaStreamSource(new MediaStream([dispAudio[0]])).connect(dest);
       if (micAudio.length) ctx.createMediaStreamSource(new MediaStream([micAudio[0]])).connect(dest);
@@ -195,29 +199,36 @@
     if (mixedAudioTrack) tracks.push(mixedAudioTrack);
     var mime = pickVideoMime();
     var rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime } : undefined);
+
     var chunks = [];
+    function stopAll() {
+      [videoTrack].concat(Array.prototype.slice.call(dispAudio), Array.prototype.slice.call(micAudio)).forEach(function (t) { try { t.stop(); } catch (_e) {} });
+      try { if (ctx) ctx.close(); } catch (_e) {}
+    }
+    // onstop is the single source of truth for the finished blob — fires whether
+    // stopped by us or automatically when the shared track ends, so there's no
+    // read-chunks-too-early race.
+    var stoppedResolve;
+    var stopped = new Promise(function (r) { stoppedResolve = r; });
     rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-    rec.start();
+    rec.onstop = function () {
+      stopAll();
+      var type = (chunks[0] && chunks[0].type) || rec.mimeType || mime || 'video/webm';
+      stoppedResolve(chunks.length ? new Blob(chunks, { type: type }) : null);
+    };
+    rec.start(1000); // timeslice: emit data every second so the file is never empty
     status(dispAudio.length ? 'Recording screen + shared audio' + (micAudio.length ? ' + mic…' : '…')
       : (micAudio.length ? 'Recording screen + mic…' : 'Recording screen (no audio shared)…'));
 
     // Ending the share from the browser's own "Stop sharing" bar ends the recording.
     videoTrack.addEventListener('ended', function () { if (opts.onAutoStop) opts.onAutoStop(); });
 
-    function stopAll() {
-      [videoTrack].concat(Array.prototype.slice.call(dispAudio), Array.prototype.slice.call(micAudio)).forEach(function (t) { try { t.stop(); } catch (_e) {} });
-      try { if (ctx) ctx.close(); } catch (_e) {}
-    }
-
     return {
       hasAudio: !!mixedAudioTrack,
+      mime: mime,
       stop: function () {
-        return new Promise(function (resolve) {
-          if (rec.state !== 'inactive') {
-            rec.onstop = function () { stopAll(); resolve(chunks.length ? new Blob(chunks, { type: chunks[0].type || rec.mimeType || 'video/webm' }) : null); };
-            rec.stop();
-          } else { stopAll(); resolve(chunks.length ? new Blob(chunks, { type: 'video/webm' }) : null); }
-        });
+        try { if (rec.state !== 'inactive') rec.stop(); } catch (_e) { stopAll(); stoppedResolve(chunks.length ? new Blob(chunks) : null); }
+        return stopped;
       },
     };
   }

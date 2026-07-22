@@ -248,6 +248,18 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.11.1 (2026-07-22):** Fix screen recordings saving as a 7-byte (empty) file.
+  Root cause: `fileToBase64` extracted the data-URL payload with `split(',')[1]`,
+  which truncates when the blob's MIME type contains a comma
+  (`video/webm;codecs=vp9,opus`) — so the base64 was garbage and decoded to ~7
+  bytes. Now keyed off the `;base64,` marker. Audio `.wav` recordings and images
+  (comma-free MIME) were unaffected. Also hardened the screen recorder: 1-second
+  MediaRecorder timeslice (never-empty output), `AudioContext.resume()` (a
+  suspended context could mute the mixed track and stall the muxer), and mp4
+  fallback + correct file extension for Safari. Verified in-browser: the stored
+  attachment is now a valid WebM (EBML magic `1a45dfa3`, ~108 KB), not 7 bytes.
+  SW cache bumped to v5. quality 0 · functional 88/88 · security 35/35 · config
+  14/14 · backup 10/10 · viewer 17/17 · transcribe 13/13.
 - **1.11.0 (2026-07-22):** Inbox source badge + outbound Slack agenda.
   - Inbox-added to-dos now show a **📥 badge** (`sourceInbox`), carried forward into
     the next daily note, so Slack items are distinguishable from typed ones.
