@@ -8,12 +8,13 @@
  * stored here; it stays encrypted on the server. */
 'use strict';
 
-const CACHE = 'meeting-notes-shell-v3';
+const CACHE = 'meeting-notes-shell-v4';
 const SHELL = [
   '/', '/index.html',
   '/css/styles.css',
   '/js/api.js', '/js/editor.js', '/js/recorder.js', '/js/app.js',
   '/manifest.webmanifest', '/icon.svg',
+  '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (e) => {
