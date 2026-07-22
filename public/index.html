@@ -98,6 +98,15 @@
         </div>
         <div class="sidebar-actions">
           <button id="importBtn" class="link-btn">📥 Import a note</button>
+          <div class="sort-control">
+            <span class="sort-label muted tiny">Sort</span>
+            <select id="noteSort" title="Sort notes by" aria-label="Sort notes by">
+              <option value="created">Created</option>
+              <option value="modified">Modified</option>
+              <option value="name">Name</option>
+            </select>
+            <button id="noteSortDir" class="icon-btn sort-dir" title="Sort direction" aria-label="Toggle sort direction">↓</button>
+          </div>
         </div>
         <ul id="noteList" class="note-list"></ul>
         <div class="sidebar-foot">
@@ -175,7 +184,8 @@
               <div class="section-title-row">
                 <h2>📝 Meeting Notes</h2>
                 <div class="rec-controls">
-                  <button id="recordBtn" class="mini" title="Record meeting audio">🔴 Record</button>
+                  <button id="recordBtn" class="mini" title="Record meeting audio (mic + shared audio → one .wav)">🔴 Record</button>
+                  <button id="screenBtn" class="mini" title="Record screen + audio → one .webm video">🖥 Screen</button>
                   <button id="sttSettingsBtn" class="mini ghost" title="Transcription settings">⚙ Transcription</button>
                   <span id="recStatus" class="rec-status muted tiny"></span>
                 </div>

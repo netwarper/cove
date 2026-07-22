@@ -149,5 +149,78 @@
     };
   }
 
-  window.Recorder = { supported: supported, start: start };
+  // ---- Screen + audio recording (separate from the audio-only meeting recorder) ----
+
+  function screenSupported() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && window.MediaRecorder);
+  }
+
+  function pickVideoMime() {
+    var cands = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+    for (var i = 0; i < cands.length; i++) {
+      if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(cands[i])) return cands[i];
+    }
+    return '';
+  }
+
+  /**
+   * Record the screen (or a window/tab) with audio. Captures the shared video +
+   * its system audio and mixes in your mic, recording to a single webm video.
+   * Returns a session with .stop() -> Promise<Blob|null>.
+   */
+  async function startScreen(opts) {
+    opts = opts || {};
+    var status = opts.onStatus || function () {};
+    var disp = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    var videoTrack = disp.getVideoTracks()[0];
+    if (!videoTrack) { disp.getTracks().forEach(function (t) { t.stop(); }); throw new Error('no screen video was shared'); }
+
+    var dispAudio = disp.getAudioTracks();
+    var mic = null;
+    try { mic = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (_e) { mic = null; }
+    var micAudio = mic ? mic.getAudioTracks() : [];
+
+    // Mix any system audio + mic into one track via Web Audio.
+    var ctxClass = window.AudioContext || window.webkitAudioContext;
+    var ctx = null, mixedAudioTrack = null;
+    if ((dispAudio.length || micAudio.length) && ctxClass) {
+      ctx = new ctxClass();
+      var dest = ctx.createMediaStreamDestination();
+      if (dispAudio.length) ctx.createMediaStreamSource(new MediaStream([dispAudio[0]])).connect(dest);
+      if (micAudio.length) ctx.createMediaStreamSource(new MediaStream([micAudio[0]])).connect(dest);
+      mixedAudioTrack = dest.stream.getAudioTracks()[0];
+    }
+
+    var tracks = [videoTrack];
+    if (mixedAudioTrack) tracks.push(mixedAudioTrack);
+    var mime = pickVideoMime();
+    var rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime } : undefined);
+    var chunks = [];
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.start();
+    status(dispAudio.length ? 'Recording screen + shared audio' + (micAudio.length ? ' + mic…' : '…')
+      : (micAudio.length ? 'Recording screen + mic…' : 'Recording screen (no audio shared)…'));
+
+    // Ending the share from the browser's own "Stop sharing" bar ends the recording.
+    videoTrack.addEventListener('ended', function () { if (opts.onAutoStop) opts.onAutoStop(); });
+
+    function stopAll() {
+      [videoTrack].concat(Array.prototype.slice.call(dispAudio), Array.prototype.slice.call(micAudio)).forEach(function (t) { try { t.stop(); } catch (_e) {} });
+      try { if (ctx) ctx.close(); } catch (_e) {}
+    }
+
+    return {
+      hasAudio: !!mixedAudioTrack,
+      stop: function () {
+        return new Promise(function (resolve) {
+          if (rec.state !== 'inactive') {
+            rec.onstop = function () { stopAll(); resolve(chunks.length ? new Blob(chunks, { type: chunks[0].type || rec.mimeType || 'video/webm' }) : null); };
+            rec.stop();
+          } else { stopAll(); resolve(chunks.length ? new Blob(chunks, { type: 'video/webm' }) : null); }
+        });
+      },
+    };
+  }
+
+  window.Recorder = { supported: supported, start: start, screenSupported: screenSupported, startScreen: startScreen };
 })();

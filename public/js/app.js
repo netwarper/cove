@@ -138,6 +138,7 @@
     state.settings = await API.getSettings();
     applyFontSize(state.settings.fontSize || 14);
     applyTheme(state.settings.theme || 'auto');
+    applySortControl();
     await loadTemplates();
     await loadWorkspaces();
     await routeFromHash();
@@ -303,6 +304,23 @@
     state.wsId = $('workspaceSelect').value; showView('note'); await loadCurrentNote();
   });
 
+  // ---------------- Note sort control ----------------
+  function noteSort() { return state.settings.noteSort || { field: 'created', dir: 'desc' }; }
+  function applySortControl() {
+    var s = noteSort();
+    $('noteSort').value = s.field;
+    $('noteSortDir').textContent = s.dir === 'asc' ? '↑' : '↓';
+    $('noteSortDir').title = 'Sort ' + (s.dir === 'asc' ? 'ascending' : 'descending') + ' (click to flip)';
+  }
+  function saveSort(next) {
+    state.settings.noteSort = next;
+    applySortControl();
+    renderNoteList();
+    API.saveSettings({ noteSort: next });
+  }
+  $('noteSort').addEventListener('change', function () { saveSort({ field: $('noteSort').value, dir: noteSort().dir }); });
+  $('noteSortDir').addEventListener('click', function () { saveSort({ field: noteSort().field, dir: noteSort().dir === 'asc' ? 'desc' : 'asc' }); });
+
   // ---------------- Note load / render ----------------
   async function loadCurrentNote() {
     var n = await API.currentNote(state.wsId);
@@ -371,7 +389,8 @@
   }
 
   async function renderNoteList() {
-    var notes = await API.listNotes(state.wsId);
+    var s = noteSort();
+    var notes = await API.listNotes(state.wsId, { sort: s.field, dir: s.dir });
     var ul = $('noteList'); ul.innerHTML = '';
     notes.forEach(function (nm) {
       var li = document.createElement('li');
@@ -683,6 +702,7 @@
       });
       state.recording = { session: session, noteId: noteId };
       $('recordBtn').textContent = '⏹ Stop'; $('recordBtn').classList.add('recording');
+      $('screenBtn').disabled = true;
       renderTranscript();
     } catch (ex) {
       $('recStatus').textContent = '';
@@ -708,7 +728,46 @@
         $('recStatus').textContent = 'Nothing recorded.';
       }
     } catch (ex) { $('recStatus').textContent = 'Save failed: ' + ex.message; }
-    finally { $('recordBtn').disabled = false; $('recordBtn').textContent = '🔴 Record'; $('recordBtn').classList.remove('recording'); }
+    finally { $('recordBtn').disabled = false; $('recordBtn').textContent = '🔴 Record'; $('recordBtn').classList.remove('recording'); $('screenBtn').disabled = false; }
+  }
+
+  // ---------------- Screen + audio recording ----------------
+  state.screenRec = null;
+  $('screenBtn').addEventListener('click', async function () {
+    if (state.screenRec) { await stopScreen(); return; }
+    if (!window.Recorder || !window.Recorder.screenSupported()) { await dialog.alert('Screen recording is not supported in this browser.'); return; }
+    var noteId = state.note.id;
+    try {
+      $('screenBtn').disabled = true;
+      var session = await window.Recorder.startScreen({
+        onStatus: function (m) { $('recStatus').textContent = m; },
+        onAutoStop: function () { if (state.screenRec) stopScreen(); }, // user hit the browser's "Stop sharing"
+      });
+      state.screenRec = { session: session, noteId: noteId };
+      $('screenBtn').textContent = '⏹ Stop screen'; $('screenBtn').classList.add('recording');
+      $('recordBtn').disabled = true;
+    } catch (ex) {
+      $('recStatus').textContent = '';
+      if (!/permission|denied|cancel|dismiss|abort/i.test(ex.message || '')) await dialog.alert('Could not start screen recording: ' + ex.message);
+    } finally { $('screenBtn').disabled = false; }
+  });
+
+  async function stopScreen() {
+    if (!state.screenRec) return;
+    var rec = state.screenRec; state.screenRec = null;
+    $('screenBtn').disabled = true; $('recStatus').textContent = 'Saving screen recording…';
+    try {
+      var blob = await rec.session.stop();
+      if (blob && blob.size) {
+        var stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+        var b64 = await fileToBase64(blob);
+        var meta = await API.addAttachment(rec.noteId, { name: 'meeting-screen-' + stamp + '.webm', mime: blob.type || 'video/webm', dataB64: b64 });
+        if (state.note && state.note.id === rec.noteId) { state.note.attachments = (state.note.attachments || []).concat(meta); renderAttachments(); }
+        $('recStatus').textContent = 'Screen recording saved ✓ (' + fmtSize(blob.size) + ')';
+      } else { $('recStatus').textContent = 'Nothing recorded.'; }
+    } catch (ex) {
+      $('recStatus').textContent = 'Save failed: ' + (ex.status === 413 ? 'recording too large — raise MAX_BODY or record a shorter clip' : ex.message);
+    } finally { $('screenBtn').disabled = false; $('screenBtn').textContent = '🖥 Screen'; $('screenBtn').classList.remove('recording'); $('recordBtn').disabled = false; }
   }
 
   $('transcriptToggle').addEventListener('click', function () {
@@ -790,7 +849,7 @@
   function openNotePicker(insert) {
     openModal('notePickerModal');
     var search = $('notePickerSearch'); search.value = '';
-    API.listNotes(state.wsId, 'all').then(function (notes) {
+    API.listNotes(state.wsId, { sort: 'name', dir: 'asc' }).then(function (notes) {
       function draw(filter) {
         var ul = $('notePickerList'); ul.innerHTML = '';
         notes.filter(function (n) { return !filter || n.displayTitle.toLowerCase().indexOf(filter) >= 0; }).forEach(function (n) {

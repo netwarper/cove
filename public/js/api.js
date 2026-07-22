@@ -56,9 +56,12 @@
     setWorkspaceTemplate: (id, defaultTemplateId) => req('PUT', '/api/workspaces/' + id, { defaultTemplateId }),
     deleteWorkspace: (id) => req('DELETE', '/api/workspaces/' + id),
 
-    listNotes: (wsId, filter) => {
-      var qs = filter === 'open' ? '?sort=open' : '';
-      return req('GET', '/api/workspaces/' + wsId + '/notes' + qs);
+    listNotes: (wsId, opts) => {
+      opts = opts || {};
+      var qs = [];
+      if (opts.sort) qs.push('sort=' + encodeURIComponent(opts.sort));
+      if (opts.dir) qs.push('dir=' + encodeURIComponent(opts.dir));
+      return req('GET', '/api/workspaces/' + wsId + '/notes' + (qs.length ? '?' + qs.join('&') : ''));
     },
     backlinks: (id) => req('GET', '/api/notes/' + id + '/backlinks'),
     listVersions: (id) => req('GET', '/api/notes/' + id + '/versions'),
