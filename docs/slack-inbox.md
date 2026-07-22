@@ -1,8 +1,8 @@
-# Send yourself to-dos (Slack → inbox)
+# Send yourself tasks (Slack → inbox)
 
-Add something to your to-do list by messaging yourself on Slack — even while your
+Add something to your task list by messaging yourself on Slack — even while your
 Mac is asleep. The message is buffered by an always-on service and turned into a
-to-do the next time the app is running and unlocked.
+task the next time the app is running and unlocked.
 
 ## How it works
 
@@ -12,12 +12,11 @@ The app watches an **inbox folder** inside your data directory:
 <DATA_DIR>/inbox/
 ```
 
-Anything an outside service drops there is drained into a to-do on the **latest
-daily note** of your chosen workspace (Settings → *Inbox*), then the file is
-deleted (the to-do is now stored encrypted). Because your `DATA_DIR` lives in a
-cloud-sync folder (Google Drive / Dropbox / Box), the sync service is the
-always-on buffer: a to-do you send at 2am lands whenever your Mac next wakes and
-you unlock.
+Anything an outside service drops there is drained into a **task** in your chosen
+workspace (Settings → *Inbox*), badged **📥**, then the file is deleted (the task
+is now stored encrypted). Because your `DATA_DIR` lives in a cloud-sync folder
+(Google Drive / Dropbox / Box), the sync service is the always-on buffer: a task
+you send at 2am lands whenever your Mac next wakes and you unlock.
 
 Draining happens automatically about once a minute while the app is unlocked (and
 right after you unlock), so you don't have to do anything.
@@ -26,7 +25,7 @@ right after you unlock), so you don't have to do anything.
 
 Drop any of these into `inbox/`:
 
-- **`.txt` / `.md`** — each non-empty line becomes one to-do.
+- **`.txt` / `.md`** — each non-empty line becomes one task.
 - **`.json`** — `{"text":"buy milk"}`, or `["a","b"]`, or `{"items":["a","b"]}`.
 
 Filenames don't matter. Example `groceries.txt`:
@@ -91,7 +90,7 @@ export default {
 ```
 
 In Slack: **Your app → Slash Commands → Create** `/todo`, Request URL = your
-Worker URL. Now `/todo buy milk` from anywhere adds a to-do.
+Worker URL. Now `/todo buy milk` from anywhere adds a task.
 
 > Dropbox tokens are short-lived by default; for something you set and forget,
 > create a Dropbox app with a **refresh token** and exchange it in the Worker, or
@@ -132,7 +131,7 @@ await fetch('https://your-tunnel-host/api/inbox', {
 
 ## Outbound: post your agenda to Slack
 
-The reverse direction is built in — the app can post your **due & overdue to-dos**
+The reverse direction is built in — the app can post your **due & overdue tasks**
 to a Slack channel.
 
 1. In Slack, create an **Incoming Webhook** (api.slack.com → *Incoming Webhooks*)
@@ -150,18 +149,18 @@ it; the webhook URL is stored encrypted in your settings (or set `SLACK_WEBHOOK_
 > need the app running with data access, which the local-only model doesn't provide
 > while closed).
 
-## Distinguishing inbox to-dos
+## Distinguishing inbox tasks
 
-To-dos added via the inbox show a small **📥** badge so you can tell them from ones
-you typed. The badge carries forward with the to-do into the next daily note.
+Tasks added via the inbox show a small **📥** badge so you can tell them from ones
+you typed.
 
 ## Security notes
 
 - Inbox files sit **unencrypted** in the sync folder until drained (seconds to a
-  couple of minutes); your notes stay encrypted. Only inbound to-do text is
+  couple of minutes); your notes stay encrypted. Only inbound task text is
   briefly in the clear.
 - The `/api/inbox` endpoint is **off unless `INBOX_TOKEN` is set**, is constant-
   time compared, and **cannot read or modify any encrypted data** — a leaked
-  token only lets someone add a to-do, never read your notes.
-- Choose the target workspace in **Settings → Inbox**. If it has no daily note
-  yet, one is created so nothing is lost.
+  token only lets someone add a task, never read your notes.
+- Choose the target workspace in **Settings → Inbox**. Tasks are workspace-level,
+  so the item lands even if the workspace has no notes yet.

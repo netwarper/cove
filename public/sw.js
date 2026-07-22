@@ -8,11 +8,11 @@
  * stored here; it stays encrypted on the server. */
 'use strict';
 
-const CACHE = 'meeting-notes-shell-v5';
+const CACHE = 'meeting-notes-shell-v6';
 const SHELL = [
   '/', '/index.html',
   '/css/styles.css',
-  '/js/api.js', '/js/editor.js', '/js/recorder.js', '/js/app.js',
+  '/js/api.js', '/js/editor.js', '/js/recorder.js', '/js/taskparse.js', '/js/app.js',
   '/manifest.webmanifest', '/icon.svg',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png',
 ];

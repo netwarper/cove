@@ -56,8 +56,8 @@
       </div>
       <nav class="top-actions">
         <button id="navNote" class="tab active" title="Current note">Note</button>
-        <button id="navTodos" class="tab" title="All open to-dos">To-Dos</button>
-        <button id="navAgenda" class="tab" title="Agenda (due items &amp; reminders)">📅</button>
+        <button id="navTodos" class="tab" title="All open tasks">Tasks</button>
+        <button id="navAgenda" class="tab" title="Agenda (all dated tasks)">📅</button>
         <button id="navFavs" class="tab" title="Favorites">★</button>
         <button id="notifyBtn" class="icon-btn" title="Enable reminder notifications" aria-label="Enable notifications">🔔</button>
         <button id="themeBtn" class="icon-btn" title="Theme: auto / light / dark" aria-label="Toggle theme">🌓</button>
@@ -87,7 +87,7 @@
         <div class="sidebar-head">
           <span>Notes</span>
           <div class="new-note-wrap">
-            <button id="newNoteBtn" class="primary sm" title="New daily note — carries forward to-dos &amp; carryover from the last daily note">＋ New Daily</button>
+            <button id="newNoteBtn" class="primary sm" title="New daily note — carries carryover forward from the last daily note">＋ New Daily</button>
             <button id="newNoteCaret" class="primary sm caret" title="New note options" aria-label="New note options">▾</button>
             <div id="newNoteMenu" class="menu hidden">
               <button data-new="daily">New daily note</button>
@@ -150,30 +150,42 @@
           </div>
 
           <div id="sections" class="sections">
-            <div class="section" data-sec="todos">
-              <h2>✔ To-Do</h2>
-              <div class="add-row"><input id="todoInput" placeholder="Add a to-do…"></div>
-              <ul id="todoList" class="todo-list"></ul>
+            <div class="section" data-sec="today">
+              <h2>✔ Overdue &amp; Today</h2>
+              <div class="quick-add">
+                <input id="taskInput" placeholder="Add a task…  e.g. “email Sam tomorrow p1 every Friday”" autocomplete="off">
+                <div class="qa-controls">
+                  <button id="qaDate" type="button" class="qa-pill" title="Due date">📅 <span id="qaDateLbl">Date</span></button>
+                  <select id="qaPriority" class="qa-pill" title="Priority" aria-label="Priority">
+                    <option value="4">P4</option>
+                    <option value="3">P3</option>
+                    <option value="2">P2</option>
+                    <option value="1">P1</option>
+                  </select>
+                  <select id="qaRecur" class="qa-pill" title="Repeat" aria-label="Repeat">
+                    <option value="none">No repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  <button id="qaAdd" class="sm primary">Add</button>
+                </div>
+              </div>
+              <ul id="todayList" class="task-list"></ul>
+              <div id="nodateWrap" class="task-group hidden">
+                <div class="task-group-label">No date</div>
+                <ul id="nodateList" class="task-list"></ul>
+              </div>
+              <div id="completedWrap" class="task-group hidden">
+                <div class="task-group-label">Completed on this note</div>
+                <ul id="completedList" class="task-list"></ul>
+              </div>
             </div>
 
-            <div class="section" data-sec="reminders">
-              <h2>⏰ Reminders</h2>
-              <div class="add-row reminder-add">
-                <input id="reminderText" placeholder="Remind me to…">
-                <select id="reminderCadence" aria-label="Cadence">
-                  <option value="once">Once</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="everyNDays">Every N days</option>
-                </select>
-                <input id="reminderN" type="number" min="1" value="2" class="hidden" title="N days" aria-label="Every N days">
-                <input id="reminderDue" type="date" class="hidden" title="Due date" aria-label="Due date">
-                <input id="reminderEnd" type="date" class="hidden reminder-time" title="Repeat until (optional)" aria-label="Repeat until">
-                <input id="reminderTime" type="time" class="reminder-time" title="Time of day (optional)" aria-label="Time of day">
-                <button id="addReminderBtn" class="sm">Add</button>
-              </div>
-              <ul id="reminderList" class="reminder-list"></ul>
+            <div class="section" data-sec="upcoming">
+              <h2>📆 Upcoming</h2>
+              <div id="upcomingList" class="upcoming-list"></div>
             </div>
 
             <div class="section" data-sec="carryover">
@@ -233,7 +245,7 @@
               <button id="landingNewScratch" class="sm">✏️ New scratch note</button>
             </div>
             <ul class="landing-tips">
-              <li><b>Daily notes</b> carry your open to-dos and carryover forward from the previous daily note — your running thread.</li>
+              <li><b>Daily notes</b> carry your carryover notes forward from the previous daily note — your running thread. Tasks live at the workspace level and show up as Overdue &amp; Today and Upcoming.</li>
               <li><b>Scratch notes</b> are a clean Meeting Notes page for a quick jot; they don’t affect carryover.</li>
               <li>Record meeting audio with <b>🔴 Record</b>; the transcript appears in its own area below your notes.</li>
               <li>Press <kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd> for the command palette, or <kbd>?</kbd> for help &amp; shortcuts.</li>
@@ -244,13 +256,13 @@
 
         <section id="agendaView" class="view hidden">
           <h1>📅 Agenda</h1>
-          <p class="muted">Upcoming due to-dos and reminders across all workspaces.</p>
+          <p class="muted">Every dated task across all workspaces, by due date.</p>
           <div id="agendaList" class="agenda-list"></div>
         </section>
 
         <section id="todosView" class="view hidden">
-          <h1>All Open To-Dos</h1>
-          <p class="muted">Across every workspace. Completing here updates the source note.</p>
+          <h1>All Open Tasks</h1>
+          <p class="muted">Across every workspace. Complete or open any task from here.</p>
           <ul id="globalTodoList" class="global-todo-list"></ul>
         </section>
 
@@ -302,14 +314,12 @@
 
     <div class="modal hidden" id="templateModal">
       <h3>Templates</h3>
-      <p class="muted tiny">A template seeds the <b>Meeting Notes</b> section of new notes. To-Do &amp; Carryover still carry over from the previous note (a template's defaults fill them only on the first note of a workspace).</p>
+      <p class="muted tiny">A template seeds the <b>Meeting Notes</b> section of new notes. Carryover still carries over from the previous note (a template's default carryover fills it only on the first note of a workspace).</p>
       <ul id="templateList" class="ws-manage-list"></ul>
       <div class="tpl-editor">
         <input id="tplName" placeholder="Template name (e.g. 1:1, Standup, Retro)">
         <label class="tiny muted">Meeting Notes scaffold</label>
         <div id="tplMeeting" class="rte small" contenteditable="true"></div>
-        <label class="tiny muted">Default to-dos (one per line — first note only)</label>
-        <textarea id="tplTodos" rows="3" placeholder="Review action items&#10;Check metrics"></textarea>
         <input type="hidden" id="tplEditingId">
         <div class="modal-actions">
           <button id="saveTplBtn" class="primary">Save template</button>
@@ -364,15 +374,15 @@
         <button id="saveSttBtn" class="sm">Save transcription settings</button>
       </div>
       <div class="acct-block">
-        <h4>Inbox — send yourself to-dos (Slack, etc.)</h4>
-        <p class="muted tiny">Drop a <code>.txt</code>/<code>.md</code>/<code>.json</code> file into the inbox folder — via Zapier, Make, or a Cloudflare Worker — and each line becomes a to-do on the latest daily note, even if this Mac was asleep (it lands next time you unlock). Full setup in <code>docs/slack-inbox.md</code>.</p>
-        <label class="tiny muted">Add inbox to-dos to workspace</label>
+        <h4>Inbox — send yourself tasks (Slack, etc.)</h4>
+        <p class="muted tiny">Drop a <code>.txt</code>/<code>.md</code>/<code>.json</code> file into the inbox folder — via Zapier, Make, or a Cloudflare Worker — and each line becomes a task in the chosen workspace, even if this Mac was asleep (it lands next time you unlock). Full setup in <code>docs/slack-inbox.md</code>.</p>
+        <label class="tiny muted">Add inbox tasks to workspace</label>
         <select id="inboxWs" class="ws-tpl"></select>
         <div id="inboxInfo" class="tiny muted" style="margin-top:6px"></div>
       </div>
       <div class="acct-block">
         <h4>Slack — send yourself an agenda</h4>
-        <p class="muted tiny">Post your due &amp; overdue to-dos to Slack via an <b>Incoming Webhook</b> (create one at api.slack.com → Incoming Webhooks and paste the URL). Auto-send only fires while the app is open and unlocked.</p>
+        <p class="muted tiny">Post your due &amp; overdue tasks to Slack via an <b>Incoming Webhook</b> (create one at api.slack.com → Incoming Webhooks and paste the URL). Auto-send only fires while the app is open and unlocked.</p>
         <label class="tiny muted">Slack Incoming Webhook URL</label>
         <input id="slackWebhook" type="password" placeholder="https://hooks.slack.com/services/…" autocomplete="off">
         <label class="tiny muted slack-daily"><input id="slackDaily" type="checkbox"> Auto-send daily at <input id="slackTime" type="time"></label>
@@ -493,9 +503,9 @@
         <section>
           <h4>Good to know</h4>
           <ul class="kbd-list">
-            <li><span>📅</span><span>Give a to-do a due date → it shows in the Agenda</span></li>
+            <li><span>📝</span><span>Add a task like “email Sam tomorrow p1 every Friday” — due date, priority &amp; repeat are parsed for you</span></li>
+            <li><span>🔁</span><span>Recurring tasks roll forward when you complete them; ⏭ skips one occurrence</span></li>
             <li><span>#tag</span><span>Tag notes; search with <code>tag:name</code></span></li>
-            <li><span>⏰</span><span>Reminders pop into the To-Do list when due; snooze with 💤</span></li>
             <li><span>⋮</span><span>Templates · Trash · Backup &amp; offline viewer · Settings</span></li>
             <li><span>★</span><span>Hover a note in the sidebar to favorite or delete it</span></li>
           </ul>
@@ -517,6 +527,7 @@
   <script src="/js/api.js"></script>
   <script src="/js/editor.js"></script>
   <script src="/js/recorder.js"></script>
+  <script src="/js/taskparse.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

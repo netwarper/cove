@@ -479,6 +479,8 @@ async function route(s, req, res, pathname, query) {
     if (seg[3] === 'reminders' && seg[4] && seg[5] === 'snooze' && m === 'POST') return s.snoozeReminder(wsId, safeId(seg[4]), (await readBody(req)).until);
     if (seg[3] === 'reminders' && seg[4] && m === 'PUT') return s.updateReminder(wsId, safeId(seg[4]), await readBody(req));
     if (seg[3] === 'reminders' && seg[4] && m === 'DELETE') return s.deleteReminder(wsId, safeId(seg[4]));
+    if (seg[3] === 'tasks' && seg.length === 4 && m === 'GET') return s.listTasks(wsId);
+    if (seg[3] === 'tasks' && seg.length === 4 && m === 'POST') return s.addTask(wsId, await readBody(req));
     if (seg[3] === 'import' && m === 'POST') return s.importNote(wsId, await readBody(req));
     if (seg[3] === 'export' && m === 'GET') {
       const out = s.exportWorkspaceZip(wsId, query.format);
@@ -516,6 +518,17 @@ async function route(s, req, res, pathname, query) {
     if (seg[3] === 'attachments' && seg[4] && m === 'DELETE') return s.deleteAttachment(noteId, safeId(seg[4]));
   }
 
+  // tasks (unified to-do + reminder)
+  if (pathname === '/api/tasks' && m === 'GET') return s.globalTasks();
+  if (seg[1] === 'tasks' && seg[2]) {
+    const taskId = safeId(seg[2]);
+    if (seg.length === 3 && m === 'PUT') return s.updateTask(taskId, await readBody(req));
+    if (seg.length === 3 && m === 'DELETE') return s.deleteTask(taskId);
+    if (seg[3] === 'complete' && m === 'POST') return s.completeTask(taskId, { noteId: (await readBody(req)).noteId });
+    if (seg[3] === 'skip' && m === 'POST') return s.skipTask(taskId);
+    if (seg[3] === 'reschedule' && m === 'POST') return s.rescheduleTask(taskId, (await readBody(req)).due);
+  }
+
   // trash
   if (pathname === '/api/trash' && m === 'GET') return s.listTrash();
   if (seg[1] === 'trash' && seg[2] && seg[3] === 'restore' && m === 'POST') return s.restoreNote(safeId(seg[2]));
@@ -529,7 +542,7 @@ async function route(s, req, res, pathname, query) {
   if (pathname === '/api/slack/agenda' && m === 'POST') {
     const url = (s.getSettings().slackWebhook || process.env.SLACK_WEBHOOK_URL || '').trim();
     if (!url) throw Object.assign(new Error('no Slack webhook configured (Settings → Slack)'), { status: 400 });
-    await slack.postWebhook(url, slack.formatAgenda(s.globalTodos(), todayStr()));
+    await slack.postWebhook(url, slack.formatAgenda(s.globalTasks(), todayStr()));
     return { ok: true, posted: true };
   }
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);

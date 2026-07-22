@@ -96,6 +96,16 @@
 
     favorites: () => req('GET', '/api/favorites'),
     globalTodos: () => req('GET', '/api/todos'),
+
+    // Tasks (unified to-do + reminder)
+    listTasks: (wsId) => req('GET', '/api/workspaces/' + wsId + '/tasks'),
+    addTask: (wsId, data) => req('POST', '/api/workspaces/' + wsId + '/tasks', data),
+    updateTask: (id, patch) => req('PUT', '/api/tasks/' + id, patch),
+    deleteTask: (id) => req('DELETE', '/api/tasks/' + id),
+    completeTask: (id, noteId) => req('POST', '/api/tasks/' + id + '/complete', { noteId: noteId }),
+    skipTask: (id) => req('POST', '/api/tasks/' + id + '/skip', {}),
+    rescheduleTask: (id, due) => req('POST', '/api/tasks/' + id + '/reschedule', { due: due }),
+    globalTasks: () => req('GET', '/api/tasks'),
     search: (q) => req('GET', '/api/search?q=' + encodeURIComponent(q)),
     importNote: (wsId, payload) => req('POST', '/api/workspaces/' + wsId + '/import', payload),
     exportUrl: (noteId, fmt) => '/api/notes/' + noteId + '/export?format=' + fmt,

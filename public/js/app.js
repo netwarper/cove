@@ -281,7 +281,7 @@
       { label: '＋ New Daily note', run: function () { createNewNote({}); } },
       { label: '✏️ New scratch note', run: function () { createNewNote({ scratch: true }); } },
       { label: 'Go to: Current note', run: function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); } },
-      { label: 'Go to: All open to-dos', run: renderGlobalTodos },
+      { label: 'Go to: All open tasks', run: renderGlobalTasks },
       { label: 'Go to: Agenda', run: renderAgenda },
       { label: 'Go to: Favorites', run: renderFavorites },
       { label: 'Open: Templates', run: openTemplateModal },
@@ -444,12 +444,12 @@
     if (!n) { state.note = null; showLanding(); await renderNoteList(); return; }
     state.note = n;
     showView('note'); renderNote();
-    await Promise.all([renderNoteList(), renderReminders()]);
+    await Promise.all([renderNoteList(), loadTasks()]);
   }
   async function openNote(id) {
     state.note = await API.getNote(id);
     state.wsId = state.note.workspaceId; $('workspaceSelect').value = state.wsId;
-    showView('note'); renderNote(); renderNoteList(); renderReminders();
+    showView('note'); renderNote(); renderNoteList(); loadTasks();
   }
 
   function showLanding() {
@@ -473,7 +473,7 @@
     $('noteCustomTitle').value = n.customTitle || '';
     $('favBtn').textContent = n.favorite ? '★' : '☆';
     renderTags();
-    renderTodos();
+    renderTasks();
     $('carryoverEditor').innerHTML = n.carryover || '';
     $('meetingEditor').innerHTML = n.meetingNotes || '';
     renderAttachments();
@@ -515,9 +515,10 @@
       var tags = (nm.tags || []).length ? '<span class="nl-tags">' + nm.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</span>' : '';
       var main = document.createElement('div'); main.className = 'nl-main';
       var scratch = nm.kind === 'scratch';
+      var doneHere = nm.doneTaskCount ? '<span title="Tasks completed on this note">✓ ' + nm.doneTaskCount + '</span>' : '';
       main.innerHTML =
         '<div class="nl-title">' + (scratch ? '<span class="nl-scratch" title="Scratch note">✏️</span> ' : '') + esc(nm.displayTitle) + '</div>' +
-        '<div class="nl-meta">' + (scratch ? '<span>scratch</span>' : '<span>' + nm.openTodoCount + ' open</span>') +
+        '<div class="nl-meta">' + (scratch ? '<span>scratch</span>' : doneHere) +
         (nm.attachmentCount ? '<span>📎 ' + nm.attachmentCount + '</span>' : '') + tags + '</div>';
       main.addEventListener('click', function () { openNote(nm.id); });
 
@@ -576,134 +577,142 @@
   var todayStr = function () { var d = new Date(); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
   function p2(n) { return String(n).padStart(2, '0'); }
 
-  function renderTodos() {
-    var ul = $('todoList'); ul.innerHTML = '';
-    (state.note.todos || []).forEach(function (t) {
-      var li = document.createElement('li');
-      li.className = t.done ? 'done' : '';
-      if (!t.done && t.due && t.due < todayStr()) li.classList.add('overdue');
-      if (!t.done) { li.setAttribute('draggable', 'true'); li.dataset.id = t.id; }
-      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!t.done;
-      cb.addEventListener('change', function () { toggleTodo(t.id, cb.checked); });
-      var span = document.createElement('span'); span.className = 'todo-text'; span.contentEditable = 'true'; span.textContent = t.text;
-      span.addEventListener('blur', function () { t.text = span.textContent.trim(); scheduleSave(); });
-      var due = document.createElement('button');
-      due.className = 'todo-due' + (t.due ? ' set' : ' empty');
-      due.textContent = t.due ? '📅 ' + t.due.slice(5) : '📅';
-      due.title = t.due ? 'Due ' + t.due + ' — click to change' : 'Add a due date';
-      due.addEventListener('click', function () { pickDue(t); });
-      var del = document.createElement('button'); del.className = 'todo-del'; del.textContent = '✕';
-      del.addEventListener('click', function () {
-        state.note.todos = state.note.todos.filter(function (x) { return x.id !== t.id; });
-        renderTodos(); scheduleSave();
-      });
-      li.appendChild(cb); li.appendChild(span);
-      if (t.sourceInbox) {
-        var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'Added from your inbox (e.g. Slack)'; li.appendChild(ib);
-      }
-      if (t.sourceReminderId) {
-        var b = document.createElement('span'); b.className = 'reminder-badge'; b.textContent = '⏰'; li.appendChild(b);
-        var sn = document.createElement('button'); sn.className = 'todo-snooze'; sn.title = 'Snooze this reminder'; sn.textContent = '💤';
-        sn.addEventListener('click', function () { snoozeReminderTodo(t); });
-        li.appendChild(sn);
-      }
-      li.appendChild(due); li.appendChild(del);
-      addTodoDnd(li);
-      ul.appendChild(li);
+  // ---------------- Tasks (unified to-do + reminder, Todoist-style) ----------------
+  state.tasks = [];
+  state.qa = { due: null, time: null, priority: 4, recurrence: null };
+
+  async function loadTasks() {
+    try { state.tasks = await API.listTasks(state.wsId); } catch (_e) { state.tasks = []; }
+    renderTasks();
+  }
+  function applyTaskResult(res) {
+    if (res && res.tasks && res.workspaceId === state.wsId) { state.tasks = res.tasks; renderTasks(); renderNoteList(); }
+    else loadTasks();
+  }
+  function addDaysStr(iso, n) { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
+  function fmtDueShort(iso) {
+    if (!iso) return '';
+    var t = todayStr();
+    if (iso === t) return 'Today';
+    if (iso === addDaysStr(t, 1)) return 'Tomorrow';
+    if (iso < t) return iso.slice(5);
+    try { return new Date(iso + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' }); } catch (e) { return iso.slice(5); }
+  }
+  function fmtDueLong(iso) {
+    if (iso === addDaysStr(todayStr(), 1)) return 'Tomorrow';
+    try { return new Date(iso + 'T00:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return iso; }
+  }
+  function recurLabel(rec) {
+    if (!rec) return '';
+    if (rec.type === 'daily') return 'daily'; if (rec.type === 'weekdays') return 'weekdays';
+    if (rec.type === 'weekly') return 'weekly'; if (rec.type === 'monthly') return 'monthly';
+    if (rec.type === 'everyNDays') return 'every ' + rec.n + 'd'; return '';
+  }
+  function sortTasks(a, b) { return (a.due || '9999').localeCompare(b.due || '9999') || (a.priority - b.priority) || (a.order - b.order); }
+
+  function taskRow(t) {
+    var li = document.createElement('li');
+    li.className = 'task prio-p' + t.priority + (t.done ? ' done' : '');
+    var today = todayStr();
+    if (!t.done && t.due && t.due < today) li.classList.add('overdue');
+
+    var cb = document.createElement('button'); cb.className = 'task-check'; cb.setAttribute('aria-label', t.done ? 'Reopen task' : 'Complete task');
+    cb.innerHTML = t.done ? '✓' : '';
+    cb.addEventListener('click', async function () {
+      if (t.done) applyTaskResult(await API.updateTask(t.id, { done: false }));
+      else { li.classList.add('checking'); applyTaskResult(await API.completeTask(t.id, state.note ? state.note.id : null)); }
+    });
+
+    var main = document.createElement('div'); main.className = 'task-main';
+    var span = document.createElement('span'); span.className = 'task-text'; span.contentEditable = t.done ? 'false' : 'true'; span.textContent = t.text;
+    span.addEventListener('blur', async function () { var v = span.textContent.trim(); if (v && v !== t.text) applyTaskResult(await API.updateTask(t.id, { text: v })); });
+    span.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); span.blur(); } });
+    main.appendChild(span);
+    var meta = document.createElement('div'); meta.className = 'task-meta';
+    if (t.due) { var dc = document.createElement('button'); dc.className = 'task-due' + (!t.done && t.due < today ? ' overdue' : ''); dc.textContent = '📅 ' + fmtDueShort(t.due) + (t.time ? ' ' + t.time : ''); dc.title = 'Reschedule'; dc.addEventListener('click', function () { rescheduleTask(t); }); meta.appendChild(dc); }
+    if (t.recurrence) { var rc = document.createElement('span'); rc.className = 'task-recur'; rc.textContent = '🔁 ' + recurLabel(t.recurrence); meta.appendChild(rc); }
+    if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox (e.g. Slack)'; meta.appendChild(ib); }
+    if (meta.childNodes.length) main.appendChild(meta);
+    li.appendChild(cb); li.appendChild(main);
+
+    var actions = document.createElement('div'); actions.className = 'task-actions';
+    if (!t.done && t.recurrence) { var sk = document.createElement('button'); sk.className = 'task-act'; sk.title = 'Skip this occurrence'; sk.textContent = '⏭'; sk.addEventListener('click', async function () { applyTaskResult(await API.skipTask(t.id)); }); actions.appendChild(sk); }
+    if (!t.done) { var pr = document.createElement('button'); pr.className = 'task-act'; pr.title = 'Cycle priority'; pr.textContent = '⚑'; pr.addEventListener('click', async function () { applyTaskResult(await API.updateTask(t.id, { priority: t.priority <= 1 ? 4 : t.priority - 1 })); }); actions.appendChild(pr); }
+    var del = document.createElement('button'); del.className = 'task-act task-del'; del.title = 'Delete'; del.textContent = '✕';
+    del.addEventListener('click', async function () { applyTaskResult(await API.deleteTask(t.id)); });
+    actions.appendChild(del);
+    li.appendChild(actions);
+    return li;
+  }
+
+  function renderTasks() {
+    if (!state.note) return;
+    var today = todayStr();
+    var open = (state.tasks || []).filter(function (t) { return !t.done; });
+    var overdueToday = open.filter(function (t) { return t.due && t.due <= today; }).sort(sortTasks);
+    var upcoming = open.filter(function (t) { return t.due && t.due > today; }).sort(sortTasks);
+    var nodate = open.filter(function (t) { return !t.due; }).sort(function (a, b) { return (a.priority - b.priority) || (a.order - b.order); });
+    var here = (state.tasks || []).filter(function (t) { return t.done && t.completedOnNoteId === state.note.id; }).sort(function (a, b) { return (b.completedAt || '').localeCompare(a.completedAt || ''); });
+
+    var tl = $('todayList'); tl.innerHTML = '';
+    if (!overdueToday.length) { var e = document.createElement('li'); e.className = 'task-empty muted tiny'; e.textContent = 'Nothing due — add a task above.'; tl.appendChild(e); }
+    overdueToday.forEach(function (t) { tl.appendChild(taskRow(t)); });
+
+    $('nodateWrap').classList.toggle('hidden', !nodate.length);
+    var nl = $('nodateList'); nl.innerHTML = ''; nodate.forEach(function (t) { nl.appendChild(taskRow(t)); });
+
+    $('completedWrap').classList.toggle('hidden', !here.length);
+    var cl = $('completedList'); cl.innerHTML = ''; here.forEach(function (t) { cl.appendChild(taskRow(t)); });
+
+    var uw = $('upcomingList'); uw.innerHTML = '';
+    if (!upcoming.length) { uw.innerHTML = '<div class="task-empty muted tiny">No upcoming tasks.</div>'; return; }
+    var groups = {}; upcoming.forEach(function (t) { (groups[t.due] = groups[t.due] || []).push(t); });
+    Object.keys(groups).sort().forEach(function (d) {
+      var day = document.createElement('div'); day.className = 'upcoming-day';
+      var lab = document.createElement('div'); lab.className = 'upcoming-date'; lab.textContent = fmtDueLong(d); day.appendChild(lab);
+      var ul = document.createElement('ul'); ul.className = 'task-list'; groups[d].forEach(function (t) { ul.appendChild(taskRow(t)); }); day.appendChild(ul);
+      uw.appendChild(day);
     });
   }
 
-  function pickDue(t) {
+  function rescheduleTask(t) {
     var inp = document.createElement('input'); inp.type = 'date'; inp.value = t.due || '';
     inp.style.position = 'fixed'; inp.style.left = '-9999px'; document.body.appendChild(inp);
-    inp.addEventListener('change', function () { t.due = inp.value || null; renderTodos(); scheduleSave(); inp.remove(); });
+    inp.addEventListener('change', async function () { applyTaskResult(await API.rescheduleTask(t.id, inp.value || null)); inp.remove(); });
     inp.addEventListener('blur', function () { setTimeout(function () { inp.remove(); }, 200); });
     inp.focus(); if (inp.showPicker) try { inp.showPicker(); } catch (e) { inp.click(); } else inp.click();
   }
 
-  function addTodoDnd(li) {
-    if (li.getAttribute('draggable') !== 'true') return;
-    li.addEventListener('dragstart', function () { state.dragTodoId = li.dataset.id; li.classList.add('dragging'); });
-    li.addEventListener('dragend', function () { li.classList.remove('dragging'); state.dragTodoId = null; });
-    li.addEventListener('dragover', function (e) { e.preventDefault(); });
-    li.addEventListener('drop', function (e) {
-      e.preventDefault();
-      var from = state.dragTodoId, to = li.dataset.id;
-      if (!from || from === to) return;
-      var todos = state.note.todos;
-      var fi = todos.findIndex(function (x) { return x.id === from; });
-      var ti = todos.findIndex(function (x) { return x.id === to; });
-      if (fi < 0 || ti < 0) return;
-      var moved = todos.splice(fi, 1)[0];
-      todos.splice(ti, 0, moved);
-      state.note.todos = normalizeOrder(todos);
-      renderTodos(); scheduleSave();
-    });
+  // ---- quick-add (natural language + pickers) ----
+  function syncQa() {
+    $('qaPriority').value = String(state.qa.priority || 4);
+    $('qaRecur').value = state.qa.recurrence ? state.qa.recurrence.type : 'none';
+    $('qaDateLbl').textContent = state.qa.due ? fmtDueShort(state.qa.due) : 'Date';
+    $('qaDate').classList.toggle('set', !!state.qa.due);
   }
-  function normalizeOrder(todos) {
-    return todos.filter(function (t) { return !t.done; }).concat(todos.filter(function (t) { return t.done; }));
-  }
-
-  function toggleTodo(id, done) {
-    var t = state.note.todos.find(function (x) { return x.id === id; });
-    if (!t) return;
-    t.done = done; t.doneAt = done ? new Date().toISOString() : null;
-    state.note.todos = normalizeOrder(state.note.todos);
-    renderTodos(); scheduleSave();
-  }
-
-  $('todoInput').addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter') return;
-    var text = $('todoInput').value.trim(); if (!text) return;
-    state.note.todos = state.note.todos || [];
-    state.note.todos.unshift({ id: rid(), text: text, done: false, doneAt: null, due: null, sourceReminderId: null });
-    state.note.todos = normalizeOrder(state.note.todos);
-    $('todoInput').value = ''; renderTodos(); scheduleSave();
+  $('taskInput').addEventListener('input', function () {
+    var p = window.TaskParse.parse($('taskInput').value);
+    state.qa = { due: p.due, time: p.time, priority: p.priority, recurrence: p.recurrence };
+    syncQa();
   });
-
-  // ---------------- Reminders ----------------
-  $('reminderCadence').addEventListener('change', function () {
-    var v = $('reminderCadence').value;
-    $('reminderN').classList.toggle('hidden', v !== 'everyNDays');
-    $('reminderDue').classList.toggle('hidden', v !== 'once');
-    $('reminderEnd').classList.toggle('hidden', v === 'once'); // "repeat until" only for recurring
+  $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; });
+  $('qaRecur').addEventListener('change', function () { var v = $('qaRecur').value; state.qa.recurrence = v === 'none' ? null : { type: v }; });
+  $('qaDate').addEventListener('click', function () {
+    var inp = document.createElement('input'); inp.type = 'date'; inp.value = state.qa.due || '';
+    inp.style.position = 'fixed'; inp.style.left = '-9999px'; document.body.appendChild(inp);
+    inp.addEventListener('change', function () { state.qa.due = inp.value || null; syncQa(); inp.remove(); });
+    inp.addEventListener('blur', function () { setTimeout(function () { inp.remove(); }, 200); });
+    inp.focus(); if (inp.showPicker) try { inp.showPicker(); } catch (e) { inp.click(); } else inp.click();
   });
-  $('addReminderBtn').addEventListener('click', async function () {
-    var text = $('reminderText').value.trim(); if (!text) return;
-    var type = $('reminderCadence').value;
-    var cadence = { type: type };
-    if (type === 'everyNDays') cadence.n = parseInt($('reminderN').value, 10) || 1;
-    if (type === 'once') cadence.dueDate = $('reminderDue').value || undefined;
-    if (type !== 'once' && $('reminderEnd').value) cadence.endDate = $('reminderEnd').value;
-    await API.addReminder(state.wsId, { text: text, cadence: cadence, time: $('reminderTime').value || null });
-    $('reminderText').value = '';
-    await renderReminders();
-    await loadCurrentNote();
-  });
-
-  async function renderReminders() {
-    var rems = await API.listReminders(state.wsId);
-    var ul = $('reminderList'); ul.innerHTML = '';
-    rems.forEach(function (r) {
-      var li = document.createElement('li'); if (!r.active) li.classList.add('inactive');
-      li.innerHTML =
-        '<input type="checkbox" ' + (r.active ? 'checked' : '') + ' aria-label="Active">' +
-        '<span class="rm-text">' + esc(r.text) + '<br><span class="rm-cadence">' + describeCadence(r.cadence) + (r.time ? ' · ' + esc(r.time) : '') + '</span></span>' +
-        '<button class="rm-del" aria-label="Delete reminder">🗑</button>';
-      li.querySelector('input').addEventListener('change', function (e) { API.updateReminder(state.wsId, r.id, { active: e.target.checked }).then(renderReminders); });
-      li.querySelector('.rm-del').addEventListener('click', function () { API.deleteReminder(state.wsId, r.id).then(renderReminders); });
-      ul.appendChild(li);
-    });
+  async function addTaskFromInput() {
+    var raw = $('taskInput').value.trim(); if (!raw) return;
+    var p = window.TaskParse.parse(raw);
+    var payload = { text: p.text || raw, due: state.qa.due, time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
+    $('taskInput').value = ''; state.qa = { due: null, time: null, priority: 4, recurrence: null }; syncQa();
+    applyTaskResult(await API.addTask(state.wsId, payload));
   }
-  function describeCadence(cad) {
-    if (!cad) return '';
-    if (cad.type === 'once') return 'Once' + (cad.dueDate ? ' · ' + cad.dueDate : '');
-    if (cad.type === 'daily') return 'Every day';
-    if (cad.type === 'weekly') return 'Every week';
-    if (cad.type === 'monthly') return 'Every month';
-    if (cad.type === 'everyNDays') return 'Every ' + (cad.n || 1) + ' days';
-    return '';
-  }
+  $('qaAdd').addEventListener('click', addTaskFromInput);
+  $('taskInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addTaskFromInput(); } });
 
   // ---------------- Rich text ----------------
   var meetingUploader = function (file) {
@@ -923,7 +932,7 @@
     if (opts.templateId) payload.templateId = opts.templateId;
     state.note = await API.newNote(state.wsId, payload);
     showView('note'); renderNote();
-    await Promise.all([renderNoteList(), renderReminders()]);
+    await Promise.all([renderNoteList(), loadTasks()]);
   }
   function renderTemplatePick() {
     var box = $('templatePickList'); box.innerHTML = '';
@@ -957,15 +966,6 @@
       if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(url); setSaveStatus('Link copied ✓'); }
       else await dialog.alert(url, 'Link to this note');
     } catch (_e) { await dialog.alert(url, 'Link to this note'); }
-  }
-
-  async function snoozeReminderTodo(t) {
-    var val = await dialog.prompt('Snooze this reminder for how many hours?', { title: 'Snooze reminder', default: '24', inputType: 'number' });
-    if (val === null) return;
-    var hours = parseFloat(val) || 24;
-    var until = new Date(Date.now() + hours * 3600 * 1000).toISOString();
-    await API.snoozeReminder(state.wsId, t.sourceReminderId, until);
-    await loadCurrentNote();
   }
 
   // Note-link picker (for the editor's "link to a note" tool)
@@ -1065,53 +1065,62 @@
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
   $('navNote').addEventListener('click', function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); });
-  $('navTodos').addEventListener('click', renderGlobalTodos);
+  $('navTodos').addEventListener('click', renderGlobalTasks);
   $('navFavs').addEventListener('click', renderFavorites);
   $('navAgenda').addEventListener('click', renderAgenda);
+
+  function openWorkspace(wsId) {
+    state.wsId = wsId; $('workspaceSelect').value = wsId; showView('note'); loadCurrentNote();
+  }
 
   async function renderAgenda() {
     showView('agenda');
     var box = $('agendaList'); box.innerHTML = '<p class="muted">Loading…</p>';
-    var todos = await API.globalTodos();
+    var tasks = await API.globalTasks();
     var groups = {};
-    todos.filter(function (t) { return t.due; }).forEach(function (t) { (groups[t.due] = groups[t.due] || []).push(t); });
+    tasks.filter(function (t) { return t.due; }).forEach(function (t) { (groups[t.due] = groups[t.due] || []).push(t); });
     var dates = Object.keys(groups).sort();
     box.innerHTML = '';
-    if (!dates.length) { box.innerHTML = '<p class="muted">No dated to-dos. Add a due date to a to-do to see it here.</p>'; return; }
+    if (!dates.length) { box.innerHTML = '<p class="muted">No dated tasks. Add a due date to a task to see it here.</p>'; return; }
     dates.forEach(function (d) {
       var h = document.createElement('div'); h.className = 'agenda-day' + (d < todayStr() ? ' overdue' : '');
-      h.innerHTML = '<div class="agenda-date">' + esc(d) + (d < todayStr() ? ' · overdue' : (d === todayStr() ? ' · today' : '')) + '</div>';
-      groups[d].forEach(function (t) {
-        var row = document.createElement('div'); row.className = 'agenda-item';
-        row.innerHTML = '<span class="gt-ws">' + esc(t.workspaceName) + '</span> ' + esc(t.text);
-        row.addEventListener('click', function () { openNote(t.noteId); });
+      h.innerHTML = '<div class="agenda-date">' + esc(fmtDueLong(d)) + (d < todayStr() ? ' · overdue' : (d === todayStr() ? ' · today' : '')) + '</div>';
+      groups[d].sort(sortTasks).forEach(function (t) {
+        var row = document.createElement('div'); row.className = 'agenda-item prio-p' + t.priority;
+        row.innerHTML = '<span class="gt-ws">' + esc(t.workspaceName) + '</span> ' + esc(t.text) + (t.recurrence ? ' <span class="task-recur">🔁 ' + esc(recurLabel(t.recurrence)) + '</span>' : '');
+        row.addEventListener('click', function () { openWorkspace(t.workspaceId); });
         h.appendChild(row);
       });
       box.appendChild(h);
     });
   }
 
-  async function renderGlobalTodos() {
+  async function renderGlobalTasks() {
     showView('todos');
-    var todos = await API.globalTodos();
+    var tasks = await API.globalTasks();
     var ul = $('globalTodoList'); ul.innerHTML = '';
-    if (!todos.length) { ul.innerHTML = '<li class="muted">No open to-dos. 🎉</li>'; return; }
-    todos.forEach(function (t) {
-      var li = document.createElement('li');
+    if (!tasks.length) { ul.innerHTML = '<li class="muted">No open tasks. 🎉</li>'; return; }
+    tasks.sort(sortTasks);
+    tasks.forEach(function (t) {
+      var li = document.createElement('li'); li.className = 'prio-p' + t.priority;
       if (t.due && t.due < todayStr()) li.classList.add('overdue');
       var cb = document.createElement('input'); cb.type = 'checkbox';
       cb.addEventListener('change', async function () {
-        await API.toggleTodo(t.noteId, t.todoId, cb.checked); li.classList.toggle('done', cb.checked);
-        if (state.note && state.note.id === t.noteId) { state.note = await API.getNote(t.noteId); renderTodos(); }
-        setTimeout(renderGlobalTodos, 400);
+        li.classList.toggle('done', cb.checked);
+        if (cb.checked) await API.completeTask(t.id, (state.note && state.note.workspaceId === t.workspaceId) ? state.note.id : null);
+        else await API.updateTask(t.id, { done: false });
+        if (t.workspaceId === state.wsId) await loadTasks();
+        setTimeout(renderGlobalTasks, 400);
       });
       li.appendChild(cb);
       var ws = document.createElement('span'); ws.className = 'gt-ws'; ws.textContent = t.workspaceName;
       var text = document.createElement('span'); text.className = 'gt-text'; text.textContent = t.text;
       li.appendChild(ws); li.appendChild(text);
-      if (t.due) { var d = document.createElement('span'); d.className = 'gt-due'; d.textContent = '📅 ' + t.due; li.appendChild(d); }
+      if (t.due) { var d = document.createElement('span'); d.className = 'gt-due'; d.textContent = '📅 ' + fmtDueShort(t.due); li.appendChild(d); }
+      if (t.recurrence) { var rc = document.createElement('span'); rc.className = 'task-recur'; rc.textContent = '🔁 ' + recurLabel(t.recurrence); li.appendChild(rc); }
+      if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox'; li.appendChild(ib); }
       var link = document.createElement('button'); link.className = 'link-btn'; link.textContent = 'open';
-      link.addEventListener('click', function () { openNote(t.noteId); });
+      link.addEventListener('click', function () { openWorkspace(t.workspaceId); });
       li.appendChild(link); ul.appendChild(li);
     });
   }
@@ -1195,14 +1204,13 @@
       li.appendChild(name); li.appendChild(edit); li.appendChild(del); ul.appendChild(li);
     });
   }
-  function clearTplEditor() { $('tplEditingId').value = ''; $('tplName').value = ''; $('tplMeeting').innerHTML = ''; $('tplTodos').value = ''; }
-  function loadTplIntoEditor(t) { $('tplEditingId').value = t.id; $('tplName').value = t.name; $('tplMeeting').innerHTML = t.meetingNotes || ''; $('tplTodos').value = (t.defaultTodos || []).join('\n'); }
+  function clearTplEditor() { $('tplEditingId').value = ''; $('tplName').value = ''; $('tplMeeting').innerHTML = ''; }
+  function loadTplIntoEditor(t) { $('tplEditingId').value = t.id; $('tplName').value = t.name; $('tplMeeting').innerHTML = t.meetingNotes || ''; }
   $('clearTplBtn').addEventListener('click', clearTplEditor);
   $('saveTplBtn').addEventListener('click', async function () {
     var data = {
       name: $('tplName').value.trim() || 'Template',
       meetingNotes: $('tplMeeting').innerHTML,
-      defaultTodos: $('tplTodos').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean),
     };
     var id = $('tplEditingId').value;
     if (id) await API.updateTemplate(id, data); else await API.createTemplate(data);
@@ -1436,29 +1444,21 @@
     var perm = await Notification.requestPermission();
     state.notify = perm === 'granted';
     $('notifyBtn').textContent = state.notify ? '🔔' : '🔕';
-    if (state.notify) pollReminders();
+    if (state.notify) pollInbox();
   });
-  function startReminderPolling() { pollReminders(); setInterval(pollReminders, 60 * 1000); }
-  async function pollReminders() {
+  function startReminderPolling() { pollInbox(); setInterval(pollInbox, 60 * 1000); }
+  async function pollInbox() {
     try {
-      var surfaced = await API.processReminders();
-      var refreshCurrent = false;
-      surfaced.forEach(function (s) {
-        if (state.notify && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('Reminder: ' + s.text, { body: s.workspaceName });
-        }
-        if (s.workspaceId === state.wsId) refreshCurrent = true;
-      });
-      // Drain the inbox (Slack etc. → to-dos) into the target workspace.
+      // Drain the inbox (Slack etc. → tasks) into the target workspace.
       try {
         var inbox = await API.processInbox();
-        if (inbox && inbox.added && inbox.workspaceId === state.wsId) refreshCurrent = true;
+        if (inbox && inbox.added) {
+          if (state.notify && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification(inbox.added + ' new task' + (inbox.added > 1 ? 's' : '') + ' in your inbox');
+          }
+          if (inbox.workspaceId === state.wsId && state.view === 'note' && state.note) await loadTasks();
+        }
       } catch (_e) { /* ignore */ }
-      // Merge in newly-injected reminder/inbox todos without clobbering edits.
-      if (refreshCurrent && state.view === 'note' && state.note && !state.saveTimer) {
-        var fresh = await API.currentNote(state.wsId);
-        if (fresh && fresh.id === state.note.id) { state.note.todos = fresh.todos; state.note.updatedAt = fresh.updatedAt; state.note.rev = fresh.rev; renderTodos(); renderNoteList(); }
-      }
       maybeSendDailyAgenda();
     } catch (e) { /* ignore transient poll errors */ }
   }

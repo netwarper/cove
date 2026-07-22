@@ -5,9 +5,11 @@ one-click launcher — and is ready to be hosted remotely later. It has **zero
 runtime dependencies** (Node core only), so the whole folder can be copied to
 any machine with Node.js and started immediately.
 
-The central idea: **each new note is seeded from the most recent note in the
-same workspace** — your open to-dos and carryover notes come along automatically,
-while the meeting-specific notes stay behind.
+The central idea: **each new daily note is seeded with the carryover notes from
+the most recent note in the same workspace**, while the meeting-specific notes
+stay behind. Tasks live at the **workspace** level (Todoist-style, with due
+dates, priorities, and recurrence) and surface on each note as **Overdue &
+Today** and **Upcoming**.
 
 ---
 
@@ -33,29 +35,28 @@ everything stays on your machine.
 | Area | What it does |
 |------|--------------|
 | **Workspaces** | Notes are grouped into **General** plus any workspaces you create. Empty workspaces show a landing page with tips instead of an auto-created note. |
-| **Daily & scratch notes** | **New Daily** starts a note that carries your open to-dos and carryover forward from the last **daily** note. **New scratch note** is a clean Meeting Notes page for a quick jot — it never affects the carryover thread. |
-| **Sections** | To-Do · Reminders · Carryover Notes · Meeting Notes. Scratch notes show only Meeting Notes. |
-| **To-Do** | Completed items strike through and sink to the bottom. **Incomplete items copy into the next daily note.** |
-| **Reminders** | Once / daily / weekly / monthly / every-N-days. When due, a reminder **pops into the to-do list**. |
+| **Daily & scratch notes** | **New Daily** starts a note that carries carryover forward from the last **daily** note. **New scratch note** is a clean Meeting Notes page for a quick jot — it never affects the carryover thread. |
+| **Sections** | Overdue & Today · Upcoming · Carryover Notes · Meeting Notes. Scratch notes show only Meeting Notes. |
+| **Tasks (Todoist-style)** | One unified module for to-dos **and** reminders. Each task is **workspace-level** with a **due date**, **priority (P1–P4)**, and optional **recurrence** (daily / weekdays / weekly / monthly / every-N-days). The note view shows your workspace's **Overdue & Today** and **Upcoming** tasks; complete one and it rolls forward if it repeats, or crosses out **on the note it was completed on** (never on future notes). ⏭ skips a single occurrence. |
+| **Quick-add (no LLM)** | Type naturally — `email Sam tomorrow p1 every Friday` — and the due date, priority, and repeat are parsed locally (deterministic, no model calls), with pickers to adjust. |
 | **Carryover Notes** | Rich text that **copies into the next daily note**. |
 | **Meeting Notes** | Rich text that is **not** copied over. |
 | **Rich text** | Bold, italic, underline, strikethrough, bullet & numbered lists, headings, links, and **inline images** you can **resize** (drag the corner handle, or `+`/`-`) and **paste or drag-and-drop** straight in. |
 | **Attachments** | Attach files (up to 20 MB) to a note; stored encrypted. |
 | **Titles** | Auto-titled with the date, with an optional specific title. |
 | **Global search** | Search across every note in every workspace. |
-| **Global to-dos** | One view of all open to-dos across workspaces. Completing one there updates the source note, and vice-versa. |
+| **Global tasks** | One view of all open tasks across workspaces. Complete a task or jump to its workspace from here. |
 | **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) mixed into **one `.wav` file** (encrypted like any attachment), with an optional near-live transcript — timestamped and labeled **You** vs **Them** — in its own area below your notes. |
 | **Screen recording** | **🖥 Screen** records the shared screen/window/tab video with its system audio (+ your mic) to one `.webm` video, saved as an encrypted attachment. |
 | **Sort notes** | Sort the sidebar by **Created / Modified / Name**, ascending or descending (persisted). |
 | **Biometric unlock** | Optionally re-unlock with **Touch ID / Windows Hello / a device passkey** after your session times out, instead of retyping your passphrase (per-device, opt-in; passphrase still required elsewhere). |
-| **Inbox (Slack → to-dos)** | Message yourself (Slack via Zapier / Make / a Cloudflare Worker) → a file lands in `DATA_DIR/inbox/` → the app turns it into a to-do (badged **📥**) on the latest daily note, even if the Mac was asleep. See [`docs/slack-inbox.md`](docs/slack-inbox.md). |
-| **Slack agenda (→ out)** | Post your due &amp; overdue to-dos to a Slack channel via an Incoming Webhook — on demand or auto-daily (Settings → Slack). |
+| **Inbox (Slack → tasks)** | Message yourself (Slack via Zapier / Make / a Cloudflare Worker) → a file lands in `DATA_DIR/inbox/` → the app turns it into a task (badged **📥**) in the target workspace, even if the Mac was asleep. See [`docs/slack-inbox.md`](docs/slack-inbox.md). |
+| **Slack agenda (→ out)** | Post your due &amp; overdue tasks to a Slack channel via an Incoming Webhook — on demand or auto-daily (Settings → Slack). |
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
 | **Tags** | Tag notes and filter search with `tag:name`. |
-| **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carry-forward is unchanged — To-Do & Carryover still come from the previous note; a template's defaults fill them only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
+| **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carryover still comes from the previous note; a template's defaults fill it only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
 | **Trash** | Deleted notes go to Trash and can be restored for 30 days before permanent removal. |
 | **Move / duplicate** | Move a note to another workspace, or duplicate it. |
-| **Reminders (time-aware)** | Optional time-of-day; a background poll surfaces due reminders and (with permission) raises **desktop notifications** even for workspaces you aren't viewing. |
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |
 | **Import** | Upload a previously exported JSON / HTML / Markdown note into a workspace. |
 | **Encrypted backup** | Download a single encrypted backup file of everything; restore on a fresh install. Bulk-export a whole workspace as a ZIP (HTML/MD/JSON). |
@@ -63,7 +64,7 @@ everything stays on your machine.
 | **Live sync** | Changes to the data directory (e.g. from another device via a synced folder) refresh open notes in real time; save conflicts can be resolved by keeping both copies. |
 | **Note links & backlinks** | Link between notes (`⧉` in the editor); each note shows what links to it. Rich text also supports **tables** and **/slash commands**. |
 | **Deep links** | Each note has a shareable `#note/<id>` link (**⋯ → Copy link to note**); a page refresh reopens the same note instead of jumping to the newest. |
-| **Agenda** | A dated view of all due to-dos across workspaces. Reminders support a time-of-day, an end date, and snooze. |
+| **Agenda** | A dated view of every task with a due date, across all workspaces, grouped by day. |
 | **Offline / installable** | Ships as a PWA — installable, with an offline app shell. |
 | **Security** | AES-256-GCM **envelope encryption at rest**, scrypt key derivation, **passphrase change + recovery key**, CSRF tokens, session auth with idle auto-lock, CSP + anti-clickjacking headers, login rate-limiting. |
 
@@ -305,7 +306,9 @@ npm run verify  # both of the above
 ```
 server.js              zero-dependency HTTP server + router
 lib/crypto.js          scrypt KDF + AES-256-GCM helpers
-lib/store.js           encrypted file store, note/reminder/todo logic
+lib/store.js           encrypted file store, note & task logic
+lib/tasks.js           recurrence engine + task helpers (pure)
+public/js/taskparse.js natural-language quick-add parser (no LLM)
 public/                frontend (index.html, css, vanilla JS)
 test/                  functional + security suites
 scripts/check-quality.js  syntax + static checks

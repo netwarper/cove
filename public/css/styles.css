@@ -145,8 +145,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .sections [data-sec="carryover"],
 .sections [data-sec="meeting"] { grid-column: 1 / -1; }
 .sections.scratch { grid-template-columns: 1fr; }
-.sections.scratch [data-sec="todos"],
-.sections.scratch [data-sec="reminders"],
+.sections.scratch [data-sec="today"],
+.sections.scratch [data-sec="upcoming"],
 .sections.scratch [data-sec="carryover"] { display: none; }
 @media (max-width: 680px) { .sections { grid-template-columns: 1fr; } }
 .section {
@@ -165,30 +165,71 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 }
 button.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
 
-/* ---- To-dos ---- */
-.todo-list, .reminder-list { list-style: none; margin: 0; padding: 0; overflow: auto; }
-.todo-list li {
-  display: flex; align-items: flex-start; gap: 8px; padding: 5px 4px; border-radius: 6px;
+/* ---- Tasks (Todoist-style: unified to-dos + reminders) ---- */
+.quick-add { margin-bottom: 10px; }
+.quick-add > input {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel-2); color: var(--ink); font-size: 14px;
 }
-.todo-list li:hover { background: var(--panel-2); }
-.todo-list li.done .todo-text { text-decoration: line-through; color: var(--done); }
-.todo-list .todo-text { flex: 1; word-break: break-word; }
-.todo-list .todo-text[contenteditable] { outline: none; }
-.todo-del { border: 0; background: none; color: var(--muted); opacity: 0; }
-.todo-list li:hover .todo-del { opacity: 1; }
-.reminder-badge { font-size: 10px; background: var(--brand); color: #fff; border-radius: 4px; padding: 0 4px; align-self: center; }
+.quick-add > input:focus { outline: none; border-color: var(--brand); }
+.qa-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.qa-pill {
+  padding: 4px 9px; border: 1px solid var(--line); border-radius: 14px;
+  background: var(--panel-2); color: var(--ink); font-size: 12px; cursor: pointer;
+}
+.qa-pill:hover { border-color: var(--brand); }
+select.qa-pill { padding: 4px 6px; }
+#qaDate.set { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.qa-controls #qaAdd { margin-left: auto; }
+
+.task-list { list-style: none; margin: 0; padding: 0; }
+.task {
+  display: flex; align-items: flex-start; gap: 9px; padding: 6px 6px 6px 8px;
+  border-radius: 7px; border-left: 3px solid transparent;
+}
+.task:hover { background: var(--panel-2); }
+.task-check {
+  flex: none; width: 18px; height: 18px; margin-top: 1px; border: 1.5px solid var(--muted);
+  border-radius: 50%; background: none; color: #fff; font-size: 11px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.task-check:hover { border-color: var(--brand); }
+.task.done .task-check { background: var(--done); border-color: var(--done); }
+.task-main { flex: 1; min-width: 0; }
+.task-text { display: block; word-break: break-word; outline: none; }
+.task.done .task-text { text-decoration: line-through; color: var(--done); }
+.task.overdue .task-text { color: var(--danger); }
+.task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 3px; }
+.task-due { border: 0; background: none; padding: 0; cursor: pointer; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.task-due:hover { color: var(--brand); }
+.task-due.overdue { color: var(--danger); font-weight: 700; }
+.task-recur { font-size: 11px; color: var(--muted); white-space: nowrap; }
+/* priority accents (P1 highest) */
+.prio-p1 { border-left-color: var(--danger); }
+.prio-p2 { border-left-color: #e0821e; }
+.prio-p3 { border-left-color: var(--brand); }
+.task.done { border-left-color: transparent; }
+
+.task-actions { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity .12s; }
+.task:hover .task-actions, .task:focus-within .task-actions { opacity: 1; }
+.task-act { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 5px; }
+.task-act:hover { background: var(--panel); color: var(--ink); }
+.task-del:hover { color: var(--danger); }
+
+.task-group { margin-top: 12px; }
+.task-group-label, .upcoming-date {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); margin-bottom: 4px;
+}
+.task-empty { list-style: none; padding: 6px 4px; }
+.upcoming-list { display: flex; flex-direction: column; gap: 12px; }
+.upcoming-day .upcoming-date { margin-bottom: 6px; }
+
 .inbox-badge { font-size: 11px; align-self: center; }
 .slack-daily { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .slack-daily input[type="checkbox"] { width: auto; margin: 0; }
 .slack-daily input[type="time"] { width: auto; margin: 0; }
 .slack-actions { display: flex; gap: 8px; margin-top: 8px; }
-
-/* ---- Reminders ---- */
-.reminder-list li { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); }
-.reminder-list .rm-text { flex: 1; }
-.reminder-list .rm-cadence { font-size: 11px; color: var(--muted); }
-.reminder-list .rm-del { border: 0; background: none; color: var(--danger); }
-.reminder-list li.inactive .rm-text { color: var(--done); text-decoration: line-through; }
 
 /* ---- Rich text ---- */
 .rte-toolbar { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
@@ -297,16 +338,7 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .tag-input:focus { outline: none; border-color: var(--brand); }
 .nl-tags, .sr-tags { color: var(--brand); }
 
-/* ---- To-do due + drag ---- */
-.todo-due { border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 1px 5px; border-radius: 10px; white-space: nowrap; }
-.todo-due.set { background: var(--panel-2); border: 1px solid var(--line); color: var(--ink); }
-.todo-due.empty { opacity: 0; transition: opacity .12s; }
-.todo-list li:hover .todo-due.empty { opacity: .7; }
-.todo-due:hover { border-color: var(--brand); }
-.todo-list li.overdue .todo-due.set { color: var(--danger); font-weight: 700; border-color: var(--danger); }
-.todo-list li.overdue .todo-text { color: var(--danger); }
-.todo-list li.dragging { opacity: .5; }
-.todo-list li[draggable="true"] { cursor: grab; }
+/* ---- Global task due chips ---- */
 .gt-due { font-size: 11px; color: var(--muted); }
 .global-todo-list li.overdue .gt-due { color: var(--danger); font-weight: 700; }
 
@@ -334,7 +366,6 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .recovery-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; letter-spacing: 1px; background: var(--panel-2); border: 1px dashed var(--brand); border-radius: 8px; padding: 14px; text-align: center; word-break: break-all; margin: 10px 0; }
 .ws-tpl { padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--ink); max-width: 150px; }
 select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
-.reminder-time { max-width: 92px; }
 .link-btn.danger { color: var(--danger); }
 
 /* ---- v1.2 additions ---- */
@@ -348,9 +379,6 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 .slash-menu { position: absolute; z-index: 60; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 150px; }
 .slash-menu button { text-align: left; padding: 7px 12px; border: 0; background: none; color: var(--ink); }
 .slash-menu button:hover { background: var(--panel-2); }
-
-.todo-snooze { border: 0; background: none; cursor: pointer; opacity: .6; font-size: 12px; }
-.todo-snooze:hover { opacity: 1; }
 
 .backlinks { margin-top: 12px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .backlinks .bl-label { color: var(--muted); font-weight: 600; }
@@ -448,7 +476,7 @@ button.mini.ghost:hover { color: var(--ink); }
 
 /* ---- Print ---- */
 @media print {
-  .topbar, .sidebar, .note-tools, .rte-toolbar, .add-row, .rec-controls, .transcript-region, #reminderList, .attach-head label { display: none !important; }
+  .topbar, .sidebar, .note-tools, .rte-toolbar, .quick-add, .task-actions, .rec-controls, .transcript-region, .attach-head label { display: none !important; }
   .app, .body, .main { display: block; height: auto; overflow: visible; }
   .sections { grid-template-columns: 1fr 1fr; }
   .section { break-inside: avoid; box-shadow: none; }
