@@ -368,6 +368,45 @@
     API.saveSettings({ inboxWorkspace: state.settings.inboxWorkspace });
   });
 
+  // ---------------- Slack outbound (agenda) ----------------
+  function renderSlackSettings() {
+    $('slackWebhook').value = state.settings.slackWebhook || '';
+    $('slackDaily').checked = !!state.settings.slackDaily;
+    $('slackTime').value = state.settings.slackTime || '08:00';
+    $('slackMsg').textContent = '';
+  }
+  function slackMsg(s, isErr) { var el = $('slackMsg'); el.textContent = s; el.style.color = isErr ? 'var(--danger)' : 'var(--muted)'; }
+  $('slackSaveBtn').addEventListener('click', async function () {
+    state.settings.slackWebhook = $('slackWebhook').value.trim();
+    state.settings.slackDaily = $('slackDaily').checked;
+    state.settings.slackTime = $('slackTime').value || '08:00';
+    await API.saveSettings({ slackWebhook: state.settings.slackWebhook, slackDaily: state.settings.slackDaily, slackTime: state.settings.slackTime });
+    slackMsg('Saved ✓', false);
+  });
+  $('slackSendBtn').addEventListener('click', async function () {
+    var url = $('slackWebhook').value.trim();
+    if (!url) { slackMsg('Add your Slack webhook URL first.', true); return; }
+    // persist the URL so the server can use it, then post
+    state.settings.slackWebhook = url; await API.saveSettings({ slackWebhook: url });
+    slackMsg('Posting…', false);
+    try { await API.slackAgenda(); slackMsg('Agenda posted to Slack ✓', false); }
+    catch (ex) { slackMsg('Post failed: ' + ex.message, true); }
+  });
+
+  // Best-effort daily auto-send while the app is open (deduped per day).
+  async function maybeSendDailyAgenda() {
+    var s = state.settings || {};
+    if (!s.slackDaily || !s.slackWebhook) return;
+    var t = todayStr();
+    if (s.lastSlackDate === t) return;
+    var now = new Date(); var hhmm = p2(now.getHours()) + ':' + p2(now.getMinutes());
+    if (hhmm < (s.slackTime || '08:00')) return;
+    try {
+      await API.slackAgenda();
+      state.settings.lastSlackDate = t; await API.saveSettings({ lastSlackDate: t });
+    } catch (_e) { /* try again on the next poll */ }
+  }
+
   // ---------------- Workspaces ----------------
   async function loadWorkspaces() {
     state.workspaces = await API.listWorkspaces();
@@ -559,6 +598,9 @@
         renderTodos(); scheduleSave();
       });
       li.appendChild(cb); li.appendChild(span);
+      if (t.sourceInbox) {
+        var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'Added from your inbox (e.g. Slack)'; li.appendChild(ib);
+      }
       if (t.sourceReminderId) {
         var b = document.createElement('span'); b.className = 'reminder-badge'; b.textContent = '⏰'; li.appendChild(b);
         var sn = document.createElement('button'); sn.className = 'todo-snooze'; sn.title = 'Snooze this reminder'; sn.textContent = '💤';
@@ -1186,6 +1228,7 @@
     updateSttWarn();
     renderBioSettings();
     renderInboxSettings();
+    renderSlackSettings();
     loadStatsInto();
     openModal('accountModal');
     if (focusStt) setTimeout(function () { var el = $('sttEndpoint'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 40);
@@ -1413,6 +1456,7 @@
         var fresh = await API.currentNote(state.wsId);
         if (fresh && fresh.id === state.note.id) { state.note.todos = fresh.todos; state.note.updatedAt = fresh.updatedAt; state.note.rev = fresh.rev; renderTodos(); renderNoteList(); }
       }
+      maybeSendDailyAgenda();
     } catch (e) { /* ignore transient poll errors */ }
   }
 

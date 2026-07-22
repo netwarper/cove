@@ -130,6 +130,31 @@ await fetch('https://your-tunnel-host/api/inbox', {
 });
 ```
 
+## Outbound: post your agenda to Slack
+
+The reverse direction is built in — the app can post your **due & overdue to-dos**
+to a Slack channel.
+
+1. In Slack, create an **Incoming Webhook** (api.slack.com → *Incoming Webhooks*)
+   for the channel you want, and copy the URL.
+2. In the app: **Settings → Slack**, paste the webhook URL, **Save**.
+3. Click **Send agenda now**, or tick **Auto-send daily at HH:MM**.
+
+The browser can't post to Slack directly (strict CSP), so the app's server proxies
+it; the webhook URL is stored encrypted in your settings (or set `SLACK_WEBHOOK_URL`).
+
+> Auto-send is best-effort **while the app is open and unlocked** — it fires on the
+> first check past your chosen time each day. For a post that happens even when the
+> app is closed, trigger it externally instead (e.g. a scheduled Cloudflare Worker
+> that calls `POST /api/inbox`… — that's inbound; a scheduled *outbound* post would
+> need the app running with data access, which the local-only model doesn't provide
+> while closed).
+
+## Distinguishing inbox to-dos
+
+To-dos added via the inbox show a small **📥** badge so you can tell them from ones
+you typed. The badge carries forward with the to-do into the next daily note.
+
 ## Security notes
 
 - Inbox files sit **unencrypted** in the sync folder until drained (seconds to a

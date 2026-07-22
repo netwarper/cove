@@ -248,6 +248,17 @@ read-only `meeting-notes-viewer.html` that decrypts on-device.
 
 ## Changelog
 
+- **1.11.0 (2026-07-22):** Inbox source badge + outbound Slack agenda.
+  - Inbox-added to-dos now show a **📥 badge** (`sourceInbox`), carried forward into
+    the next daily note, so Slack items are distinguishable from typed ones.
+  - **Outbound Slack:** post your due/overdue to-dos to a Slack **Incoming Webhook**
+    — on demand ("Send agenda now") or best-effort **auto-daily** while the app is
+    open (Settings → Slack). Server proxies the post (CSP), webhook stored encrypted
+    in settings or `SLACK_WEBHOOK_URL`. New `lib/slack.js` (`postWebhook`,
+    `formatAgenda`) + `POST /api/slack/agenda`. Verified: quality 0 · functional
+    88/88 (adds formatAgenda + a stub-webhook post incl. a due to-do) · security
+    35/35 · config 14/14 · backup 10/10 · viewer 17/17 · transcribe 13/13; browser
+    test confirmed the 📥 badge and a successful agenda post to a stub webhook.
 - **1.10.0 (2026-07-22):** Inbox — send yourself to-dos (e.g. from Slack).
   The app drains a `DATA_DIR/inbox/` folder (`.txt`/`.md` one-per-line, or
   `.json` `{text}|[...]|{items}`) into to-dos on the latest daily note of a

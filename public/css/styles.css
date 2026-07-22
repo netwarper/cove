@@ -177,6 +177,11 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .todo-del { border: 0; background: none; color: var(--muted); opacity: 0; }
 .todo-list li:hover .todo-del { opacity: 1; }
 .reminder-badge { font-size: 10px; background: var(--brand); color: #fff; border-radius: 4px; padding: 0 4px; align-self: center; }
+.inbox-badge { font-size: 11px; align-self: center; }
+.slack-daily { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.slack-daily input[type="checkbox"] { width: auto; margin: 0; }
+.slack-daily input[type="time"] { width: auto; margin: 0; }
+.slack-actions { display: flex; gap: 8px; margin-top: 8px; }
 
 /* ---- Reminders ---- */
 .reminder-list li { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); }

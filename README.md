@@ -48,7 +48,8 @@ everything stays on your machine.
 | **Screen recording** | **🖥 Screen** records the shared screen/window/tab video with its system audio (+ your mic) to one `.webm` video, saved as an encrypted attachment. |
 | **Sort notes** | Sort the sidebar by **Created / Modified / Name**, ascending or descending (persisted). |
 | **Biometric unlock** | Optionally re-unlock with **Touch ID / Windows Hello / a device passkey** after your session times out, instead of retyping your passphrase (per-device, opt-in; passphrase still required elsewhere). |
-| **Inbox (Slack → to-dos)** | Message yourself (Slack via Zapier / Make / a Cloudflare Worker) → a file lands in `DATA_DIR/inbox/` → the app turns it into a to-do on the latest daily note, even if the Mac was asleep. See [`docs/slack-inbox.md`](docs/slack-inbox.md). |
+| **Inbox (Slack → to-dos)** | Message yourself (Slack via Zapier / Make / a Cloudflare Worker) → a file lands in `DATA_DIR/inbox/` → the app turns it into a to-do (badged **📥**) on the latest daily note, even if the Mac was asleep. See [`docs/slack-inbox.md`](docs/slack-inbox.md). |
+| **Slack agenda (→ out)** | Post your due &amp; overdue to-dos to a Slack channel via an Incoming Webhook — on demand or auto-daily (Settings → Slack). |
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
 | **Tags** | Tag notes and filter search with `tag:name`. |
 | **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carry-forward is unchanged — To-Do & Carryover still come from the previous note; a template's defaults fill them only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
@@ -226,6 +227,7 @@ All optional, via environment variables (or a `.env` file):
 | `SESSION_TTL` | `240` | Session lifetime in minutes |
 | `COOKIE_SECURE` | `auto` | `auto` adds the `Secure` cookie flag over TLS; `always` / `never` to force |
 | `INBOX_TOKEN` | _(off)_ | Enable `POST /api/inbox` for a relay/Slack push (see [`docs/slack-inbox.md`](docs/slack-inbox.md)); the folder inbox works without it |
+| `SLACK_WEBHOOK_URL` | _(off)_ | Default Slack Incoming Webhook for the outbound agenda (also settable in Settings → Slack) |
 | `AUTO_BACKUP_DIR` | _(off)_ | Enable scheduled encrypted backups to this directory (use a different disk/folder) |
 | `AUTO_BACKUP_HOURS` | `24` | Hours between automatic backups |
 | `AUTO_BACKUP_KEEP` | `7` | How many recent backups to retain |

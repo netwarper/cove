@@ -370,6 +370,18 @@
         <select id="inboxWs" class="ws-tpl"></select>
         <div id="inboxInfo" class="tiny muted" style="margin-top:6px"></div>
       </div>
+      <div class="acct-block">
+        <h4>Slack — send yourself an agenda</h4>
+        <p class="muted tiny">Post your due &amp; overdue to-dos to Slack via an <b>Incoming Webhook</b> (create one at api.slack.com → Incoming Webhooks and paste the URL). Auto-send only fires while the app is open and unlocked.</p>
+        <label class="tiny muted">Slack Incoming Webhook URL</label>
+        <input id="slackWebhook" type="password" placeholder="https://hooks.slack.com/services/…" autocomplete="off">
+        <label class="tiny muted slack-daily"><input id="slackDaily" type="checkbox"> Auto-send daily at <input id="slackTime" type="time"></label>
+        <div class="slack-actions">
+          <button id="slackSaveBtn" class="sm">Save</button>
+          <button id="slackSendBtn" class="sm primary">Send agenda now</button>
+        </div>
+        <div id="slackMsg" class="tiny" aria-live="polite"></div>
+      </div>
       <div id="acctMsg" class="tiny" aria-live="polite"></div>
       <div class="modal-actions"><button class="modal-close">Close</button></div>
     </div>

@@ -27,6 +27,7 @@ const config = require('./lib/config');
 const backup = require('./lib/backup');
 const viewer = require('./lib/viewer');
 const transcribe = require('./lib/transcribe');
+const slack = require('./lib/slack');
 const { Store } = store;
 
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -188,6 +189,7 @@ function inboundToken(req, raw) {
   const m = /(?:^|&)token=([^&]*)/.exec(String(raw || '')); return m ? decodeURIComponent(m[1]) : '';
 }
 function clientIp(req) { return (req.socket && req.socket.remoteAddress) || 'unknown'; }
+function todayStr() { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 
 function isSecureReq(req) {
   if (COOKIE_SECURE === 'always') return true;
@@ -524,6 +526,12 @@ async function route(s, req, res, pathname, query) {
   if (pathname === '/api/todos' && m === 'GET') return s.globalTodos();
   if (pathname === '/api/reminders/process' && m === 'POST') return s.processReminders();
   if (pathname === '/api/inbox/process' && m === 'POST') return s.processInbox();
+  if (pathname === '/api/slack/agenda' && m === 'POST') {
+    const url = (s.getSettings().slackWebhook || process.env.SLACK_WEBHOOK_URL || '').trim();
+    if (!url) throw Object.assign(new Error('no Slack webhook configured (Settings → Slack)'), { status: 400 });
+    await slack.postWebhook(url, slack.formatAgenda(s.globalTodos(), todayStr()));
+    return { ok: true, posted: true };
+  }
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);
   if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
   if (pathname === '/api/stats' && m === 'GET') return s.stats();

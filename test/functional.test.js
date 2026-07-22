@@ -3,6 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const http = require('http');
 const { makeClient, harness } = require('./helpers');
 
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-func-'));
@@ -18,6 +19,12 @@ const t = harness('functional');
   const port = server.address().port;
   const c = makeClient(port);
   const PASS = 'correct horse battery';
+
+  // stub Slack Incoming Webhook that records the last posted body
+  let slackReceived = null;
+  const slackStub = http.createServer((rq, rs) => { const ch = []; rq.on('data', (x) => ch.push(x)); rq.on('end', () => { slackReceived = Buffer.concat(ch).toString('utf8'); rs.writeHead(200); rs.end('ok'); }); });
+  await new Promise((r) => slackStub.listen(0, '127.0.0.1', r));
+  const slackUrl = 'http://127.0.0.1:' + slackStub.address().port + '/hook';
 
   try {
     // --- setup / auth ---
@@ -256,6 +263,20 @@ const t = harness('functional');
     r = await c.request('POST', '/api/inbox/process', {});
     t.eq(r.body.added, 0, 'draining an empty inbox is a no-op');
 
+    // --- Slack outbound agenda ---
+    const slackLib = require('../lib/slack');
+    t.ok(/Overdue/.test(slackLib.formatAgenda([{ text: 'x', due: '2000-01-01', workspaceName: 'W' }], today)), 'formatAgenda labels overdue items');
+    t.ok(/No dated to-dos/.test(slackLib.formatAgenda([], today)), 'formatAgenda handles an empty agenda');
+    r = await c.request('POST', '/api/slack/agenda', {});
+    t.eq(r.status, 400, 'slack agenda without a configured webhook is rejected');
+    await c.request('PUT', '/api/settings', { slackWebhook: slackUrl });
+    r = await c.request('POST', '/api/workspaces/general/notes/new', {});
+    const agNote = r.body.id;
+    await c.request('PUT', '/api/notes/' + agNote, { customTitle: 'AgendaNote', todos: [{ id: 'ag1', text: 'SLACKTODO-TOKEN', done: false, doneAt: null, due: today, sourceReminderId: null }] });
+    r = await c.request('POST', '/api/slack/agenda', {});
+    t.eq(r.status, 200, 'slack agenda posts when a webhook is configured');
+    t.ok(slackReceived && slackReceived.includes('SLACKTODO-TOKEN'), 'Slack webhook received the agenda including the due to-do');
+
     // --- search index reflects edits + deletes ---
     r = await c.request('PUT', '/api/notes/' + linker, { meetingNotes: '<p>ZEBRACODE unique token</p>' });
     r = await c.request('GET', '/api/search?q=ZEBRACODE');
@@ -338,6 +359,7 @@ const t = harness('functional');
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {
     server.close();
+    slackStub.close();
     fs.rmSync(DATA_DIR, { recursive: true, force: true });
     t.done();
   }
