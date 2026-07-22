@@ -281,8 +281,7 @@
       { label: '＋ New Daily note', run: function () { createNewNote({}); } },
       { label: '✏️ New scratch note', run: function () { createNewNote({ scratch: true }); } },
       { label: 'Go to: Current note', run: function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); } },
-      { label: 'Go to: All open tasks', run: renderGlobalTasks },
-      { label: 'Go to: Agenda', run: renderAgenda },
+      { label: 'Go to: Tasks', run: renderGlobalTasks },
       { label: 'Go to: Favorites', run: renderFavorites },
       { label: 'Open: Templates', run: openTemplateModal },
       { label: 'Open: Trash', run: renderTrash },
@@ -629,7 +628,16 @@
     span.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); span.blur(); } });
     main.appendChild(span);
     var meta = document.createElement('div'); meta.className = 'task-meta';
-    if (t.due) { var dc = document.createElement('button'); dc.className = 'task-due' + (!t.done && t.due < today ? ' overdue' : ''); dc.textContent = '📅 ' + fmtDueShort(t.due) + (t.time ? ' ' + t.time : ''); dc.title = 'Reschedule'; dc.addEventListener('click', function () { rescheduleTask(t); }); meta.appendChild(dc); }
+    if (!t.done) {
+      var dc = document.createElement('button');
+      dc.className = 'task-due' + (t.due && t.due < today ? ' overdue' : '') + (t.due ? '' : ' nodate');
+      dc.textContent = t.due ? ('📅 ' + fmtDueShort(t.due) + (t.time ? ' ' + t.time : '')) : '📅 Set date';
+      dc.title = t.due ? 'Reschedule' : 'Add a due date';
+      dc.addEventListener('click', function () { rescheduleTask(t, dc); });
+      meta.appendChild(dc);
+    } else if (t.due) {
+      var dcs = document.createElement('span'); dcs.className = 'task-due'; dcs.textContent = '📅 ' + fmtDueShort(t.due); meta.appendChild(dcs);
+    }
     if (t.recurrence) { var rc = document.createElement('span'); rc.className = 'task-recur'; rc.textContent = '🔁 ' + recurLabel(t.recurrence); meta.appendChild(rc); }
     if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox (e.g. Slack)'; meta.appendChild(ib); }
     if (meta.childNodes.length) main.appendChild(meta);
@@ -655,7 +663,7 @@
     var here = (state.tasks || []).filter(function (t) { return t.done && t.completedOnNoteId === state.note.id; }).sort(function (a, b) { return (b.completedAt || '').localeCompare(a.completedAt || ''); });
 
     var tl = $('todayList'); tl.innerHTML = '';
-    if (!overdueToday.length) { var e = document.createElement('li'); e.className = 'task-empty muted tiny'; e.textContent = 'Nothing due — add a task above.'; tl.appendChild(e); }
+    if (!overdueToday.length && !nodate.length) { var e = document.createElement('li'); e.className = 'task-empty muted tiny'; e.textContent = 'Nothing due — add a task above.'; tl.appendChild(e); }
     overdueToday.forEach(function (t) { tl.appendChild(taskRow(t)); });
 
     $('nodateWrap').classList.toggle('hidden', !nodate.length);
@@ -675,12 +683,33 @@
     });
   }
 
-  function rescheduleTask(t) {
-    var inp = document.createElement('input'); inp.type = 'date'; inp.value = t.due || '';
-    inp.style.position = 'fixed'; inp.style.left = '-9999px'; document.body.appendChild(inp);
-    inp.addEventListener('change', async function () { applyTaskResult(await API.rescheduleTask(t.id, inp.value || null)); inp.remove(); });
-    inp.addEventListener('blur', function () { setTimeout(function () { inp.remove(); }, 200); });
-    inp.focus(); if (inp.showPicker) try { inp.showPicker(); } catch (e) { inp.click(); } else inp.click();
+  // Opens a native date picker anchored under `anchorEl`. The throwaway <input>
+  // must stay ON-SCREEN — at left:-9999px the browser opens the picker off-screen
+  // (or refuses), which is why the old picker "didn't work". We keep it laid out
+  // at the anchor but visually hidden, and call showPicker() inside the click's
+  // user-activation window.
+  function openDatePicker(anchorEl, current, cb) {
+    var inp = document.createElement('input');
+    inp.type = 'date';
+    if (current) inp.value = current;
+    var r = (anchorEl && anchorEl.getBoundingClientRect) ? anchorEl.getBoundingClientRect() : { left: 24, bottom: 80 };
+    inp.style.position = 'fixed';
+    inp.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 40)) + 'px';
+    inp.style.top = ((r.bottom || 80) + 2) + 'px';
+    inp.style.width = '1px'; inp.style.height = '1px';
+    inp.style.opacity = '0'; inp.style.border = '0'; inp.style.padding = '0'; inp.style.margin = '0';
+    inp.style.zIndex = '2000'; inp.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(inp);
+    var settled = false;
+    function cleanup() { if (settled) return; settled = true; inp.remove(); }
+    inp.addEventListener('change', function () { var v = inp.value || null; cleanup(); cb(v); });
+    inp.addEventListener('blur', function () { setTimeout(cleanup, 200); });
+    inp.focus();
+    if (inp.showPicker) { try { inp.showPicker(); } catch (e) { inp.click(); } } else { inp.click(); }
+  }
+
+  function rescheduleTask(t, anchorEl) {
+    openDatePicker(anchorEl, t.due, async function (v) { applyTaskResult(await API.rescheduleTask(t.id, v)); });
   }
 
   // ---- quick-add (natural language + pickers) ----
@@ -698,11 +727,7 @@
   $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; });
   $('qaRecur').addEventListener('change', function () { var v = $('qaRecur').value; state.qa.recurrence = v === 'none' ? null : { type: v }; });
   $('qaDate').addEventListener('click', function () {
-    var inp = document.createElement('input'); inp.type = 'date'; inp.value = state.qa.due || '';
-    inp.style.position = 'fixed'; inp.style.left = '-9999px'; document.body.appendChild(inp);
-    inp.addEventListener('change', function () { state.qa.due = inp.value || null; syncQa(); inp.remove(); });
-    inp.addEventListener('blur', function () { setTimeout(function () { inp.remove(); }, 200); });
-    inp.focus(); if (inp.showPicker) try { inp.showPicker(); } catch (e) { inp.click(); } else inp.click();
+    openDatePicker($('qaDate'), state.qa.due, function (v) { state.qa.due = v; syncQa(); });
   });
   async function addTaskFromInput() {
     var raw = $('taskInput').value.trim(); if (!raw) return;
@@ -1056,73 +1081,70 @@
   // ---------------- Views ----------------
   function showView(v) {
     state.view = v;
-    ['noteView', 'landingView', 'todosView', 'favsView', 'trashView', 'searchView', 'agendaView'].forEach(function (id) { $(id).classList.add('hidden'); });
+    ['noteView', 'landingView', 'todosView', 'favsView', 'trashView', 'searchView'].forEach(function (id) { $(id).classList.add('hidden'); });
     $('navNote').classList.toggle('active', v === 'note' || v === 'landing');
     $('navTodos').classList.toggle('active', v === 'todos');
     $('navFavs').classList.toggle('active', v === 'favs');
-    $('navAgenda').classList.toggle('active', v === 'agenda');
-    var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', agenda: 'agendaView' };
+    var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView' };
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
   $('navNote').addEventListener('click', function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); });
   $('navTodos').addEventListener('click', renderGlobalTasks);
   $('navFavs').addEventListener('click', renderFavorites);
-  $('navAgenda').addEventListener('click', renderAgenda);
 
   function openWorkspace(wsId) {
     state.wsId = wsId; $('workspaceSelect').value = wsId; showView('note'); loadCurrentNote();
   }
 
-  async function renderAgenda() {
-    showView('agenda');
-    var box = $('agendaList'); box.innerHTML = '<p class="muted">Loading…</p>';
+  // Global Tasks page: every open task across workspaces, grouped by due date
+  // (overdue dates first, then today, then upcoming, then undated), and within
+  // each date sorted by priority then workspace. This replaces the old Agenda.
+  async function renderGlobalTasks() {
+    showView('todos');
+    var box = $('globalTaskList'); box.innerHTML = '<p class="muted">Loading…</p>';
     var tasks = await API.globalTasks();
-    var groups = {};
-    tasks.filter(function (t) { return t.due; }).forEach(function (t) { (groups[t.due] = groups[t.due] || []).push(t); });
-    var dates = Object.keys(groups).sort();
     box.innerHTML = '';
-    if (!dates.length) { box.innerHTML = '<p class="muted">No dated tasks. Add a due date to a task to see it here.</p>'; return; }
-    dates.forEach(function (d) {
-      var h = document.createElement('div'); h.className = 'agenda-day' + (d < todayStr() ? ' overdue' : '');
-      h.innerHTML = '<div class="agenda-date">' + esc(fmtDueLong(d)) + (d < todayStr() ? ' · overdue' : (d === todayStr() ? ' · today' : '')) + '</div>';
-      groups[d].sort(sortTasks).forEach(function (t) {
-        var row = document.createElement('div'); row.className = 'agenda-item prio-p' + t.priority;
-        row.innerHTML = '<span class="gt-ws">' + esc(t.workspaceName) + '</span> ' + esc(t.text) + (t.recurrence ? ' <span class="task-recur">🔁 ' + esc(recurLabel(t.recurrence)) + '</span>' : '');
-        row.addEventListener('click', function () { openWorkspace(t.workspaceId); });
-        h.appendChild(row);
-      });
-      box.appendChild(h);
+    if (!tasks.length) { box.innerHTML = '<p class="muted">No open tasks. 🎉</p>'; return; }
+    var today = todayStr();
+    var NODATE = '￿'; // sorts after all YYYY-MM-DD keys
+    var groups = {};
+    tasks.forEach(function (t) { var k = t.due || NODATE; (groups[k] = groups[k] || []).push(t); });
+    Object.keys(groups).sort().forEach(function (k) {
+      var isNo = k === NODATE, overdue = !isNo && k < today;
+      var sec = document.createElement('div'); sec.className = 'task-group';
+      var lab = document.createElement('div'); lab.className = 'upcoming-date' + (overdue ? ' overdue' : '');
+      lab.textContent = isNo ? 'No date' : (fmtDueLong(k) + (overdue ? ' · overdue' : (k === today ? ' · today' : '')));
+      sec.appendChild(lab);
+      var ul = document.createElement('ul'); ul.className = 'task-list';
+      groups[k].sort(function (a, b) { return (a.priority - b.priority) || String(a.workspaceName || '').localeCompare(String(b.workspaceName || '')); })
+        .forEach(function (t) { ul.appendChild(globalTaskRow(t, today)); });
+      sec.appendChild(ul); box.appendChild(sec);
     });
   }
 
-  async function renderGlobalTasks() {
-    showView('todos');
-    var tasks = await API.globalTasks();
-    var ul = $('globalTodoList'); ul.innerHTML = '';
-    if (!tasks.length) { ul.innerHTML = '<li class="muted">No open tasks. 🎉</li>'; return; }
-    tasks.sort(sortTasks);
-    tasks.forEach(function (t) {
-      var li = document.createElement('li'); li.className = 'prio-p' + t.priority;
-      if (t.due && t.due < todayStr()) li.classList.add('overdue');
-      var cb = document.createElement('input'); cb.type = 'checkbox';
-      cb.addEventListener('change', async function () {
-        li.classList.toggle('done', cb.checked);
-        if (cb.checked) await API.completeTask(t.id, (state.note && state.note.workspaceId === t.workspaceId) ? state.note.id : null);
-        else await API.updateTask(t.id, { done: false });
-        if (t.workspaceId === state.wsId) await loadTasks();
-        setTimeout(renderGlobalTasks, 400);
-      });
-      li.appendChild(cb);
-      var ws = document.createElement('span'); ws.className = 'gt-ws'; ws.textContent = t.workspaceName;
-      var text = document.createElement('span'); text.className = 'gt-text'; text.textContent = t.text;
-      li.appendChild(ws); li.appendChild(text);
-      if (t.due) { var d = document.createElement('span'); d.className = 'gt-due'; d.textContent = '📅 ' + fmtDueShort(t.due); li.appendChild(d); }
-      if (t.recurrence) { var rc = document.createElement('span'); rc.className = 'task-recur'; rc.textContent = '🔁 ' + recurLabel(t.recurrence); li.appendChild(rc); }
-      if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox'; li.appendChild(ib); }
-      var link = document.createElement('button'); link.className = 'link-btn'; link.textContent = 'open';
-      link.addEventListener('click', function () { openWorkspace(t.workspaceId); });
-      li.appendChild(link); ul.appendChild(li);
+  function globalTaskRow(t, today) {
+    var li = document.createElement('li'); li.className = 'task prio-p' + t.priority;
+    if (t.due && t.due < today) li.classList.add('overdue');
+    var cb = document.createElement('button'); cb.className = 'task-check'; cb.setAttribute('aria-label', 'Complete task');
+    cb.addEventListener('click', async function () {
+      li.classList.add('checking');
+      await API.completeTask(t.id, (state.note && state.note.workspaceId === t.workspaceId) ? state.note.id : null);
+      if (t.workspaceId === state.wsId) await loadTasks();
+      renderGlobalTasks();
     });
+    var main = document.createElement('div'); main.className = 'task-main';
+    var line = document.createElement('div'); line.className = 'gt-line';
+    var ws = document.createElement('button'); ws.className = 'gt-ws'; ws.textContent = t.workspaceName; ws.title = 'Open ' + t.workspaceName;
+    ws.addEventListener('click', function () { openWorkspace(t.workspaceId); });
+    var text = document.createElement('span'); text.className = 'task-text'; text.textContent = t.text;
+    line.appendChild(ws); line.appendChild(text); main.appendChild(line);
+    var meta = document.createElement('div'); meta.className = 'task-meta';
+    if (t.time) { var tm = document.createElement('span'); tm.className = 'task-recur'; tm.textContent = '🕑 ' + t.time; meta.appendChild(tm); }
+    if (t.recurrence) { var rc = document.createElement('span'); rc.className = 'task-recur'; rc.textContent = '🔁 ' + recurLabel(t.recurrence); meta.appendChild(rc); }
+    if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox'; meta.appendChild(ib); }
+    if (meta.childNodes.length) main.appendChild(meta);
+    li.appendChild(cb); li.appendChild(main);
+    return li;
   }
 
   async function renderFavorites() {

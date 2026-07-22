@@ -37,7 +37,7 @@ everything stays on your machine.
 | **Workspaces** | Notes are grouped into **General** plus any workspaces you create. Empty workspaces show a landing page with tips instead of an auto-created note. |
 | **Daily & scratch notes** | **New Daily** starts a note that carries carryover forward from the last **daily** note. **New scratch note** is a clean Meeting Notes page for a quick jot — it never affects the carryover thread. |
 | **Sections** | Overdue & Today · Upcoming · Carryover Notes · Meeting Notes. Scratch notes show only Meeting Notes. |
-| **Tasks (Todoist-style)** | One unified module for to-dos **and** reminders. Each task is **workspace-level** with a **due date**, **priority (P1–P4)**, and optional **recurrence** (daily / weekdays / weekly / monthly / every-N-days). The note view shows your workspace's **Overdue & Today** and **Upcoming** tasks; complete one and it rolls forward if it repeats, or crosses out **on the note it was completed on** (never on future notes). ⏭ skips a single occurrence. |
+| **Tasks (Todoist-style)** | One unified module for to-dos **and** reminders. Each task is **workspace-level** with a **due date** (defaults to today if you don't set one), **priority (P1–P4)**, and optional **recurrence** (daily / weekdays / weekly / monthly / every-N-days). The note view shows your workspace's **Overdue & Today** and **Upcoming** tasks; complete one and it rolls forward if it repeats, or crosses out **on the note it was completed on** (never on future notes). ⏭ skips a single occurrence. |
 | **Quick-add (no LLM)** | Type naturally — `email Sam tomorrow p1 every Friday` — and the due date, priority, and repeat are parsed locally (deterministic, no model calls), with pickers to adjust. |
 | **Carryover Notes** | Rich text that **copies into the next daily note**. |
 | **Meeting Notes** | Rich text that is **not** copied over. |
@@ -45,7 +45,7 @@ everything stays on your machine.
 | **Attachments** | Attach files (up to 20 MB) to a note; stored encrypted. |
 | **Titles** | Auto-titled with the date, with an optional specific title. |
 | **Global search** | Search across every note in every workspace. |
-| **Global tasks** | One view of all open tasks across workspaces. Complete a task or jump to its workspace from here. |
+| **Tasks page** | One view of every open task across all workspaces, **grouped by due date** (overdue → today → upcoming → no date) and, within a day, by priority then workspace. Complete a task or click its workspace badge to jump there. |
 | **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) mixed into **one `.wav` file** (encrypted like any attachment), with an optional near-live transcript — timestamped and labeled **You** vs **Them** — in its own area below your notes. |
 | **Screen recording** | **🖥 Screen** records the shared screen/window/tab video with its system audio (+ your mic) to one `.webm` video, saved as an encrypted attachment. |
 | **Sort notes** | Sort the sidebar by **Created / Modified / Name**, ascending or descending (persisted). |
@@ -64,7 +64,6 @@ everything stays on your machine.
 | **Live sync** | Changes to the data directory (e.g. from another device via a synced folder) refresh open notes in real time; save conflicts can be resolved by keeping both copies. |
 | **Note links & backlinks** | Link between notes (`⧉` in the editor); each note shows what links to it. Rich text also supports **tables** and **/slash commands**. |
 | **Deep links** | Each note has a shareable `#note/<id>` link (**⋯ → Copy link to note**); a page refresh reopens the same note instead of jumping to the newest. |
-| **Agenda** | A dated view of every task with a due date, across all workspaces, grouped by day. |
 | **Offline / installable** | Ships as a PWA — installable, with an offline app shell. |
 | **Security** | AES-256-GCM **envelope encryption at rest**, scrypt key derivation, **passphrase change + recovery key**, CSRF tokens, session auth with idle auto-lock, CSP + anti-clickjacking headers, login rate-limiting. |
 

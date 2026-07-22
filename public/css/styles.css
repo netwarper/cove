@@ -203,6 +203,8 @@ select.qa-pill { padding: 4px 6px; }
 .task-due { border: 0; background: none; padding: 0; cursor: pointer; font-size: 11px; color: var(--muted); white-space: nowrap; }
 .task-due:hover { color: var(--brand); }
 .task-due.overdue { color: var(--danger); font-weight: 700; }
+.task-due.nodate { opacity: 0; transition: opacity .12s; }
+.task:hover .task-due.nodate, .task:focus-within .task-due.nodate { opacity: .75; }
 .task-recur { font-size: 11px; color: var(--muted); white-space: nowrap; }
 /* priority accents (P1 highest) */
 .prio-p1 { border-left-color: var(--danger); }
@@ -257,23 +259,34 @@ select.qa-pill { padding: 4px 6px; }
 .attach-list .at-size { color: var(--muted); font-size: 11px; }
 .attach-list .at-del { border: 0; background: none; color: var(--danger); }
 
-/* ---- Global todos / favorites / search ---- */
-.global-todo-list, .fav-list, .search-results { list-style: none; margin: 12px 0; padding: 0; }
-.global-todo-list li, .fav-list li, .search-results li {
+/* ---- Favorites / search lists ---- */
+.fav-list, .search-results { list-style: none; margin: 12px 0; padding: 0; }
+.fav-list li, .search-results li {
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
   margin-bottom: 8px; display: flex; align-items: center; gap: 10px;
 }
-.global-todo-list .gt-ws, .search-results .sr-ws {
+.search-results .sr-ws {
   font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 1px 8px; color: var(--muted);
 }
-.global-todo-list .gt-text { flex: 1; }
-.global-todo-list li.done .gt-text { text-decoration: line-through; color: var(--done); }
 .search-results li { cursor: pointer; flex-direction: column; align-items: stretch; }
 .search-results .sr-top { display: flex; gap: 8px; align-items: center; }
 .search-results .sr-title { font-weight: 600; flex: 1; }
 .search-results .sr-snippet { color: var(--muted); font-size: 13px; margin-top: 4px; }
 .fav-list li { cursor: pointer; }
 .fav-list .fv-title { flex: 1; font-weight: 600; }
+
+/* ---- Global Tasks page (grouped by due date) ---- */
+.global-task-list { margin: 12px 0; display: flex; flex-direction: column; gap: 14px; }
+.global-task-list .task-group { margin: 0; }
+.global-task-list .task-list { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); overflow: hidden; }
+.global-task-list .task { padding: 8px 10px; border-bottom: 1px solid var(--line); border-radius: 0; }
+.global-task-list .task:last-child { border-bottom: 0; }
+.gt-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+button.gt-ws {
+  font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 1px 8px; color: var(--muted); cursor: pointer; flex: none;
+}
+button.gt-ws:hover { border-color: var(--brand); color: var(--brand); }
 
 /* Save indicator pinned to the bottom of the sidebar (always visible). */
 .sidebar-foot { border-top: 1px solid var(--line); padding: 8px 14px; min-height: 34px; display: flex; align-items: center; background: var(--panel); }
@@ -338,10 +351,6 @@ select.qa-pill { padding: 4px 6px; }
 .tag-input:focus { outline: none; border-color: var(--brand); }
 .nl-tags, .sr-tags { color: var(--brand); }
 
-/* ---- Global task due chips ---- */
-.gt-due { font-size: 11px; color: var(--muted); }
-.global-todo-list li.overdue .gt-due { color: var(--danger); font-weight: 700; }
-
 /* ---- Menus / new-note / more ---- */
 .new-note-wrap, .more-wrap { position: relative; display: inline-flex; }
 .new-note-wrap .caret { margin-left: 2px; padding: 7px 6px; }
@@ -386,13 +395,6 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 
 .save-row { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
 .word-count { font-size: 12px; color: var(--muted); }
-
-.agenda-list { margin-top: 12px; }
-.agenda-day { margin-bottom: 14px; }
-.agenda-date { font-weight: 700; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
-.agenda-day.overdue .agenda-date { color: var(--danger); }
-.agenda-item { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; cursor: pointer; }
-.agenda-item:hover { border-color: var(--brand); }
 
 #instanceInfo code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 .note-list .nl-tags { color: var(--brand); font-size: 11px; }
