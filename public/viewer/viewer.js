@@ -58,6 +58,19 @@
     }
     notes.sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; });
     state.notes = notes;
+    // decrypt workspace tasks + find each workspace's latest daily note
+    state.tasksByWs = {};
+    var td = DATA.tasks || {};
+    for (var ws in td) {
+      if (!td.hasOwnProperty(ws)) continue;
+      try { var obj = await D.decryptJSON(dek, td[ws]); state.tasksByWs[ws] = (obj && obj.tasks) || []; } catch (e) { /* skip */ }
+    }
+    state.latestDailyByWs = {};
+    notes.forEach(function (n) {
+      if ((n.kind || 'daily') === 'scratch') return;
+      var cur = state.latestDailyByWs[n._ws];
+      if (!cur || (n.createdAt || '') > (cur.createdAt || '')) state.latestDailyByWs[n._ws] = n;
+    });
     // decrypt image attachments -> object URLs
     var imgs = DATA.images || {};
     for (var key in imgs) {
@@ -108,17 +121,32 @@
   }
 
   // ---- note ----
+  function taskLine(t, done) {
+    return '<li class="' + (done ? 'done' : '') + '"><span>' + (done ? '☑' : '☐') + '</span><span>' + esc(t.text) +
+      (t.due ? ' <span class="muted">· ' + esc(t.due) + (t.time ? ' ' + esc(t.time) : '') + '</span>' : '') +
+      (t.recurrence ? ' <span class="muted">🔁</span>' : '') +
+      (t.priority && t.priority < 4 ? ' <span class="muted">P' + esc(t.priority) + '</span>' : '') + '</span></li>';
+  }
   function renderNote(n) {
     showView('note');
-    var todos = (n.todos || []).map(function (t) {
-      return '<li class="' + (t.done ? 'done' : '') + '"><span>' + (t.done ? '☑' : '☐') + '</span><span>' + esc(t.text) + (t.due ? ' <span class="muted">· ' + esc(t.due) + '</span>' : '') + '</span></li>';
-    }).join('');
+    var wsTasks = (state.tasksByWs && state.tasksByWs[n._ws]) || [];
+    var isLatest = state.latestDailyByWs && state.latestDailyByWs[n._ws] && state.latestDailyByWs[n._ws].id === n.id;
+    var openTasks = isLatest ? wsTasks.filter(function (t) { return !t.done; }).sort(function (a, b) { return (a.due || '9999').localeCompare(b.due || '9999') || (a.priority - b.priority); }) : [];
+    var completedHere = wsTasks.filter(function (t) { return t.done && t.completedOnNoteId === n.id; });
+    var legacy = (n.todos || []); // pre-migration data, if any
+    var taskItems = openTasks.map(function (t) { return taskLine(t, false); }).join('') +
+      completedHere.map(function (t) { return taskLine(t, true); }).join('') +
+      legacy.map(function (t) { return taskLine(t, !!t.done); }).join('');
+    var tasksHead = isLatest ? 'Tasks' : 'Tasks completed on this note';
+    var tasksSec = taskItems
+      ? '<div class="sec"><h3>' + tasksHead + '</h3><ul class="todos">' + taskItems + '</ul></div>'
+      : '';
     var atNames = (n.attachments || []).filter(function (a) { return (a.mime || '').indexOf('image/') !== 0; }).map(function (a) { return esc(a.name); });
     var html = '<button class="back" id="backBtn">‹ All notes</button>' +
       '<div class="note"><h2>' + esc(displayTitle(n)) + '</h2>' +
       '<div class="sub">' + esc(state.wsNames[n._ws] || '') + ' · created ' + esc((n.createdAt || '').slice(0, 10)) + '</div>' +
       ((n.tags || []).length ? '<div class="tags">' + n.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</div>' : '') +
-      '<div class="sec"><h3>To-Do</h3><ul class="todos">' + (todos || '<li class="muted">None</li>') + '</ul></div>' +
+      tasksSec +
       '<div class="sec"><h3>Carryover Notes</h3><div class="rich">' + (withImages(sanitize(n.carryover), n.id) || '<span class="muted">None</span>') + '</div></div>' +
       '<div class="sec"><h3>Meeting Notes</h3><div class="rich">' + (withImages(sanitize(n.meetingNotes), n.id) || '<span class="muted">None</span>') + '</div>' +
       (atNames.length ? '<div class="attach">📎 ' + atNames.join(', ') + ' <span class="muted">(open in the app to download)</span></div>' : '') +
