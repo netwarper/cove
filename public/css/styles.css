@@ -194,6 +194,10 @@ select.qa-pill { padding: 4px 6px; }
   cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
 }
 .task-check:hover { border-color: var(--brand); }
+/* Reveal a faint check on hover so any open task — including future/Upcoming
+   ones — reads as completable, not just a bullet. */
+.task:not(.done) .task-check::after { content: '✓'; color: var(--brand); opacity: 0; transition: opacity .1s; }
+.task:not(.done) .task-check:hover::after { opacity: .9; }
 .task.done .task-check { background: var(--done); border-color: var(--done); }
 .task-main { flex: 1; min-width: 0; }
 .task-text { display: block; word-break: break-word; outline: none; }
@@ -437,6 +441,8 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 .help { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: min(620px, 96vw); max-height: 86vh; overflow: auto; box-shadow: var(--shadow); }
 .help-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
 .help-head h3 { margin: 0; }
+.help-manual { display: block; margin: 12px 18px 0; padding: 10px 14px; border: 1px solid var(--brand); border-radius: 9px; background: var(--panel-2); color: var(--brand); font-weight: 600; font-size: 14px; text-decoration: none; }
+.help-manual:hover { background: var(--brand); color: var(--brand-ink); }
 .help-body { padding: 8px 18px 18px; }
 .help-body section { margin-top: 14px; }
 .help-body h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }

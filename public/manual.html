@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meeting Notes — User Manual</title>
+<link rel="icon" href="/icon.svg">
+<style>
+  :root {
+    --bg: #f4f6fb; --panel: #ffffff; --panel-2: #fbfcfe; --ink: #1f2430;
+    --muted: #6b7280; --line: #e3e7ef; --brand: #3b6cf6; --brand-ink: #fff;
+    --danger: #e5484d; --done: #98a0ad; --radius: 10px;
+    --shadow: 0 1px 3px rgba(20,30,60,.08); --maxw: 820px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161c; --panel: #1c1f27; --panel-2: #21252f; --ink: #e7eaf0;
+      --muted: #9aa2b1; --line: #2c313d; --brand: #5b84f7; --shadow: 0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161c; --panel: #1c1f27; --panel-2: #21252f; --ink: #e7eaf0;
+    --muted: #9aa2b1; --line: #2c313d; --brand: #5b84f7; --shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6fb; --panel: #ffffff; --panel-2: #fbfcfe; --ink: #1f2430;
+    --muted: #6b7280; --line: #e3e7ef; --brand: #3b6cf6; --shadow: 0 1px 3px rgba(20,30,60,.08);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .86em;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+  }
+  kbd { box-shadow: 0 1px 0 var(--line); }
+  pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow: auto; }
+  pre code { background: none; border: 0; padding: 0; }
+
+  /* layout */
+  .topbar {
+    position: sticky; top: 0; z-index: 20; background: var(--panel);
+    border-bottom: 1px solid var(--line); box-shadow: var(--shadow);
+  }
+  .topbar-inner {
+    max-width: calc(var(--maxw) + 300px); margin: 0 auto; padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .topbar .brand { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .topbar .spacer { flex: 1; }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+  .btn:hover { border-color: var(--brand); }
+  .wrap { max-width: calc(var(--maxw) + 300px); margin: 0 auto; display: flex; gap: 28px; padding: 0 20px; }
+
+  nav.toc {
+    position: sticky; top: 62px; align-self: flex-start; width: 240px; flex: none;
+    max-height: calc(100vh - 78px); overflow: auto; padding: 22px 0; font-size: 13.5px;
+  }
+  nav.toc h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0 0 8px; }
+  nav.toc ol { list-style: none; margin: 0 0 16px; padding: 0; }
+  nav.toc li { margin: 1px 0; }
+  nav.toc a { display: block; color: var(--muted); padding: 4px 10px; border-radius: 7px; border-left: 2px solid transparent; }
+  nav.toc a:hover { color: var(--ink); background: var(--panel-2); text-decoration: none; }
+  nav.toc a.active { color: var(--brand); border-left-color: var(--brand); background: var(--panel-2); }
+
+  main { flex: 1; min-width: 0; max-width: var(--maxw); padding: 26px 0 120px; }
+  .hero { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 8px; }
+  .hero h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -.5px; }
+  .hero p { color: var(--muted); margin: 0; font-size: 16px; }
+  .pill { display: inline-block; font-size: 12px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 20px; padding: 2px 10px; margin-top: 10px; }
+
+  section.doc { padding: 26px 0; border-bottom: 1px solid var(--line); scroll-margin-top: 74px; }
+  section.doc:last-of-type { border-bottom: 0; }
+  h2.sec { font-size: 21px; margin: 0 0 4px; letter-spacing: -.3px; }
+  h3 { font-size: 16px; margin: 22px 0 6px; }
+  p { margin: 10px 0; }
+  ul, ol { padding-left: 22px; margin: 10px 0; }
+  li { margin: 5px 0; }
+  .lead { color: var(--muted); margin-top: 2px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); margin: 14px 0; }
+  .note, .tip, .warn {
+    border-radius: 8px; padding: 11px 14px; margin: 14px 0; border: 1px solid var(--line);
+    background: var(--panel-2); font-size: 14px;
+  }
+  .note { border-left: 3px solid var(--brand); }
+  .tip { border-left: 3px solid #2e9e6b; }
+  .warn { border-left: 3px solid var(--danger); }
+  .note b, .tip b, .warn b { font-weight: 700; }
+
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; display: block; overflow-x: auto; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); font-weight: 600; }
+  .kbd-row td:first-child { white-space: nowrap; }
+
+  .steps { counter-reset: step; list-style: none; padding-left: 0; }
+  .steps > li { position: relative; padding-left: 34px; margin: 12px 0; }
+  .steps > li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 23px; height: 23px; border-radius: 50%;
+    background: var(--brand); color: var(--brand-ink); font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .backtop { display: inline-block; margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    nav.toc { display: none; }
+    .wrap { padding: 0 16px; }
+    main { padding-top: 18px; }
+    .hero h1 { font-size: 25px; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand">📓 Meeting Notes</span>
+      <span class="pill" style="margin:0">User Manual</span>
+      <span class="spacer"></span>
+      <a class="btn" href="/" id="backToApp">← Back to the app</a>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <nav class="toc" aria-label="Contents">
+      <h2>Contents</h2>
+      <ol id="tocList">
+        <li><a href="#intro">1. What this is</a></li>
+        <li><a href="#start">2. Getting started</a></li>
+        <li><a href="#interface">3. The interface</a></li>
+        <li><a href="#workspaces">4. Workspaces</a></li>
+        <li><a href="#notes">5. Notes</a></li>
+        <li><a href="#tasks">6. Tasks</a></li>
+        <li><a href="#editor">7. Writing &amp; the editor</a></li>
+        <li><a href="#recording">8. Recording &amp; transcription</a></li>
+        <li><a href="#search">9. Search, tags &amp; favorites</a></li>
+        <li><a href="#slack">10. Slack &amp; the inbox</a></li>
+        <li><a href="#security">11. Security &amp; unlocking</a></li>
+        <li><a href="#backup">12. Backup, export &amp; sync</a></li>
+        <li><a href="#pwa">13. Install &amp; offline</a></li>
+        <li><a href="#shortcuts">14. Keyboard shortcuts</a></li>
+        <li><a href="#storage">15. Where your data lives</a></li>
+        <li><a href="#faq">16. Troubleshooting &amp; FAQ</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <div class="hero">
+        <h1>Meeting Notes — User Manual</h1>
+        <p>A private, encrypted place for your meeting notes and tasks. Everything runs locally and stays on your own storage.</p>
+        <span class="pill" id="verPill">Manual</span>
+      </div>
+
+      <!-- 1 -->
+      <section class="doc" id="intro">
+        <h2 class="sec">1. What this is</h2>
+        <p class="lead">A self-contained notes-and-tasks app with nothing to sign up for.</p>
+        <p>Meeting Notes keeps a running thread of <b>daily notes</b> per workspace, a unified <b>Tasks</b> system
+        (due dates, priorities, recurrence), rich-text notes with images and attachments, optional meeting
+        <b>recording &amp; transcription</b>, and full-text search — all <b>encrypted at rest</b> and served by a
+        tiny local server with zero third-party runtime dependencies.</p>
+        <ul>
+          <li><b>Local &amp; private.</b> Your notes never leave your machine unless you choose to sync the data folder or send yourself something over Slack.</li>
+          <li><b>Encrypted.</b> Everything is stored with AES-256-GCM; the key is derived from your passphrase and only held in memory while you're unlocked.</li>
+          <li><b>Portable.</b> The whole folder can be copied to any machine with Node.js and started immediately.</li>
+        </ul>
+        <div class="tip"><b>Tip:</b> Point the data directory at a cloud-sync folder (Google Drive, Dropbox, Box) and the same encrypted vault follows you across devices.</div>
+      </section>
+
+      <!-- 2 -->
+      <section class="doc" id="start">
+        <h2 class="sec">2. Getting started</h2>
+        <h3>First launch — set your passphrase</h3>
+        <p>The first time you open the app it asks you to create a <b>passphrase</b>. This is the key to everything —
+        it derives the encryption key for your vault. Choose something strong (at least 8 characters; a memorable
+        phrase is better than a short password).</p>
+        <div class="warn"><b>There is no password reset.</b> If you forget your passphrase and lose your recovery key, your notes cannot be decrypted by anyone — that's the point of the encryption. Save the recovery key.</div>
+        <h3>Save your recovery key</h3>
+        <p>Right after setup you're shown a one-time <b>recovery key</b>. It's a second way into your vault if you
+        forget your passphrase. Write it down or store it in a password manager. You can't see it again later.</p>
+        <h3>Unlocking</h3>
+        <p>On later visits you unlock with your passphrase (or recovery key, or biometrics if you enrolled — see
+        <a href="#security">Security</a>). After a period of inactivity the app <b>auto-locks</b> and you'll unlock again.</p>
+      </section>
+
+      <!-- 3 -->
+      <section class="doc" id="interface">
+        <h2 class="sec">3. The interface</h2>
+        <p class="lead">Three zones: the top bar, the sidebar, and the note area.</p>
+        <h3>Top bar</h3>
+        <table>
+          <tr><th>Control</th><th>What it does</th></tr>
+          <tr><td>Search box</td><td>Full-text search across every note in every workspace. Try <code>tag:planning</code>.</td></tr>
+          <tr><td><b>Note</b></td><td>Return to the current note.</td></tr>
+          <tr><td><b>Tasks</b></td><td>The global task list — every open task across workspaces, grouped by due date.</td></tr>
+          <tr><td>★</td><td>Your favorite notes.</td></tr>
+          <tr><td>🔔</td><td>Enable desktop notifications (for inbox items arriving).</td></tr>
+          <tr><td>🌓 / ☀️ / 🌙</td><td>Theme: auto → light → dark.</td></tr>
+          <tr><td>?</td><td>Help &amp; shortcuts (and a link to this manual).</td></tr>
+          <tr><td>⋮</td><td>Templates · Trash · Backup &amp; restore · Settings.</td></tr>
+          <tr><td>⏻</td><td>Lock the app immediately.</td></tr>
+        </table>
+        <h3>Sidebar</h3>
+        <p>Pick your <b>workspace</b> at the top, create notes with <b>＋ New Daily</b> (the ▾ caret offers scratch notes
+        and templates), sort the note list, and see each note with a small <b>✓ count</b> of tasks completed on it. Hover a
+        note to <b>favorite (★)</b> or <b>delete (🗑)</b> it. The save indicator (<i>Saving… / Saved ✓</i>) is pinned to the bottom.</p>
+        <h3>Command palette</h3>
+        <p>Press <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>K</kbd> to jump to any note, workspace, or action by typing.</p>
+      </section>
+
+      <!-- 4 -->
+      <section class="doc" id="workspaces">
+        <h2 class="sec">4. Workspaces</h2>
+        <p>Workspaces are independent streams of notes — one per project, team, or area of life. Each keeps its own
+        notes, its own <a href="#tasks">tasks</a>, and its own default template.</p>
+        <ul>
+          <li><b>Switch</b> with the dropdown at the top of the sidebar.</li>
+          <li><b>Create / rename / delete</b> via the ⚙ button next to the workspace dropdown.</li>
+          <li>A brand-new workspace shows a <b>landing page</b> with tips instead of auto-creating an empty note.</li>
+        </ul>
+        <div class="note"><b>General</b> is the default workspace and is always present.</div>
+      </section>
+
+      <!-- 5 -->
+      <section class="doc" id="notes">
+        <h2 class="sec">5. Notes</h2>
+        <h3>Daily vs. scratch</h3>
+        <ul>
+          <li><b>New Daily</b> starts a dated note that carries your <b>Carryover Notes</b> forward from the previous daily note — your running thread.</li>
+          <li><b>New scratch note</b> is a clean Meeting-Notes page for a quick jot. It never affects the carryover thread.</li>
+        </ul>
+        <h3>The sections of a note</h3>
+        <table>
+          <tr><th>Section</th><th>Purpose</th></tr>
+          <tr><td>✔ Overdue &amp; Today</td><td>Your workspace's tasks due today or earlier, plus a quick-add box. See <a href="#tasks">Tasks</a>.</td></tr>
+          <tr><td>📆 Upcoming</td><td>Future-dated tasks in this workspace, grouped by day.</td></tr>
+          <tr><td>↻ Carryover Notes</td><td>Rich text that <b>copies into the next daily note</b>.</td></tr>
+          <tr><td>📝 Meeting Notes</td><td>Rich text specific to this meeting — <b>not</b> carried over.</td></tr>
+        </table>
+        <p class="lead">Scratch notes show only the Meeting Notes section.</p>
+        <h3>Titles &amp; tags</h3>
+        <p>Notes are auto-titled with the date; add an optional specific title in the field under the date. Add
+        <b>#tags</b> to organize and filter (search with <code>tag:name</code>).</p>
+        <h3>Managing a note (⋯ menu)</h3>
+        <table>
+          <tr><td>🔗 Copy link to note</td><td>A shareable <code>#note/&lt;id&gt;</code> deep link; a refresh reopens the same note.</td></tr>
+          <tr><td>🕐 Version history</td><td>Every note keeps automatic snapshots (up to 20) you can view and restore.</td></tr>
+          <tr><td>➜ Move to workspace…</td><td>Move the note to a different workspace.</td></tr>
+          <tr><td>⧉ Duplicate</td><td>Make a copy.</td></tr>
+          <tr><td>🗑 Delete (to trash)</td><td>Goes to Trash — restorable for 30 days before permanent removal.</td></tr>
+        </table>
+        <h3>Templates</h3>
+        <p>Reusable meeting templates (1:1, standup, retro) that seed the <b>Meeting Notes</b> section of new notes.
+        Manage them in <b>⋮ → Templates</b>; set a per-workspace default or pick one from the <b>New ▾</b> menu.</p>
+      </section>
+
+      <!-- 6 -->
+      <section class="doc" id="tasks">
+        <h2 class="sec">6. Tasks</h2>
+        <p class="lead">One unified, Todoist-style system for to-dos <em>and</em> reminders.</p>
+        <p>Tasks live at the <b>workspace</b> level — not on a single note — so the same task shows on whichever daily
+        note you're looking at. Each task has a <b>due date</b>, a <b>priority</b> (P1–P4), and optional <b>recurrence</b>.</p>
+
+        <h3>Adding a task (quick-add)</h3>
+        <p>Type into the box under <b>✔ Overdue &amp; Today</b>. You can write naturally — the due date, priority, and
+        repeat are parsed <b>locally, with no AI</b> — or set them with the pickers. Examples:</p>
+        <pre><code>email Sam tomorrow p1
+review Q3 deck friday
+standup every weekday
+pay rent every month p2
+call dentist in 3 days
+sync with Alex next tue 3pm</code></pre>
+        <table>
+          <tr><th>You type…</th><th>It parses…</th></tr>
+          <tr><td><code>p1</code> … <code>p4</code></td><td>Priority (P1 highest → red; P4 none)</td></tr>
+          <tr><td><code>today</code>, <code>tomorrow</code>, <code>next tue</code>, <code>aug 14</code>, <code>8/14</code>, <code>in 3 days</code></td><td>Due date</td></tr>
+          <tr><td><code>5pm</code>, <code>at 17:00</code></td><td>Time of day</td></tr>
+          <tr><td><code>every day</code>, <code>every weekday</code>, <code>every friday</code>, <code>weekly</code>, <code>monthly</code>, <code>every 3 days</code></td><td>Recurrence</td></tr>
+        </table>
+        <div class="tip"><b>No date?</b> A task with no due date defaults to <b>today</b>, so it never gets lost. Every task's date chip is clickable — use it (or “📅 Set date”) to open the calendar and reschedule.</div>
+
+        <h3>Where tasks appear</h3>
+        <ul>
+          <li><b>Overdue &amp; Today</b> — anything due today or earlier, in the note view.</li>
+          <li><b>Upcoming</b> — future-dated tasks, grouped by day.</li>
+          <li><b>Completed on this note</b> — when you finish a task, it crosses out on the note where you completed it, and never appears on future notes.</li>
+          <li><b>The Tasks page</b> (top bar) — every open task across <em>all</em> workspaces, grouped by due date, then by priority and workspace. Click a workspace badge to jump there.</li>
+        </ul>
+
+        <h3>Completing, repeating, skipping</h3>
+        <ul>
+          <li>Click the circle to <b>complete</b> a task (click again to reopen).</li>
+          <li>A <b>recurring</b> task rolls forward to its next occurrence when you complete it; the finished occurrence stays crossed-out on that note.</li>
+          <li><b>⏭ Skip</b> advances a recurring task to the next occurrence <em>without</em> marking it done.</li>
+          <li><b>⚑</b> cycles priority; the <b>📅 date chip</b> reschedules; <b>✕</b> deletes.</li>
+        </ul>
+        <div class="note">Priorities show as a colored bar on the left of each task: <b>P1</b> red, <b>P2</b> amber, <b>P3</b> blue, <b>P4</b> none.</div>
+      </section>
+
+      <!-- 7 -->
+      <section class="doc" id="editor">
+        <h2 class="sec">7. Writing &amp; the editor</h2>
+        <p>The Carryover and Meeting Notes areas are rich-text editors.</p>
+        <ul>
+          <li><b>Formatting:</b> bold, italic, underline, strikethrough, bullet &amp; numbered lists, headings, quotes, code, and links from the toolbar.</li>
+          <li><b>Slash menu:</b> type <kbd>/</kbd> at the start of a line for headings, lists, tables, quotes, and code blocks.</li>
+          <li><b>Images:</b> paste, drag-and-drop, or insert with 🖼. Drag the corner handle to <b>resize</b>, or use <kbd>+</kbd>/<kbd>-</kbd>.</li>
+          <li><b>Tables:</b> insert with ▦.</li>
+          <li><b>Note links &amp; backlinks:</b> ⧉ links to another note and creates a backlink; each note lists what links to it.</li>
+          <li><b>Attachments:</b> attach files up to 20&nbsp;MB below the Meeting Notes; they're stored encrypted like everything else.</li>
+        </ul>
+        <p>Your work saves automatically — watch the <b>Saved ✓</b> indicator at the bottom of the sidebar. If the same
+        note was changed elsewhere (another tab or a synced device), you'll be offered to <b>keep both</b> copies.</p>
+      </section>
+
+      <!-- 8 -->
+      <section class="doc" id="recording">
+        <h2 class="sec">8. Recording &amp; transcription</h2>
+        <h3>Record a meeting</h3>
+        <p>In the Meeting Notes section, <b>🔴 Record</b> captures your <b>mic</b> and the <b>other side</b> (a shared
+        tab or system audio) mixed into a single <code>.wav</code> file, saved as an encrypted attachment. <b>🖥 Screen</b>
+        records a shared screen/window/tab as a <code>.webm</code> video (with system audio and your mic).</p>
+        <h3>Live transcript</h3>
+        <p>With transcription enabled, a near-live transcript appears in its own area below your notes — timestamped and
+        labelled <b>You</b> vs <b>Them</b>, ordered by when things were actually said.</p>
+        <div class="note">Transcription is optional and configured under <b>⚙ Transcription</b> in the Meeting Notes header. Recording uses your browser's microphone/screen-share permissions.</div>
+      </section>
+
+      <!-- 9 -->
+      <section class="doc" id="search">
+        <h2 class="sec">9. Search, tags &amp; favorites</h2>
+        <ul>
+          <li><b>Search</b> the top box to find text across every note in every workspace.</li>
+          <li><b>Tags:</b> add <code>#tags</code> to notes; filter results with <code>tag:name</code>.</li>
+          <li><b>Favorites:</b> star a note (the ☆ on the note, or hover it in the sidebar) and find them under ★.</li>
+          <li><b>Sort</b> the sidebar by Created, Modified, or Name, ascending or descending. Name-sort sinks un-named notes below same-date named ones.</li>
+        </ul>
+      </section>
+
+      <!-- 10 -->
+      <section class="doc" id="slack">
+        <h2 class="sec">10. Slack &amp; the inbox</h2>
+        <p class="lead">Two independent, optional integrations.</p>
+        <h3>Inbox: send yourself tasks (Slack → app)</h3>
+        <p>Message yourself on Slack and have it become a task — even while your computer is asleep. An outside service
+        (Zapier, Make, or a Cloudflare Worker) drops a file into your data folder's <code>inbox/</code>, and the app turns
+        each line into a task (badged <b>📥</b>) in your chosen workspace the next time it's unlocked.</p>
+        <p>Pick the target workspace in <b>⚙ Settings → Inbox</b>. Full setup lives in <code>docs/slack-inbox.md</code>.</p>
+        <h3>Agenda: post your tasks to Slack (app → Slack)</h3>
+        <p>The app can post your due &amp; overdue tasks to a Slack channel via an <b>Incoming Webhook</b> — on demand or
+        auto-daily. Configure it in <b>⚙ Settings → Slack</b>.</p>
+        <div class="note">Auto-send is best-effort while the app is open and unlocked. The webhook URL is stored encrypted in your settings.</div>
+      </section>
+
+      <!-- 11 -->
+      <section class="doc" id="security">
+        <h2 class="sec">11. Security &amp; unlocking</h2>
+        <ul>
+          <li><b>Encryption at rest:</b> AES-256-GCM envelope encryption; the key is derived from your passphrase with scrypt and only lives in server memory while unlocked.</li>
+          <li><b>Passphrase &amp; recovery key:</b> change your passphrase or use your recovery key under <b>⚙ Settings</b>.</li>
+          <li><b>Biometric unlock:</b> optionally re-unlock with Touch ID / Windows Hello / a device passkey after an auto-lock, instead of retyping your passphrase. It's per-device and opt-in; your passphrase is still required elsewhere. Enable it in <b>⚙ Settings</b>.</li>
+          <li><b>Idle auto-lock:</b> the app locks itself after a period of inactivity.</li>
+          <li><b>Hardening:</b> CSRF tokens, session auth, a strict Content-Security-Policy, anti-clickjacking headers, and login rate-limiting.</li>
+        </ul>
+        <div class="warn"><b>Biometric note:</b> passkeys need a real hostname — <code>localhost</code> or a domain over HTTPS, not a raw <code>127.0.0.1</code> IP address.</div>
+      </section>
+
+      <!-- 12 -->
+      <section class="doc" id="backup">
+        <h2 class="sec">12. Backup, export &amp; sync</h2>
+        <h3>Backup &amp; restore</h3>
+        <p>Under <b>⋮ → Backup &amp; restore</b> you can download a single <b>encrypted backup</b> of everything and restore
+        it on a fresh install. You can also bulk-export a whole workspace as a ZIP (HTML / Markdown / JSON), and there's a
+        standalone <b>offline viewer</b>.</p>
+        <h3>Export &amp; import a note</h3>
+        <p>Export any note to <b>PDF (print), HTML, Markdown, or JSON</b>. Import a previously exported JSON / HTML /
+        Markdown note back into a workspace.</p>
+        <h3>Sync across devices</h3>
+        <p>Because the data folder is just files, put it in a cloud-sync folder (Google Drive / Dropbox / Box) and your
+        encrypted vault follows you. Changes to the folder <b>refresh open notes in real time</b>; if two devices edit the
+        same note, you'll be offered to keep both copies.</p>
+        <div class="tip"><b>Scheduled backups</b> can be configured so you always have a recent snapshot.</div>
+      </section>
+
+      <!-- 13 -->
+      <section class="doc" id="pwa">
+        <h2 class="sec">13. Install &amp; offline</h2>
+        <p>Meeting Notes ships as a <b>PWA</b> — installable from your browser as an app, with an offline app shell so the
+        interface loads even without a connection. Your note data still comes from the local server when it's running.</p>
+        <p>To install: use your browser's <i>Install app</i> / <i>Add to Home Screen</i> option while viewing the app.</p>
+      </section>
+
+      <!-- 14 -->
+      <section class="doc" id="shortcuts">
+        <h2 class="sec">14. Keyboard shortcuts</h2>
+        <table>
+          <tr><th>Shortcut</th><th>Action</th></tr>
+          <tr class="kbd-row"><td><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Command palette — jump to any note, workspace, or action</td></tr>
+          <tr class="kbd-row"><td><kbd>/</kbd></td><td>Focus search (or, inside an editor, the slash menu)</td></tr>
+          <tr class="kbd-row"><td><kbd>n</kbd></td><td>New daily note</td></tr>
+          <tr class="kbd-row"><td><kbd>?</kbd></td><td>Help &amp; shortcuts</td></tr>
+          <tr class="kbd-row"><td><kbd>Esc</kbd></td><td>Close menus / dialogs</td></tr>
+          <tr class="kbd-row"><td><kbd>Enter</kbd></td><td>In quick-add: add the task</td></tr>
+        </table>
+      </section>
+
+      <!-- 15 -->
+      <section class="doc" id="storage">
+        <h2 class="sec">15. Where your data lives</h2>
+        <p>Everything is stored under the app's <b>data directory</b> (set with the <code>DATA_DIR</code> environment
+        variable; defaults to a <code>data/</code> folder beside the app). Notes and attachments are individual
+        <code>.enc</code> files, encrypted at rest; only a small <code>vault.json</code> key descriptor is plaintext.</p>
+        <pre><code>&lt;DATA_DIR&gt;/
+  vault.json           key descriptor (no secrets in the clear)
+  index.json.enc       workspaces, settings, templates
+  ws/&lt;id&gt;/             one folder per workspace
+    tasks.json.enc     that workspace's tasks
+    notes/*.enc        encrypted notes &amp; attachments
+  inbox/               drop-zone for Slack/etc. → tasks</code></pre>
+        <div class="note">To move everything to another machine, copy the whole data directory (and the app) — then unlock with your passphrase.</div>
+      </section>
+
+      <!-- 16 -->
+      <section class="doc" id="faq">
+        <h2 class="sec">16. Troubleshooting &amp; FAQ</h2>
+        <h3>I forgot my passphrase.</h3>
+        <p>Use your <b>recovery key</b> to unlock, then change your passphrase in Settings. Without either, the data can't be decrypted — by design.</p>
+        <h3>The calendar / date picker doesn't open.</h3>
+        <p>Make sure you're on an up-to-date version. Click the date chip on a task (or “📅 Set date”); the picker opens anchored to the chip. If your browser blocks it, the field still accepts a typed date.</p>
+        <h3>Biometric unlock says “invalid domain”.</h3>
+        <p>Passkeys require <code>localhost</code>, a domain, or HTTPS — not a raw <code>127.0.0.1</code> address. Open the app at <code>http://localhost:&lt;port&gt;</code>.</p>
+        <h3>My Slack message didn't become a task.</h3>
+        <p>The app drains the inbox about once a minute <b>while it's unlocked</b>. Open and unlock the app, and confirm your glue service is writing into the right <code>inbox/</code> folder. See <code>docs/slack-inbox.md</code>.</p>
+        <h3>I see an old version after updating.</h3>
+        <p>The app serves the freshest files on reload; a hard refresh clears any cached shell. Installed PWAs update on next launch.</p>
+        <h3>Is anything sent to the cloud?</h3>
+        <p>No — not unless you deliberately sync the data folder or configure the Slack integrations. There are no analytics and no third-party runtime dependencies.</p>
+        <p class="backtop"><a href="#intro">↑ Back to top</a></p>
+      </section>
+    </main>
+  </div>
+
+  <script src="/js/manual.js"></script>
+</body>
+</html>

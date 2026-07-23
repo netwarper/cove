@@ -64,6 +64,7 @@ everything stays on your machine.
 | **Live sync** | Changes to the data directory (e.g. from another device via a synced folder) refresh open notes in real time; save conflicts can be resolved by keeping both copies. |
 | **Note links & backlinks** | Link between notes (`⧉` in the editor); each note shows what links to it. Rich text also supports **tables** and **/slash commands**. |
 | **Deep links** | Each note has a shareable `#note/<id>` link (**⋯ → Copy link to note**); a page refresh reopens the same note instead of jumping to the newest. |
+| **User manual** | A full in-app manual at `/manual.html` (also linked from **?** Help and **⋮ → User manual**), theme-matched and available offline. |
 | **Offline / installable** | Ships as a PWA — installable, with an offline app shell. |
 | **Security** | AES-256-GCM **envelope encryption at rest**, scrypt key derivation, **passphrase change + recovery key**, CSRF tokens, session auth with idle auto-lock, CSP + anti-clickjacking headers, login rate-limiting. |
 

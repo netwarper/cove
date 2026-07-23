@@ -227,25 +227,39 @@
     window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
   }
 
-  // Live-sync: refresh when note files change on disk (e.g. another device via a synced folder)
+  // Live-sync: refresh when note files change on disk (e.g. another device via a
+  // synced folder). Change events are COALESCED and self-echo-suppressed: when the
+  // data dir lives in a cloud-sync folder, the sync client touches files
+  // constantly, so reacting to every event would fire a stream of refetches and
+  // keep the browser tab in a perpetual "loading" state (a flickering favicon).
   function startLiveSync() {
     if (!('EventSource' in window)) return;
     try {
       var es = new EventSource('/api/events');
-      es.addEventListener('change', function (ev) {
-        var data = {}; try { data = JSON.parse(ev.data); } catch (e) {}
-        // don't clobber in-progress edits
-        if (state.saveTimer) return;
-        if (state.view === 'note' && state.note && data.noteId && data.noteId === state.note.id) {
+      var timer = null, wantNote = false;
+      function flush() {
+        timer = null;
+        // Ignore watcher echoes of our own recent writes (incl. cloud-sync
+        // re-touching the file we just saved).
+        if (Date.now() - (state.lastSaveAt || 0) < 3000) { wantNote = false; return; }
+        if (state.view !== 'note') { wantNote = false; return; }
+        var needNote = wantNote; wantNote = false;
+        if (needNote && state.note) {
           API.getNote(state.note.id).then(function (fresh) {
-            // Only refresh on a genuine content change (rev), not housekeeping writes.
+            // Only re-render on a genuine content change (rev), not housekeeping.
             if ((fresh.rev || 0) !== (state.note.rev || 0)) { state.note = fresh; renderNote(); setSaveStatus('Updated from another device'); }
             else { state.note.updatedAt = fresh.updatedAt; }
           }).catch(function () {});
         }
-        if (state.view === 'note') renderNoteList();
+        renderNoteList();
+      }
+      es.addEventListener('change', function (ev) {
+        if (state.saveTimer) return; // an edit is in flight — don't clobber it
+        var data = {}; try { data = JSON.parse(ev.data); } catch (e) {}
+        if (data.noteId && state.note && data.noteId === state.note.id) wantNote = true;
+        clearTimeout(timer); timer = setTimeout(flush, 1000); // coalesce bursts
       });
-      es.onerror = function () { /* browser auto-reconnects */ };
+      es.onerror = function () { /* browser auto-reconnects (retry is set server-side) */ };
     } catch (e) { /* SSE unsupported */ }
   }
 
@@ -270,9 +284,16 @@
   // ---------------- Help / shortcuts overlay ----------------
   function openHelp() { $('helpLayer').classList.remove('hidden'); }
   function closeHelp() { $('helpLayer').classList.add('hidden'); }
+  // Open the full user manual, matching the app's current theme.
+  function openManual() {
+    var t = (state.settings && state.settings.theme) || 'auto';
+    var q = (t === 'light' || t === 'dark') ? ('?theme=' + t) : '';
+    window.open('/manual.html' + q, '_blank', 'noopener');
+  }
   $('helpBtn').addEventListener('click', openHelp);
   $('helpLayer').addEventListener('click', function (e) { if (e.target === $('helpLayer')) closeHelp(); });
   document.querySelector('.help-close').addEventListener('click', closeHelp);
+  $('manualLink').addEventListener('click', function (e) { e.preventDefault(); closeHelp(); openManual(); });
 
   // ---------------- Command palette (⌘K / Ctrl-K) ----------------
   var palette = { open: false, items: [], active: 0 };
@@ -289,6 +310,7 @@
       { label: 'Open: Settings', run: function () { openAccount(); } },
       { label: 'Toggle theme', run: function () { $('themeBtn').click(); } },
       { label: 'Help & shortcuts', run: openHelp },
+      { label: 'Open the user manual', run: openManual },
       { label: 'Lock (log out)', run: function () { $('logoutBtn').click(); } },
     ];
   }
@@ -1050,6 +1072,7 @@
         tags: state.note.tags, transcript: state.note.transcript, baseRev: state.note.rev,
       });
       state.note.todos = saved.todos; state.note.updatedAt = saved.updatedAt; state.note.rev = saved.rev;
+      state.lastSaveAt = Date.now(); // suppress the live-sync echo of our own write
       setSaveStatus('Saved ✓'); renderNoteList();
     } catch (ex) {
       if (ex.status === 409) {
@@ -1248,6 +1271,7 @@
     else if (m === 'trash') renderTrash();
     else if (m === 'backup') openModal('backupModal');
     else if (m === 'account') openAccount();
+    else if (m === 'manual') openManual();
   });
   function openAccount(focusStt) {
     $('acctMsg').textContent = '';
