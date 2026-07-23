@@ -200,9 +200,11 @@
     $('authGate').classList.add('hidden');
     $('app').classList.remove('hidden');
     state.settings = await API.getSettings();
+    state.tagBookmarks = Array.isArray(state.settings.tagBookmarks) ? state.settings.tagBookmarks : [];
     applyFontSize(state.settings.fontSize || 14);
     applyTheme(state.settings.theme || 'auto');
     applySortControl();
+    renderTagBookmarks();
     await loadTemplates();
     await loadWorkspaces();
     await routeFromHash();
@@ -510,6 +512,9 @@
     var n = txt ? txt.split(/\s+/).length : 0;
     $('wordCount').textContent = n + (n === 1 ? ' word' : ' words');
   }
+  // Debounced so it doesn't recount the whole note on every keystroke (typing lag).
+  var wcTimer = null;
+  function scheduleWordCount() { clearTimeout(wcTimer); wcTimer = setTimeout(updateWordCount, 400); }
 
   async function renderBacklinks() {
     try {
@@ -574,11 +579,14 @@
     var bar = $('tagBar'); bar.innerHTML = '';
     (state.note.tags || []).forEach(function (t) {
       var chip = document.createElement('span'); chip.className = 'tag-chip';
-      chip.innerHTML = '#' + esc(t) + ' <button aria-label="Remove tag">✕</button>';
-      chip.querySelector('button').addEventListener('click', function () {
+      var lbl = document.createElement('button'); lbl.className = 'tag-open'; lbl.textContent = '#' + t; lbl.title = 'View all notes tagged #' + t;
+      lbl.addEventListener('click', function () { openTagView(t); });
+      var rm = document.createElement('button'); rm.className = 'tag-rm'; rm.setAttribute('aria-label', 'Remove tag'); rm.textContent = '✕';
+      rm.addEventListener('click', function () {
         state.note.tags = state.note.tags.filter(function (x) { return x !== t; });
         renderTags(); scheduleSave();
       });
+      chip.appendChild(lbl); chip.appendChild(rm);
       bar.appendChild(chip);
     });
     var inp = document.createElement('input'); inp.className = 'tag-input'; inp.placeholder = '+ tag';
@@ -594,6 +602,80 @@
     bar.appendChild(inp);
   }
 
+  // ---------------- Tag bookmarks (global saved tags) ----------------
+  function normTag(t) { return String(t || '').replace(/^#/, '').trim(); }
+  function isTagBookmarked(tag) {
+    var lc = normTag(tag).toLowerCase();
+    return (state.tagBookmarks || []).some(function (x) { return x.toLowerCase() === lc; });
+  }
+  async function saveTagBookmarks() {
+    try { await API.saveSettings({ tagBookmarks: state.tagBookmarks }); } catch (_e) {}
+  }
+  async function toggleTagBookmark(tag) {
+    tag = normTag(tag); if (!tag) return;
+    if (isTagBookmarked(tag)) {
+      var lc = tag.toLowerCase();
+      state.tagBookmarks = state.tagBookmarks.filter(function (x) { return x.toLowerCase() !== lc; });
+    } else {
+      state.tagBookmarks = (state.tagBookmarks || []).concat(tag);
+    }
+    renderTagBookmarks();
+    if (state.view === 'tag' && state.activeTag) syncTagBookmarkBtn();
+    await saveTagBookmarks();
+  }
+
+  // Sidebar section — shown regardless of the current workspace, only when there
+  // is at least one bookmarked tag.
+  function renderTagBookmarks() {
+    var wrap = $('tagBookmarks'); if (!wrap) return;
+    var list = state.tagBookmarks || [];
+    wrap.classList.toggle('hidden', !list.length);
+    var ul = $('tagBookmarkList'); ul.innerHTML = '';
+    list.slice().sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); }).forEach(function (tag) {
+      var li = document.createElement('li'); li.className = 'tagbm' + (state.view === 'tag' && state.activeTag && state.activeTag.toLowerCase() === tag.toLowerCase() ? ' active' : '');
+      var open = document.createElement('button'); open.className = 'tagbm-open'; open.textContent = '# ' + tag; open.title = 'View notes tagged #' + tag;
+      open.addEventListener('click', function () { openTagView(tag); });
+      var rm = document.createElement('button'); rm.className = 'tagbm-rm'; rm.textContent = '✕'; rm.title = 'Remove bookmark'; rm.setAttribute('aria-label', 'Remove bookmark');
+      rm.addEventListener('click', function (e) { e.stopPropagation(); toggleTagBookmark(tag); });
+      li.appendChild(open); li.appendChild(rm); ul.appendChild(li);
+    });
+  }
+
+  function syncTagBookmarkBtn() {
+    var b = $('tagBookmarkBtn'); if (!b) return;
+    var on = isTagBookmarked(state.activeTag);
+    b.textContent = on ? '🔖 Bookmarked' : '🔖 Bookmark tag';
+    b.classList.toggle('on', on);
+  }
+
+  // A cross-workspace view of every note carrying a tag.
+  async function openTagView(tag) {
+    tag = normTag(tag); if (!tag) return;
+    // Flush a pending note save so the search index reflects any just-added tag.
+    if (state.saveTimer) { clearTimeout(state.saveTimer); state.saveTimer = null; await saveNow(); }
+    state.activeTag = tag;
+    showView('tag');
+    $('tagViewTitle').textContent = '#' + tag;
+    syncTagBookmarkBtn();
+    renderTagBookmarks();
+    var ul = $('tagNoteList'); ul.innerHTML = '<li class="muted">Loading…</li>';
+    var hits = [];
+    try { hits = await API.search('tag:' + tag); } catch (_e) { hits = []; }
+    $('tagViewSub').textContent = hits.length + ' note' + (hits.length === 1 ? '' : 's') + ' across all workspaces';
+    ul.innerHTML = '';
+    if (!hits.length) { ul.innerHTML = '<li class="muted">No notes with this tag yet. Create one with ＋ New Daily.</li>'; return; }
+    hits.forEach(function (h) {
+      var li = document.createElement('li'); li.className = 'tag-note';
+      var ws = document.createElement('span'); ws.className = 'gt-ws'; ws.textContent = h.workspaceName || '';
+      var title = document.createElement('span'); title.className = 'fv-title'; title.textContent = h.title || '(untitled)';
+      li.appendChild(ws); li.appendChild(title);
+      li.addEventListener('click', function () { openNote(h.noteId); });
+      ul.appendChild(li);
+    });
+  }
+  $('tagBookmarkBtn').addEventListener('click', function () { if (state.activeTag) toggleTagBookmark(state.activeTag); });
+  $('tagNewNoteBtn').addEventListener('click', function () { createNewNote({}); });
+
   // ---------------- To-dos ----------------
   var todayStr = function () { var d = new Date(); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
   function p2(n) { return String(n).padStart(2, '0'); }
@@ -607,7 +689,10 @@
     renderTasks();
   }
   function applyTaskResult(res) {
-    if (res && res.tasks && res.workspaceId === state.wsId) { state.tasks = res.tasks; renderTasks(); renderNoteList(); }
+    // Task changes don't alter the note list itself — only the sidebar's small
+    // "completed here" badge — so we deliberately avoid rebuilding the whole
+    // list here (that was a per-click cost that lagged on large workspaces).
+    if (res && res.tasks && res.workspaceId === state.wsId) { state.tasks = res.tasks; renderTasks(); }
     else loadTasks();
   }
   function addDaysStr(iso, n) { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
@@ -775,8 +860,8 @@
   };
   window.Editor.init($('sections').querySelector('[data-target="carryoverEditor"]'), $('carryoverEditor'), { noteLinkPicker: openNotePicker });
   window.Editor.init($('sections').querySelector('[data-target="meetingEditor"]'), $('meetingEditor'), { uploader: function (f) { return meetingUploader(f); }, noteLinkPicker: openNotePicker });
-  $('carryoverEditor').addEventListener('input', function () { state.note.carryover = $('carryoverEditor').innerHTML; scheduleSave(); updateWordCount(); });
-  $('meetingEditor').addEventListener('input', function () { state.note.meetingNotes = $('meetingEditor').innerHTML; scheduleSave(); updateWordCount(); });
+  $('carryoverEditor').addEventListener('input', function () { state.note.carryover = $('carryoverEditor').innerHTML; scheduleSave(); scheduleWordCount(); });
+  $('meetingEditor').addEventListener('input', function () { state.note.meetingNotes = $('meetingEditor').innerHTML; scheduleSave(); scheduleWordCount(); });
   window.addEventListener('mn-open-note', function (e) { openNote(e.detail); });
 
   // ---------------- Attachments ----------------
@@ -974,12 +1059,28 @@
   });
   async function createNewNote(opts) {
     opts = opts || {};
+    var wsId = state.wsId;
     var payload = {};
     if (opts.scratch) payload.scratch = true;
     if (opts.templateId) payload.templateId = opts.templateId;
-    state.note = await API.newNote(state.wsId, payload);
+    // In a tag view the note isn't tied to a workspace, so ask where it should
+    // live, then auto-apply the tag.
+    if (state.view === 'tag' && state.activeTag) {
+      var pick = await pickWorkspace('Add a “#' + state.activeTag + '” note to which workspace?');
+      if (!pick) return;
+      wsId = pick; payload.tags = [state.activeTag];
+    }
+    state.note = await API.newNote(wsId, payload);
+    state.wsId = wsId; $('workspaceSelect').value = wsId;
     showView('note'); renderNote();
     await Promise.all([renderNoteList(), loadTasks()]);
+  }
+
+  // Prompt for a target workspace; resolves to a workspace id or null if cancelled.
+  async function pickWorkspace(message) {
+    var buttons = state.workspaces.map(function (w, i) { return { label: w.name, returns: w.id, primary: i === 0 && w.id === state.wsId }; });
+    buttons.push({ label: 'Cancel', returns: null });
+    return dialog.choose(message, buttons, { title: 'Choose a workspace', cancelValue: null });
   }
   function renderTemplatePick() {
     var box = $('templatePickList'); box.innerHTML = '';
@@ -1104,11 +1205,12 @@
   // ---------------- Views ----------------
   function showView(v) {
     state.view = v;
-    ['noteView', 'landingView', 'todosView', 'favsView', 'trashView', 'searchView'].forEach(function (id) { $(id).classList.add('hidden'); });
+    ['noteView', 'landingView', 'todosView', 'favsView', 'trashView', 'searchView', 'tagView'].forEach(function (id) { $(id).classList.add('hidden'); });
     $('navNote').classList.toggle('active', v === 'note' || v === 'landing');
     $('navTodos').classList.toggle('active', v === 'todos');
     $('navFavs').classList.toggle('active', v === 'favs');
-    var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView' };
+    if (v !== 'tag') { state.activeTag = null; renderTagBookmarks(); }
+    var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', tag: 'tagView' };
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
   $('navNote').addEventListener('click', function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); });

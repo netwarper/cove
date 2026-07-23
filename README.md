@@ -53,8 +53,9 @@ everything stays on your machine.
 | **Inbox (Slack → tasks)** | Message yourself (Slack via Zapier / Make / a Cloudflare Worker) → a file lands in `DATA_DIR/inbox/` → the app turns it into a task (badged **📥**) in the target workspace, even if the Mac was asleep. See [`docs/slack-inbox.md`](docs/slack-inbox.md). |
 | **Slack agenda (→ out)** | Post your due &amp; overdue tasks to a Slack channel via an Incoming Webhook — on demand or auto-daily (Settings → Slack). |
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
-| **Tags** | Tag notes and filter search with `tag:name`. |
-| **Templates** | Reusable meeting templates (1:1, standup, retro) that seed the **Meeting Notes** section of new notes. Carryover still comes from the previous note; a template's defaults fill it only on a workspace's first note. Set a per-workspace default or pick one from **New ▾**. |
+| **Tags** | Tag notes and filter search with `tag:name`. Click a tag to open a **cross-workspace tag view** of every note carrying it. |
+| **Tag bookmarks** | Bookmark a tag to pin it to a sidebar section that's visible in **every** workspace. Creating a note from a tag view auto-applies the tag and asks which workspace to put it in. |
+| **Templates** | Reusable meeting templates that seed the **Meeting Notes** section of new notes — ships with **1:1**, **Team standup**, **Project update**, and **Interview**, and you can add your own. Carryover still comes from the previous note. Set a per-workspace default or pick one from **New ▾**. |
 | **Trash** | Deleted notes go to Trash and can be restored for 30 days before permanent removal. |
 | **Move / duplicate** | Move a note to another workspace, or duplicate it. |
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |

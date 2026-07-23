@@ -84,6 +84,10 @@
             <button id="manageWs" class="icon-btn" title="Add / rename / delete workspaces" aria-label="Manage workspaces">⚙︎</button>
           </div>
         </div>
+        <div id="tagBookmarks" class="tag-bookmarks hidden">
+          <div class="tag-bookmarks-head">🔖 Bookmarked tags</div>
+          <ul id="tagBookmarkList" class="tag-bookmark-list"></ul>
+        </div>
         <div class="sidebar-head">
           <span>Notes</span>
           <div class="new-note-wrap">
@@ -274,6 +278,18 @@
         <section id="searchView" class="view hidden">
           <h1>Search results</h1>
           <ul id="searchResults" class="search-results"></ul>
+        </section>
+
+        <section id="tagView" class="view hidden">
+          <div class="tag-view-head">
+            <h1 id="tagViewTitle">#tag</h1>
+            <div class="tag-view-actions">
+              <button id="tagNewNoteBtn" class="sm primary" title="Create a note with this tag">＋ New note</button>
+              <button id="tagBookmarkBtn" class="sm" title="Bookmark this tag">🔖 Bookmark tag</button>
+            </div>
+          </div>
+          <p class="muted" id="tagViewSub"></p>
+          <ul id="tagNoteList" class="fav-list"></ul>
         </section>
       </main>
     </div>

@@ -174,6 +174,23 @@ const t = harness('functional');
     t.ok(r.body.meetingNotes.includes('Wins'), 'workspace default template seeds Meeting Notes');
     t.eq(r.body.todos.map((x) => x.text), ['ask about blockers'], 'carry-forward keeps prior open todos (template did not duplicate)');
 
+    // --- built-in starter templates are seeded on init ---
+    r = await c.request('GET', '/api/templates');
+    const tplNames = r.body.map((x) => x.name);
+    for (const nm of ['1:1', 'Team standup', 'Project update', 'Interview']) t.ok(tplNames.includes(nm), 'seeded template present: ' + nm);
+
+    // --- a new note can carry (normalized) tags: the tag-bookmark "new note" flow ---
+    r = await c.request('POST', '/api/workspaces/general/notes/new', { tags: ['planning', '#Ops', ''] });
+    const taggedId = r.body.id;
+    t.eq(r.body.tags, ['planning', 'Ops'], 'new note applies + normalizes + drops empty tags');
+    r = await c.request('GET', '/api/search?q=tag:planning');
+    t.ok(r.body.some((x) => x.noteId === taggedId), 'tagged note is findable by cross-workspace tag search');
+
+    // --- tag bookmarks persist (stored in settings) ---
+    await c.request('PUT', '/api/settings', { tagBookmarks: ['planning', 'ops'] });
+    r = await c.request('GET', '/api/settings');
+    t.eq(r.body.tagBookmarks, ['planning', 'ops'], 'tag bookmarks persist in settings');
+
     // --- move + copy note ---
     r = await c.request('POST', '/api/notes/' + note1.id + '/copy', { workspaceId: teamWs });
     const copyId = r.body.id;
