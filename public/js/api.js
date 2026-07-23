@@ -115,6 +115,8 @@
 
     verifyIntegrity: () => req('GET', '/api/verify'),
     stats: () => req('GET', '/api/stats'),
+    getDataDir: () => req('GET', '/api/datadir'),
+    saveDataDir: (path) => req('PUT', '/api/datadir', { path }),
     transcribe: (audioB64, mime, filename, source) => req('POST', '/api/transcribe', { audioB64, mime, filename, source }),
     listTrash: () => req('GET', '/api/trash'),
     restoreTrash: (id) => req('POST', '/api/trash/' + id + '/restore', {}),

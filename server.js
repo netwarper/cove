@@ -30,7 +30,12 @@ const transcribe = require('./lib/transcribe');
 const slack = require('./lib/slack');
 const { Store } = store;
 
-const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
+// Where data lives. An explicit DATA_DIR env var always wins; otherwise a
+// gitignored `datadir.path` pointer file (settable from the web UI) is used;
+// otherwise the bundled ./data. The env override is exposed to the UI so it can
+// explain why the path field is read-only when one is set.
+const DATA_DIR_ENV = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : null;
+const DATA_DIR = DATA_DIR_ENV || config.readDataDirPointer(__dirname) || path.join(__dirname, 'data');
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // A `--port <n>` flag overrides the port for this run (highest precedence).
@@ -246,7 +251,7 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, {
         initialized: vaultExists(), authenticated: !!s, csrf: s ? s.csrf : null,
         bio,
-        instance: { name: CFG.name, url: CFG.url, domain: CFG.domain, version: APP_VERSION },
+        instance: { name: CFG.name, url: CFG.url, domain: CFG.domain, version: APP_VERSION, dataDir: DATA_DIR, dataDirEnv: !!DATA_DIR_ENV },
       });
     }
 
@@ -382,6 +387,42 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/logout' && req.method === 'POST') {
       sessions.delete(cookies.mn_session);
       return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': 'mn_session=; HttpOnly; Path=/; Max-Age=0; SameSite=Strict' });
+    }
+
+    // Where the encrypted data lives, and how it was chosen. Lets the UI show
+    // the active path and explain when it is pinned by a DATA_DIR env var.
+    if (pathname === '/api/datadir' && req.method === 'GET') {
+      const pointer = config.readDataDirPointer(__dirname);
+      const source = DATA_DIR_ENV ? 'env' : (pointer ? 'pointer' : 'default');
+      return sendJSON(res, 200, {
+        path: DATA_DIR,
+        source,
+        envOverride: !!DATA_DIR_ENV,
+        appDir: __dirname,
+        pointerFile: config.dataDirPointerPath(__dirname),
+      });
+    }
+
+    // Change where data lives. This only records the new location (in the
+    // gitignored pointer file) and requires a restart to take effect — moving
+    // an open vault live would risk corrupting locks, watchers and in-flight
+    // writes. The existing data is left in place; the user copies/moves it.
+    if (pathname === '/api/datadir' && req.method === 'PUT') {
+      if (DATA_DIR_ENV) return sendJSON(res, 409, { error: 'data directory is pinned by the DATA_DIR environment variable; unset it to change the location from here' });
+      const body = await readBody(req);
+      const wanted = String(body.path || '').trim();
+      if (!wanted) return sendJSON(res, 400, { error: 'a directory path is required' });
+      if (!path.isAbsolute(wanted)) return sendJSON(res, 400, { error: 'please provide an absolute path' });
+      const target = path.resolve(wanted);
+      try {
+        fs.mkdirSync(target, { recursive: true });
+        fs.accessSync(target, fs.constants.W_OK);
+      } catch (_e) {
+        return sendJSON(res, 400, { error: 'that path is not writable (check it exists and you have permission)' });
+      }
+      const unchanged = target === path.resolve(DATA_DIR);
+      config.writeDataDirPointer(__dirname, target);
+      return sendJSON(res, 200, { ok: true, path: target, restartRequired: !unchanged, unchanged });
     }
 
     if (pathname === '/api/passphrase' && req.method === 'POST') {

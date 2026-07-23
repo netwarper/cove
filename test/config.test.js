@@ -46,6 +46,16 @@ try {
   t.eq(config.resolve(DIR, { PORT: '4567' }, { port: 9090 }).port, 9090, 'CLI --port overrides env PORT');
   t.eq(config.resolve(DIR, {}, { port: 'nope' }).port, config.resolve(DIR, {}).port, 'an invalid --port is ignored (same as no --port)');
 
+  // --- data-directory pointer ---
+  const APP = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-app-'));
+  t.eq(config.readDataDirPointer(APP), null, 'no pointer file initially');
+  const want = path.join(os.tmpdir(), 'mn-data-target');
+  config.writeDataDirPointer(APP, want);
+  t.eq(config.readDataDirPointer(APP), path.resolve(want), 'pointer round-trips an absolute path');
+  config.writeDataDirPointer(APP, '');
+  t.eq(config.readDataDirPointer(APP), null, 'clearing the pointer removes it');
+  fs.rmSync(APP, { recursive: true, force: true });
+
   // lock lifecycle
   t.eq(config.readActiveLock(DIR), null, 'no active lock initially');
   config.writeLock(DIR, p1);

@@ -8,6 +8,9 @@ meeting-notes-viewer.html
 # Local environment overrides
 .env
 
+# Data-directory pointer (points at where THIS install keeps its data)
+datadir.path
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

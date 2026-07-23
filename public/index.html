@@ -392,6 +392,16 @@
         <div id="statsInfo" class="tiny muted" style="margin-top:6px"></div>
       </div>
       <div class="acct-block">
+        <h4>Data location</h4>
+        <p class="muted tiny">Where your encrypted notes are stored. Point this at a Google&nbsp;Drive, Dropbox, iCloud or Box sync folder to keep your notes on the cloud and in sync across devices. Everything stays end-to-end encrypted — the sync service only ever sees ciphertext.</p>
+        <div id="dataDirInfo" class="tiny"></div>
+        <label class="tiny muted" for="dataDirInput">Change data directory (absolute path)</label>
+        <input id="dataDirInput" type="text" placeholder="/Users/you/Google Drive/MeetingNotes" autocomplete="off" spellcheck="false">
+        <div style="margin-top:6px"><button id="dataDirSaveBtn" class="sm" type="button">Save data location</button></div>
+        <p class="muted tiny" style="margin-top:6px">Changing this only records the new location — <b>restart the app</b> for it to take effect, and copy or move your existing data folder to the new path first if you want to keep your notes.</p>
+        <div id="dataDirMsg" class="tiny" aria-live="polite"></div>
+      </div>
+      <div class="acct-block">
         <h4>Display</h4>
         <label class="tiny muted">Note text size</label>
         <input id="fontSize" type="range" min="13" max="20" step="1" value="14">

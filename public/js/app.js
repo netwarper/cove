@@ -400,6 +400,36 @@
     } catch (e) { $('statsInfo').textContent = ''; }
   }
 
+  async function loadDataDir() {
+    var info = $('dataDirInfo'), input = $('dataDirInput'), btn = $('dataDirSaveBtn');
+    $('dataDirMsg').textContent = '';
+    try {
+      var d = await API.getDataDir();
+      var src = d.source === 'env' ? 'set by the DATA_DIR environment variable'
+        : d.source === 'pointer' ? 'configured here' : 'default (bundled with the app)';
+      info.innerHTML = 'Current: <code>' + esc(d.path) + '</code><br><span class="muted">' + esc(src) + '</span>';
+      if (d.envOverride) {
+        input.value = ''; input.disabled = true; btn.disabled = true;
+        input.placeholder = 'Pinned by DATA_DIR — unset that env var to change it here';
+      } else {
+        input.disabled = false; btn.disabled = false; input.value = d.path;
+      }
+    } catch (e) { info.textContent = ''; }
+  }
+  function dataDirMsg(s, isErr) { var el = $('dataDirMsg'); el.textContent = s; el.style.color = isErr ? 'var(--danger)' : 'var(--muted)'; }
+  $('dataDirSaveBtn').addEventListener('click', async function () {
+    var p = $('dataDirInput').value.trim();
+    if (!p) { dataDirMsg('Enter an absolute path first.', true); return; }
+    $('dataDirSaveBtn').disabled = true; dataDirMsg('Saving…', false);
+    try {
+      var r = await API.saveDataDir(p);
+      if (r.unchanged) dataDirMsg('That is already the current location.', false);
+      else dataDirMsg('Saved ✓ — restart the app to load data from ' + r.path, false);
+      loadDataDir();
+    } catch (ex) { dataDirMsg(ex.message, true); }
+    finally { $('dataDirSaveBtn').disabled = false; }
+  });
+
   function renderInboxSettings() {
     var sel = $('inboxWs'); sel.innerHTML = '';
     var cur = state.settings.inboxWorkspace || 'general';
@@ -1713,6 +1743,7 @@
     renderInboxSettings();
     renderSlackSettings();
     loadStatsInto();
+    loadDataDir();
     openModal('accountModal');
     if (focusStt) setTimeout(function () { var el = $('sttEndpoint'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 40);
   }
