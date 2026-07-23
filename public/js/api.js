@@ -107,6 +107,7 @@
     rescheduleTask: (id, due) => req('POST', '/api/tasks/' + id + '/reschedule', { due: due }),
     globalTasks: () => req('GET', '/api/tasks'),
     search: (q) => req('GET', '/api/search?q=' + encodeURIComponent(q)),
+    allTags: () => req('GET', '/api/tags'),
     importNote: (wsId, payload) => req('POST', '/api/workspaces/' + wsId + '/import', payload),
     exportUrl: (noteId, fmt) => '/api/notes/' + noteId + '/export?format=' + fmt,
 

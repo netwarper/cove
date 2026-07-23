@@ -546,6 +546,7 @@ async function route(s, req, res, pathname, query) {
     return { ok: true, posted: true };
   }
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);
+  if (pathname === '/api/tags' && m === 'GET') return s.allTags();
   if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
   if (pathname === '/api/stats' && m === 'GET') return s.stats();
   if (pathname === '/api/transcribe' && m === 'POST') {

@@ -201,6 +201,8 @@
     $('app').classList.remove('hidden');
     state.settings = await API.getSettings();
     state.tagBookmarks = Array.isArray(state.settings.tagBookmarks) ? state.settings.tagBookmarks : [];
+    state.allTags = [];
+    try { state.allTags = await API.allTags(); } catch (_e) { /* non-fatal */ }
     applyFontSize(state.settings.fontSize || 14);
     applyTheme(state.settings.theme || 'auto');
     applySortControl();
@@ -590,16 +592,36 @@
       bar.appendChild(chip);
     });
     var inp = document.createElement('input'); inp.className = 'tag-input'; inp.placeholder = '+ tag';
+    inp.setAttribute('list', 'tagSuggest'); inp.autocomplete = 'off';
+    inp.addEventListener('focus', refreshTagSuggestions); // keep suggestions current
     inp.addEventListener('keydown', function (e) {
       if (e.key !== 'Enter' && e.key !== ',') return;
       e.preventDefault();
       var v = inp.value.trim().replace(/^#/, '');
       if (v && (state.note.tags || []).indexOf(v) < 0) {
         state.note.tags = (state.note.tags || []).concat(v);
+        if (state.allTags.indexOf(v) < 0) state.allTags.push(v);
         renderTags(); scheduleSave();
-      }
+      } else if (v) { inp.value = ''; }
     });
     bar.appendChild(inp);
+    fillTagSuggest();
+  }
+
+  // Discreet tag autocomplete: a native <datalist> of existing tags, minus the
+  // ones already on this note.
+  function fillTagSuggest() {
+    var dl = $('tagSuggest'); if (!dl) return;
+    var have = {}; (state.note && state.note.tags || []).forEach(function (t) { have[t.toLowerCase()] = 1; });
+    dl.innerHTML = '';
+    (state.allTags || []).forEach(function (t) {
+      if (have[t.toLowerCase()]) return;
+      var o = document.createElement('option'); o.value = t; dl.appendChild(o);
+    });
+  }
+  async function refreshTagSuggestions() {
+    try { state.allTags = await API.allTags(); } catch (_e) { /* keep cached */ }
+    fillTagSuggest();
   }
 
   // ---------------- Tag bookmarks (global saved tags) ----------------
@@ -683,6 +705,10 @@
   // ---------------- Tasks (unified to-do + reminder, Todoist-style) ----------------
   state.tasks = [];
   state.qa = { due: null, time: null, priority: 4, recurrence: null };
+  // Which quick-add fields the user set explicitly with a picker. Manually-set
+  // fields are preserved as you keep typing the task text (only tokens the parser
+  // actually finds in the text override them).
+  state.qaManual = { due: false, time: false, priority: false, recurrence: false };
 
   async function loadTasks() {
     try { state.tasks = await API.listTasks(state.wsId); } catch (_e) { state.tasks = []; }
@@ -826,21 +852,35 @@
     $('qaDateLbl').textContent = state.qa.due ? fmtDueShort(state.qa.due) : 'Date';
     $('qaDate').classList.toggle('set', !!state.qa.due);
   }
+  function resetQa() {
+    state.qa = { due: null, time: null, priority: 4, recurrence: null };
+    state.qaManual = { due: false, time: false, priority: false, recurrence: false };
+  }
   $('taskInput').addEventListener('input', function () {
     var p = window.TaskParse.parse($('taskInput').value);
-    state.qa = { due: p.due, time: p.time, priority: p.priority, recurrence: p.recurrence };
+    var m = p.matched || {};
+    // For each field: a token found in the text wins (and un-sticks any manual
+    // value); otherwise keep a manually-picked value, else fall back to default.
+    if (p.due != null) { state.qa.due = p.due; state.qaManual.due = false; }        // covers explicit + recurrence-implied dates
+    else if (!state.qaManual.due) { state.qa.due = null; }
+    if (p.time) { state.qa.time = p.time; state.qaManual.time = false; }
+    else if (!state.qaManual.time) { state.qa.time = null; }
+    if (m.priority) { state.qa.priority = p.priority; state.qaManual.priority = false; }
+    else if (!state.qaManual.priority) { state.qa.priority = 4; }
+    if (p.recurrence) { state.qa.recurrence = p.recurrence; state.qaManual.recurrence = false; }
+    else if (!state.qaManual.recurrence) { state.qa.recurrence = null; }
     syncQa();
   });
-  $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; });
-  $('qaRecur').addEventListener('change', function () { var v = $('qaRecur').value; state.qa.recurrence = v === 'none' ? null : { type: v }; });
+  $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; state.qaManual.priority = true; });
+  $('qaRecur').addEventListener('change', function () { var v = $('qaRecur').value; state.qa.recurrence = v === 'none' ? null : { type: v }; state.qaManual.recurrence = true; });
   $('qaDate').addEventListener('click', function () {
-    openDatePicker($('qaDate'), state.qa.due, function (v) { state.qa.due = v; syncQa(); });
+    openDatePicker($('qaDate'), state.qa.due, function (v) { state.qa.due = v; state.qaManual.due = true; syncQa(); });
   });
   async function addTaskFromInput() {
     var raw = $('taskInput').value.trim(); if (!raw) return;
     var p = window.TaskParse.parse(raw);
     var payload = { text: p.text || raw, due: state.qa.due, time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
-    $('taskInput').value = ''; state.qa = { due: null, time: null, priority: 4, recurrence: null }; syncQa();
+    $('taskInput').value = ''; resetQa(); syncQa();
     applyTaskResult(await API.addTask(state.wsId, payload));
   }
   $('qaAdd').addEventListener('click', addTaskFromInput);

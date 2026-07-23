@@ -191,6 +191,10 @@ const t = harness('functional');
     r = await c.request('GET', '/api/settings');
     t.eq(r.body.tagBookmarks, ['planning', 'ops'], 'tag bookmarks persist in settings');
 
+    // --- distinct-tags endpoint (powers tag autocomplete) ---
+    r = await c.request('GET', '/api/tags');
+    t.ok(r.body.includes('planning') && r.body.includes('Ops'), 'GET /api/tags lists distinct tags across notes');
+
     // --- move + copy note ---
     r = await c.request('POST', '/api/notes/' + note1.id + '/copy', { workspaceId: teamWs });
     const copyId = r.body.id;
