@@ -93,6 +93,38 @@ Or copy `.env.example` to `.env` and set `DATA_DIR` there. Because the files are
 encrypted before they touch disk, the cloud provider only ever sees ciphertext.
 Writes are atomic (write-then-rename) so sync clients never see half-written files.
 
+You can also **view and change the data directory from the app** — **⚙️ Settings
+→ Data location**. It shows the current path and lets you point it at a new one;
+the change is recorded in a small `datadir.path` file and takes effect on the
+next restart (move your existing data folder to the new path first if you want to
+keep your notes). An explicit `DATA_DIR` environment variable always wins and
+pins the location (the setting shows it read-only in that case).
+
+---
+
+## Updating (drop-in, keeps your notes)
+
+The app is designed so a code update never touches your data:
+
+- **Your data and local config live outside the code.** Notes, `vault.json`,
+  `instance.json`, backups and the search index all live in your `DATA_DIR`; the
+  `datadir.path` pointer and `.env` sit alongside the code but are **git-ignored**.
+  Nothing under version control contains your data or keys.
+- **To update:** `git pull` (cleanest — it never overwrites untracked/ignored
+  files), **or** download the latest code and overwrite the app folder. As long
+  as you keep your `DATA_DIR` (and `datadir.path` / `.env` if you use them), all
+  your notes, settings, tasks and unlock keys carry over untouched.
+- **Most future-proof:** keep `DATA_DIR` *outside* the app folder (set it once in
+  Settings → Data location, or via the env var). Then the code folder is fully
+  disposable — delete and replace it wholesale and your data is never at risk.
+- **The on-disk format is versioned.** Encrypted files carry a format marker and
+  the search index a version number; the app migrates/rebuilds derived data
+  automatically on first launch after an update, so newer code reads older data.
+
+A quick belt-and-braces habit: take an **encrypted backup** (⋮ → Backup &
+restore) before a big update. It restores onto a fresh install with your existing
+passphrase.
+
 ---
 
 ## Choosing the port
