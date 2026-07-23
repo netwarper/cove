@@ -72,6 +72,8 @@
     forkNote: (id, patch) => req('POST', '/api/notes/' + id + '/fork', patch),
     snoozeReminder: (wsId, id, until) => req('POST', '/api/workspaces/' + wsId + '/reminders/' + id + '/snooze', { until }),
     workspaceZipUrl: (wsId, fmt) => '/api/workspaces/' + wsId + '/export?format=' + fmt,
+    llmExportUrl: (o) => '/api/export/llm?scope=' + encodeURIComponent(o.scope) + '&mode=' + encodeURIComponent(o.mode) +
+      (o.scope === 'tag' ? '&tag=' + encodeURIComponent(o.tag || '') : '&id=' + encodeURIComponent(o.id || '')),
     currentNote: (wsId) => req('GET', '/api/workspaces/' + wsId + '/current'),
     newNote: (wsId, opts) => req('POST', '/api/workspaces/' + wsId + '/notes/new', opts || {}),
     getNote: (id) => req('GET', '/api/notes/' + id),

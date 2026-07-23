@@ -1886,6 +1886,31 @@
   // Backup / restore + bulk export
   $('downloadBackupBtn').addEventListener('click', function () { downloadUrl(API.backupUrl()); });
   $('bulkExportBtn').addEventListener('click', function () { downloadUrl(API.workspaceZipUrl(state.wsId, $('bulkFormat').value)); });
+  $('llmScope').addEventListener('change', async function () {
+    var isTag = $('llmScope').value === 'tag';
+    $('llmTag').classList.toggle('hidden', !isTag);
+    $('llmExportMsg').textContent = '';
+    if (isTag && !$('llmTag').options.length) {
+      try {
+        var tags = await API.allTags();
+        $('llmTag').innerHTML = (tags && tags.length)
+          ? tags.map(function (t) { return '<option value="' + esc(t) + '">#' + esc(t) + '</option>'; }).join('')
+          : '<option value="">(no tags yet)</option>';
+      } catch (e) { $('llmTag').innerHTML = '<option value="">(couldn’t load tags)</option>'; }
+    }
+  });
+  $('llmExportBtn').addEventListener('click', function () {
+    var scope = $('llmScope').value, mode = $('llmMode').value;
+    if (scope === 'tag') {
+      var tag = $('llmTag').value;
+      if (!tag) { $('llmExportMsg').textContent = 'Pick a tag first (or add #tags to some notes).'; return; }
+      downloadUrl(API.llmExportUrl({ scope: 'tag', mode: mode, tag: tag }));
+    } else {
+      downloadUrl(API.llmExportUrl({ scope: 'workspace', mode: mode, id: state.wsId }));
+    }
+    $('llmExportMsg').textContent = 'Downloading…';
+    setTimeout(function () { $('llmExportMsg').textContent = ''; }, 2500);
+  });
   $('viewerBtn').addEventListener('click', function () { downloadUrl(API.viewerUrl()); });
   $('verifyBtn').addEventListener('click', async function () {
     var msg = $('verifyMsg'); msg.textContent = 'Checking…'; msg.style.color = 'var(--muted)';

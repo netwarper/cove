@@ -598,6 +598,18 @@ async function route(s, req, res, pathname, query) {
   }
   if (pathname === '/api/search' && m === 'GET') return s.search(query.q);
   if (pathname === '/api/tags' && m === 'GET') return s.allTags();
+  // LLM knowledge export: a workspace or a tag as Markdown, either one
+  // comprehensive file or a ZIP of one file per note.
+  if (pathname === '/api/export/llm' && m === 'GET') {
+    const scope = query.scope === 'tag' ? 'tag' : 'workspace';
+    const mode = query.mode === 'perNote' ? 'perNote' : 'single';
+    const out = s.exportLLM({ scope, mode, wsId: query.id ? safeId(query.id) : null, tag: query.tag });
+    send(res, 200, out.body, {
+      'Content-Type': out.mime + '; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${out.filename}.${out.ext}"`,
+    });
+    return undefined;
+  }
   if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
   if (pathname === '/api/stats' && m === 'GET') return s.stats();
   if (pathname === '/api/transcribe' && m === 'POST') {

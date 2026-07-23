@@ -468,6 +468,23 @@
         <button id="bulkExportBtn" class="sm">Download ZIP</button>
       </div>
       <div class="acct-block">
+        <h4>Export for AI (ChatGPT / Claude)</h4>
+        <p class="muted tiny">Clean Markdown you can upload as knowledge/research to an AI assistant. Export the current workspace or a tag, as one combined file or a ZIP with one file per note.</p>
+        <label class="tiny muted">What to export</label>
+        <select id="llmScope" class="ws-tpl">
+          <option value="workspace">This workspace</option>
+          <option value="tag">A tag…</option>
+        </select>
+        <select id="llmTag" class="ws-tpl hidden" aria-label="Tag to export"></select>
+        <label class="tiny muted">Format</label>
+        <select id="llmMode" class="ws-tpl">
+          <option value="single">One combined file (.md)</option>
+          <option value="perNote">One file per note (.zip)</option>
+        </select>
+        <div style="margin-top:6px"><button id="llmExportBtn" class="sm primary">Download</button></div>
+        <div id="llmExportMsg" class="tiny muted" aria-live="polite"></div>
+      </div>
+      <div class="acct-block">
         <h4>Export whole vault (offline site)</h4>
         <p class="muted tiny">A single read-only HTML file containing <b>every note, task, and image</b> across all workspaces — decrypts on-device with your passphrase, no server or network. Open it from Google Drive / Box / Files anywhere. A fresh copy is also saved into your data folder as <code>meeting-notes-viewer.html</code>.</p>
         <button id="viewerBtn" class="sm primary">Export whole vault</button>

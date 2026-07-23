@@ -128,6 +128,23 @@ const t = harness('functional');
     r = await c.request('GET', '/api/notes/' + note1.id + '/export?format=md');
     t.ok(r.raw.toString().startsWith('# '), 'markdown export renders heading');
 
+    // --- LLM knowledge export (workspace + tag, single + per-note) ---
+    r = await c.request('POST', '/api/workspaces', { name: 'LLM Export WS' });
+    const llmWs = r.body.id;
+    r = await c.request('POST', '/api/workspaces/' + llmWs + '/notes/new', {});
+    const lnote = r.body;
+    await c.request('PUT', '/api/notes/' + lnote.id, { tags: ['research'], meetingNotes: '<p>Alpha findings</p><ul><li>point one</li></ul>' });
+    r = await c.request('GET', '/api/export/llm?scope=workspace&mode=single&id=' + llmWs);
+    t.ok(r.headers['content-type'].includes('text/markdown'), 'llm export content-type is markdown');
+    const llmSingle = r.raw.toString();
+    t.ok(llmSingle.includes('# Workspace:') && llmSingle.includes('## Contents'), 'llm single export has title + contents');
+    t.ok(llmSingle.includes('Alpha findings') && llmSingle.includes('- point one'), 'llm export converts html to markdown');
+    r = await c.request('GET', '/api/export/llm?scope=tag&mode=single&tag=research');
+    t.ok(r.raw.toString().toLowerCase().includes('tagged #research'), 'llm tag export names the tag');
+    r = await c.request('GET', '/api/export/llm?scope=workspace&mode=perNote&id=' + llmWs);
+    t.ok(r.headers['content-type'].includes('application/zip'), 'llm per-note export is a zip');
+    t.ok(r.raw.slice(0, 2).toString() === 'PK', 'per-note zip has PK signature');
+
     // --- settings persist ---
     r = await c.request('PUT', '/api/settings', { theme: 'dark' });
     t.eq(r.body.theme, 'dark', 'setting persisted');

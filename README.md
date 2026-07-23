@@ -59,6 +59,7 @@ everything stays on your machine.
 | **Trash** | Deleted notes go to Trash and can be restored for 30 days before permanent removal. |
 | **Move / duplicate** | Move a note to another workspace, or duplicate it. |
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |
+| **Export for AI** | Export a whole **workspace** or a **tag** as clean Markdown to upload to ChatGPT / Claude as knowledge — as one combined file (with a table of contents and open tasks) or a ZIP with one file per note. |
 | **Import** | Upload a previously exported JSON / HTML / Markdown note into a workspace. |
 | **Encrypted backup** | Download a single encrypted backup file of everything; restore on a fresh install. Bulk-export a whole workspace as a ZIP (HTML/MD/JSON). |
 | **Version history** | Every note keeps automatic snapshots (up to 20); view and restore any earlier version. |
