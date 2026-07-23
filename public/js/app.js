@@ -609,17 +609,24 @@
   }
 
   // Discreet tag autocomplete: a native <datalist> of existing tags, minus the
-  // ones already on this note.
+  // ones already on this note. We only rebuild the <option>s when the set
+  // actually changes — replacing them while the dropdown is open makes the
+  // native popup flicker.
+  var _tagSuggestSig = null, _tagsFetchedAt = 0;
   function fillTagSuggest() {
     var dl = $('tagSuggest'); if (!dl) return;
     var have = {}; (state.note && state.note.tags || []).forEach(function (t) { have[t.toLowerCase()] = 1; });
+    var opts = (state.allTags || []).filter(function (t) { return !have[t.toLowerCase()]; });
+    var sig = opts.join('\n');
+    if (sig === _tagSuggestSig) return; // unchanged — don't touch the DOM
+    _tagSuggestSig = sig;
     dl.innerHTML = '';
-    (state.allTags || []).forEach(function (t) {
-      if (have[t.toLowerCase()]) return;
-      var o = document.createElement('option'); o.value = t; dl.appendChild(o);
-    });
+    opts.forEach(function (t) { var o = document.createElement('option'); o.value = t; dl.appendChild(o); });
   }
   async function refreshTagSuggestions() {
+    // Tags change rarely; refetch at most once a minute rather than on every focus.
+    if (Date.now() - _tagsFetchedAt < 60000) { fillTagSuggest(); return; }
+    _tagsFetchedAt = Date.now();
     try { state.allTags = await API.allTags(); } catch (_e) { /* keep cached */ }
     fillTagSuggest();
   }
