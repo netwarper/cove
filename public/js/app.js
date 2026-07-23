@@ -905,7 +905,7 @@
     state.note.attachments = state.note.attachments || []; state.note.attachments.push(meta); renderAttachments();
     return API.attachmentUrl(state.note.id, meta.id);
   };
-  window.Editor.init($('sections').querySelector('[data-target="carryoverEditor"]'), $('carryoverEditor'), { noteLinkPicker: openNotePicker });
+  window.Editor.init($('sections').querySelector('[data-target="carryoverEditor"]'), $('carryoverEditor'), { uploader: function (f) { return meetingUploader(f); }, noteLinkPicker: openNotePicker });
   window.Editor.init($('sections').querySelector('[data-target="meetingEditor"]'), $('meetingEditor'), { uploader: function (f) { return meetingUploader(f); }, noteLinkPicker: openNotePicker });
   $('carryoverEditor').addEventListener('input', function () { state.note.carryover = $('carryoverEditor').innerHTML; scheduleSave(); scheduleWordCount(); });
   $('meetingEditor').addEventListener('input', function () { state.note.meetingNotes = $('meetingEditor').innerHTML; scheduleSave(); scheduleWordCount(); });

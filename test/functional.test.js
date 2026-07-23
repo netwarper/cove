@@ -195,6 +195,22 @@ const t = harness('functional');
     r = await c.request('GET', '/api/tags');
     t.ok(r.body.includes('planning') && r.body.includes('Ops'), 'GET /api/tags lists distinct tags across notes');
 
+    // --- carryover images carry forward as the new note's OWN attachments ---
+    r = await c.request('POST', '/api/workspaces', { name: 'CarryImg' });
+    const ciWs = r.body.id;
+    r = await c.request('POST', '/api/workspaces/' + ciWs + '/notes/new', {});
+    const ciA = r.body.id;
+    r = await c.request('POST', '/api/notes/' + ciA + '/attachments', { name: 'pic.png', mime: 'image/png', dataB64: Buffer.from('fakepngbytes').toString('base64') });
+    const ciAtt = r.body.id;
+    await c.request('PUT', '/api/notes/' + ciA, { carryover: '<p>see <img src="/api/notes/' + ciA + '/attachments/' + ciAtt + '"></p>' });
+    r = await c.request('POST', '/api/workspaces/' + ciWs + '/notes/new', {});
+    const ciB = r.body.id;
+    const cim = /\/api\/notes\/([A-Za-z0-9_-]+)\/attachments\/([A-Za-z0-9_-]+)/.exec(r.body.carryover || '');
+    t.ok(cim && cim[1] === ciB && cim[2] !== ciAtt, 'carryover image rewritten to the new note\'s own copy');
+    t.ok((r.body.attachments || []).some((a) => a.id === (cim && cim[2])), 'copied attachment is tracked on the new note');
+    const cimg = await c.request('GET', '/api/notes/' + ciB + '/attachments/' + (cim && cim[2]));
+    t.eq(cimg.status, 200, 'carried-forward image is served from the new note');
+
     // --- move + copy note ---
     r = await c.request('POST', '/api/notes/' + note1.id + '/copy', { workspaceId: teamWs });
     const copyId = r.body.id;
