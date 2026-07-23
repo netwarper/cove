@@ -79,6 +79,7 @@
     deleteNote: (id) => req('DELETE', '/api/notes/' + id),
     moveNote: (id, workspaceId) => req('POST', '/api/notes/' + id + '/move', { workspaceId }),
     copyNote: (id, workspaceId) => req('POST', '/api/notes/' + id + '/copy', { workspaceId }),
+    batchNotes: (action, ids, opts) => req('POST', '/api/notes/batch', Object.assign({ action, ids }, opts || {})),
     setFavorite: (id, favorite) => req('POST', '/api/notes/' + id + '/favorite', { favorite }),
     toggleTodo: (noteId, todoId, done) => req('PUT', '/api/notes/' + noteId + '/todos/' + todoId, { done }),
 

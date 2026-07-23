@@ -201,6 +201,22 @@ const t = harness('functional');
     r = await c.request('GET', '/api/tags');
     t.ok(r.body.includes('planning') && r.body.includes('Ops'), 'GET /api/tags lists distinct tags across notes');
 
+    // --- bulk note operations (single batch request) ---
+    r = await c.request('POST', '/api/workspaces', { name: 'BulkWS' });
+    const bulkWs = r.body.id;
+    const bids = [];
+    for (let i = 0; i < 3; i++) { r = await c.request('POST', '/api/workspaces/' + bulkWs + '/notes/new', {}); bids.push(r.body.id); }
+    r = await c.request('POST', '/api/notes/batch', { action: 'tag', ids: bids, tags: ['#bulktag', ''] });
+    t.eq(r.body.count, 3, 'batch tag applied to all three notes');
+    r = await c.request('GET', '/api/search?q=tag:bulktag');
+    t.ok(r.body.length >= 3, 'batch-tagged notes are findable by tag');
+    r = await c.request('POST', '/api/notes/batch', { action: 'move', ids: bids.slice(0, 2), workspaceId: 'general' });
+    t.eq(r.body.count, 2, 'batch move relocated two notes');
+    r = await c.request('POST', '/api/notes/batch', { action: 'delete', ids: bids });
+    t.ok(r.body.count === 3, 'batch delete trashed the notes');
+    r = await c.request('GET', '/api/workspaces/' + bulkWs + '/notes');
+    t.eq(r.body.length, 0, 'source workspace is empty after the batch');
+
     // --- carryover images carry forward as the new note's OWN attachments ---
     r = await c.request('POST', '/api/workspaces', { name: 'CarryImg' });
     const ciWs = r.body.id;

@@ -114,6 +114,16 @@
             </select>
             <button id="noteSortDir" class="icon-btn sort-dir" title="Sort direction" aria-label="Toggle sort direction">↓</button>
           </div>
+          <button id="selectToggle" class="link-btn tiny" title="Select multiple notes">☑ Select</button>
+        </div>
+        <div id="bulkBar" class="bulk-bar hidden">
+          <span id="bulkCount" class="bulk-count">0 selected</span>
+          <div class="bulk-actions">
+            <button id="bulkMove" class="sm" title="Move selected to a workspace">Move</button>
+            <button id="bulkTag" class="sm" title="Add a tag to selected">Tag</button>
+            <button id="bulkDelete" class="sm danger" title="Move selected to trash">Delete</button>
+            <button id="bulkCancel" class="sm" title="Exit selection">Done</button>
+          </div>
         </div>
         <ul id="noteList" class="note-list"></ul>
         <div class="sidebar-foot">

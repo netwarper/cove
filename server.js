@@ -490,7 +490,11 @@ async function route(s, req, res, pathname, query) {
   }
 
   // notes
-  if (seg[1] === 'notes' && seg[2]) {
+  if (pathname === '/api/notes/batch' && m === 'POST') {
+    const body = await readBody(req);
+    return s.batchNotes(String(body.action || ''), body.ids, { workspaceId: body.workspaceId ? safeId(body.workspaceId) : null, tags: body.tags });
+  }
+  if (seg[1] === 'notes' && seg[2] && seg[2] !== 'batch') {
     const noteId = safeId(seg[2]);
     if (seg.length === 3 && m === 'GET') return s.getNote(noteId);
     if (seg.length === 3 && m === 'PUT') return s.saveNote(noteId, await readBody(req));

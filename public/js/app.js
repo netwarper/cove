@@ -572,6 +572,7 @@
     var ul = $('noteList'); ul.innerHTML = '';
     notes.forEach(function (nm) {
       var li = document.createElement('li');
+      li.setAttribute('data-note-id', nm.id);
       if (state.note && nm.id === state.note.id && state.view === 'note') li.classList.add('active');
       var tags = (nm.tags || []).length ? '<span class="nl-tags">' + nm.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</span>' : '';
       var main = document.createElement('div'); main.className = 'nl-main';
@@ -582,7 +583,15 @@
         '<div class="nl-title">' + (scratch ? '<span class="nl-scratch" title="Scratch note">✏️</span> ' : '') + esc(nm.displayTitle) + '</div>' +
         '<div class="nl-meta">' + edited + (scratch ? '<span>scratch</span>' : doneHere) +
         (nm.attachmentCount ? '<span>📎 ' + nm.attachmentCount + '</span>' : '') + tags + '</div>';
-      main.addEventListener('click', function () { openNote(nm.id); });
+      if (state.selecting) {
+        li.classList.toggle('sel', !!state.selected[nm.id]);
+        var ck = document.createElement('input'); ck.type = 'checkbox'; ck.className = 'nl-check'; ck.checked = !!state.selected[nm.id];
+        ck.addEventListener('click', function (e) { e.stopPropagation(); toggleSelect(nm.id); });
+        li.appendChild(ck);
+        main.addEventListener('click', function () { toggleSelect(nm.id); });
+      } else {
+        main.addEventListener('click', function () { openNote(nm.id); });
+      }
 
       var actions = document.createElement('div'); actions.className = 'nl-actions';
       var star = document.createElement('button');
@@ -609,6 +618,50 @@
       ul.appendChild(li);
     });
   }
+
+  // ---------------- Bulk note selection ----------------
+  state.selecting = false;
+  state.selected = {};
+  function selectedIds() { return Object.keys(state.selected).filter(function (k) { return state.selected[k]; }); }
+  function toggleSelect(id) {
+    if (state.selected[id]) delete state.selected[id]; else state.selected[id] = true;
+    var li = $('noteList').querySelector('li[data-note-id="' + id + '"]');
+    if (li) { li.classList.toggle('sel', !!state.selected[id]); var ck = li.querySelector('.nl-check'); if (ck) ck.checked = !!state.selected[id]; }
+    updateBulkBar();
+  }
+  function updateBulkBar() {
+    var n = selectedIds().length;
+    $('bulkBar').classList.toggle('hidden', !state.selecting);
+    $('bulkCount').textContent = n + ' selected';
+    ['bulkMove', 'bulkTag', 'bulkDelete'].forEach(function (id) { $(id).disabled = n === 0; });
+  }
+  function setSelecting(on) {
+    state.selecting = on; if (!on) state.selected = {};
+    $('selectToggle').classList.toggle('on', on);
+    renderNoteList(); updateBulkBar();
+  }
+  $('selectToggle').addEventListener('click', function () { setSelecting(!state.selecting); });
+  $('bulkCancel').addEventListener('click', function () { setSelecting(false); });
+  $('bulkDelete').addEventListener('click', async function () {
+    var ids = selectedIds(); if (!ids.length) return;
+    if (!(await dialog.confirm('Move ' + ids.length + ' note' + (ids.length > 1 ? 's' : '') + ' to trash?', { okText: 'Move to trash', danger: true }))) return;
+    await API.batchNotes('delete', ids); setSelecting(false); await loadCurrentNote();
+  });
+  $('bulkMove').addEventListener('click', async function () {
+    var ids = selectedIds(); if (!ids.length) return;
+    var ws = await pickWorkspace('Move ' + ids.length + ' note' + (ids.length > 1 ? 's' : '') + ' to which workspace?');
+    if (!ws) return;
+    await API.batchNotes('move', ids, { workspaceId: ws }); setSelecting(false); await loadCurrentNote();
+  });
+  $('bulkTag').addEventListener('click', async function () {
+    var ids = selectedIds(); if (!ids.length) return;
+    var tag = await dialog.prompt('Add which tag to ' + ids.length + ' note' + (ids.length > 1 ? 's' : '') + '?', { title: 'Bulk tag' });
+    if (tag == null) return;
+    tag = String(tag).replace(/^#/, '').trim(); if (!tag) return;
+    await API.batchNotes('tag', ids, { tags: [tag] });
+    if (state.allTags.indexOf(tag) < 0) state.allTags.push(tag);
+    setSelecting(false); await loadCurrentNote();
+  });
 
   // ---------------- Tags ----------------
   function renderTags() {
