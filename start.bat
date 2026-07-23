@@ -19,7 +19,7 @@ if not exist "%DATA_DIR%\instance.json" if "%PORT%"=="" (
 )
 
 echo Starting Meeting Notes...
-node server.js --print-config
-start "" http://127.0.0.1:3000
-node server.js
+REM Extra args (e.g. --port 8080) are forwarded to the server.
+node server.js --print-config %*
+node server.js %*
 pause

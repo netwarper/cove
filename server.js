@@ -33,8 +33,13 @@ const { Store } = store;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
+// A `--port <n>` flag overrides the port for this run (highest precedence).
+const CLI_PORT = (() => {
+  const a = process.argv.slice(2); const i = a.indexOf('--port');
+  return i >= 0 ? config.validPort(a[i + 1]) : null;
+})();
 // Durable, non-drifting host/port/domain resolved from env + instance.json.
-const CFG = config.resolve(DATA_DIR);
+const CFG = config.resolve(DATA_DIR, process.env, { port: CLI_PORT });
 const PORT = CFG.port;
 const HOST = CFG.host;
 const MAX_BODY = parseInt(process.env.MAX_BODY, 10) || 32 * 1024 * 1024;
@@ -575,9 +580,11 @@ function runCli(argv) {
 Usage: node server.js [options]
 
   (no options)            Start the server (durable host/port from instance.json + env)
+  --port <n>              Run on port <n> for this launch (overrides env/instance).
+  --set-port <n>          Pin port <n> durably for THIS data directory, then exit.
   --set-domain <name>     Assign a durable local domain (bare name -> <name>.localhost)
                           and a stable port for THIS data directory, then exit.
-  --port <n>              With --set-domain, pin an explicit port instead of a derived one.
+                          Combine with --port <n> to pin an explicit port.
   --print-config          Print the resolved host/port/domain for this data directory.
   --verify                Decrypt-check every file and report any corruption.
                           Reads the passphrase from MN_PASSPHRASE, or from stdin.
@@ -592,8 +599,17 @@ Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
   }
 
   if (has('--print-config')) {
-    const cfg = config.resolve(DATA_DIR);
-    console.log(JSON.stringify(cfg, null, 2));
+    console.log(JSON.stringify(CFG, null, 2));
+    return true;
+  }
+
+  if (has('--set-port')) {
+    const port = config.validPort(val('--set-port'));
+    if (!port) { console.error('Provide a port 1–65535, e.g. --set-port 8080'); process.exitCode = 1; return true; }
+    const existing = config.readInstance(DATA_DIR) || {};
+    config.writeInstance(DATA_DIR, Object.assign({ name: 'Meeting Notes', host: '127.0.0.1', createdAt: new Date().toISOString() }, existing, { port }));
+    console.log(`\n  Port pinned to ${port} for this data directory (saved in instance.json).`);
+    console.log(`  Every "node server.js" here now uses it. Override once with --port or PORT=.\n`);
     return true;
   }
 
@@ -686,9 +702,8 @@ function startServer() {
 
   function reportPortBusy() {
     console.error(`\n  Port ${PORT} is already in use by another application.`);
-    console.error(`  Pick a durable local domain + stable port for this instance:`);
-    console.error(`    node server.js --set-domain meeting-notes    (uses <name>.localhost)`);
-    console.error(`  …or set a port explicitly:  PORT=3010 node server.js\n`);
+    console.error(`  Run on a different port:      node server.js --port 8080`);
+    console.error(`  …or pin one durably:          node server.js --set-port 8080\n`);
     process.exit(1);
   }
 

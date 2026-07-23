@@ -1,6 +1,6 @@
 {
   "name": "meeting-notes",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "description": "Self-contained, encrypted meeting-notes application. Zero runtime dependencies, portable, works over cloud-sync folders (Google Drive, Box, Dropbox).",
   "main": "server.js",
   "type": "commonjs",

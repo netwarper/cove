@@ -26,7 +26,8 @@ if [ ! -f "${DATA_DIR}/instance.json" ] && [ -z "$PORT" ] && [ -t 0 ]; then
   node server.js --set-domain "$NAME"
 fi
 
-URL="$(node server.js --print-config | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).url)}catch(e){console.log('http://127.0.0.1:3000')}})")"
+# Any extra args (e.g. --port 8080) are forwarded to the server.
+URL="$(node server.js --print-config "$@" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).url)}catch(e){console.log('http://127.0.0.1:3000')}})")"
 echo "Starting Meeting Notes at ${URL}"
 
 # Try to open a browser (best-effort, non-fatal).
@@ -35,4 +36,4 @@ echo "Starting Meeting Notes at ${URL}"
   elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL"
   fi ) >/dev/null 2>&1 &
 
-exec node server.js
+exec node server.js "$@"

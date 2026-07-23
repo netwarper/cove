@@ -37,6 +37,15 @@ try {
   cfg = config.resolve(DIR, { PORT: '4567' });
   t.eq(cfg.port, 4567, 'PORT env overrides instance.json');
 
+  // --- explicit port controls (deployer-chosen port) ---
+  t.eq(config.validPort('8080'), 8080, 'validPort accepts a numeric string');
+  t.eq(config.validPort('0'), null, 'validPort rejects 0');
+  t.eq(config.validPort('70000'), null, 'validPort rejects > 65535');
+  t.eq(config.validPort('abc'), null, 'validPort rejects non-numeric');
+  // opts.port (a --port flag) wins over env PORT and instance.json
+  t.eq(config.resolve(DIR, { PORT: '4567' }, { port: 9090 }).port, 9090, 'CLI --port overrides env PORT');
+  t.eq(config.resolve(DIR, {}, { port: 'nope' }).port, config.resolve(DIR, {}).port, 'an invalid --port is ignored (same as no --port)');
+
   // lock lifecycle
   t.eq(config.readActiveLock(DIR), null, 'no active lock initially');
   config.writeLock(DIR, p1);

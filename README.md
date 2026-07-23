@@ -94,6 +94,22 @@ Writes are atomic (write-then-rename) so sync clients never see half-written fil
 
 ---
 
+## Choosing the port
+
+The listening port resolves in this order (highest first): a **`--port` flag**,
+the **`PORT` env var**, a **durable pin** in `instance.json`, a port **derived
+from your domain**, then the default **3000**.
+
+```bash
+node server.js --port 8080         # run on 8080 for this launch
+PORT=8080 node server.js           # same, via env var
+node server.js --set-port 8080     # pin 8080 durably for this data dir, then exit
+./start.sh --port 8080             # the launchers forward flags too
+```
+
+`--set-port` stores the choice in `instance.json` inside the data directory, so
+it travels with your data and never drifts between restarts.
+
 ## Durable local domain & running multiple instances
 
 The port and address are **durable per instance** and never auto-change, so a
@@ -104,6 +120,7 @@ You can also do it explicitly:
 
 ```bash
 node server.js --set-domain notes      # -> http://notes.localhost:<stable-port>
+node server.js --set-domain notes --port 8443   # …with an explicit port
 node server.js --print-config          # show the resolved name/domain/port
 ```
 
