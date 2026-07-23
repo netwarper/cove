@@ -307,6 +307,7 @@
       { label: '✏️ New scratch note', run: function () { createNewNote({ scratch: true }); } },
       { label: 'Go to: Current note', run: function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); } },
       { label: 'Go to: Tasks', run: renderGlobalTasks },
+      { label: 'Go to: Task calendar', run: renderCalendar },
       { label: 'Go to: Favorites', run: renderFavorites },
       { label: 'Open: Templates', run: openTemplateModal },
       { label: 'Open: Trash', run: renderTrash },
@@ -1285,12 +1286,13 @@
   // ---------------- Views ----------------
   function showView(v) {
     state.view = v;
-    ['noteView', 'landingView', 'todosView', 'favsView', 'trashView', 'searchView', 'tagView'].forEach(function (id) { $(id).classList.add('hidden'); });
+    ['noteView', 'landingView', 'todosView', 'favsView', 'trashView', 'searchView', 'tagView', 'calendarView'].forEach(function (id) { $(id).classList.add('hidden'); });
     $('navNote').classList.toggle('active', v === 'note' || v === 'landing');
     $('navTodos').classList.toggle('active', v === 'todos');
+    $('navCalendar').classList.toggle('active', v === 'calendar');
     $('navFavs').classList.toggle('active', v === 'favs');
     if (v !== 'tag') { state.activeTag = null; renderTagBookmarks(); }
-    var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', tag: 'tagView' };
+    var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', tag: 'tagView', calendar: 'calendarView' };
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
   $('navNote').addEventListener('click', function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); });
@@ -1351,6 +1353,88 @@
     li.appendChild(cb); li.appendChild(main);
     return li;
   }
+
+  // ---------------- Task calendar ----------------
+  function isoUTC(dt) { return dt.toISOString().slice(0, 10); }
+  function advanceRec(iso, rec) {
+    var pr = iso.split('-').map(Number);
+    var dt = new Date(Date.UTC(pr[0], pr[1] - 1, pr[2]));
+    var next = null, dow = function (d) { return d.getUTCDay(); };
+    if (rec.type === 'daily') { dt.setUTCDate(dt.getUTCDate() + 1); next = isoUTC(dt); }
+    else if (rec.type === 'everyNDays') { dt.setUTCDate(dt.getUTCDate() + (rec.n || 1)); next = isoUTC(dt); }
+    else if (rec.type === 'weekdays') { do { dt.setUTCDate(dt.getUTCDate() + 1); } while (dow(dt) === 0 || dow(dt) === 6); next = isoUTC(dt); }
+    else if (rec.type === 'weekly') {
+      if (rec.days && rec.days.length) { for (var i = 1; i <= 7 && !next; i++) { var c = new Date(dt); c.setUTCDate(c.getUTCDate() + i); if (rec.days.indexOf(dow(c)) >= 0) next = isoUTC(c); } }
+      if (!next) { dt.setUTCDate(dt.getUTCDate() + 7); next = isoUTC(dt); }
+    } else if (rec.type === 'monthly') { dt.setUTCMonth(dt.getUTCMonth() + 1); next = isoUTC(dt); }
+    if (rec.endDate && next && next > rec.endDate) return null;
+    return next;
+  }
+  // Which days in [fromISO, toISO] a task lands on (projecting recurrence).
+  function projectOccurrences(t, fromISO, toISO) {
+    var out = [];
+    if (!t.due) return out;
+    if (!t.recurrence) { if (t.due >= fromISO && t.due <= toISO) out.push(t.due); return out; }
+    var d = t.due, guard = 0;
+    while (d && d < fromISO && guard++ < 1000) d = advanceRec(d, t.recurrence);
+    while (d && d <= toISO && guard++ < 1000) { out.push(d); d = advanceRec(d, t.recurrence); }
+    return out;
+  }
+
+  async function renderCalendar() {
+    showView('calendar');
+    if (!state.calMonth) { var n = new Date(); state.calMonth = { y: n.getFullYear(), m: n.getMonth() }; }
+    var y = state.calMonth.y, mo = state.calMonth.m;
+    $('calLabel').textContent = new Date(y, mo, 1).toLocaleDateString([], { month: 'long', year: 'numeric' });
+    var grid = $('calGrid'); grid.innerHTML = '';
+    var tasks = [];
+    try { tasks = await API.globalTasks(); } catch (_e) { tasks = []; }
+    // visible window: the weeks covering this month (Sun-start)
+    var first = new Date(y, mo, 1);
+    var start = new Date(y, mo, 1 - first.getDay());
+    var cells = 42; // 6 weeks
+    var last = new Date(y, mo, 1); last.setDate(last.getDate() + (cells - 1 - first.getDay()));
+    var p2s = function (x) { return String(x).padStart(2, '0'); };
+    var localISO = function (dt) { return dt.getFullYear() + '-' + p2s(dt.getMonth() + 1) + '-' + p2s(dt.getDate()); };
+    var fromISO = localISO(start), toISO = localISO(last);
+    // bucket tasks by day
+    var byDay = {};
+    tasks.forEach(function (t) {
+      projectOccurrences(t, fromISO, toISO).forEach(function (d) { (byDay[d] = byDay[d] || []).push(t); });
+    });
+    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(function (dn) {
+      var h = document.createElement('div'); h.className = 'cal-dow'; h.textContent = dn; grid.appendChild(h);
+    });
+    var today = todayStr();
+    for (var i = 0; i < cells; i++) {
+      var dt = new Date(start); dt.setDate(start.getDate() + i);
+      var iso = localISO(dt);
+      var cell = document.createElement('div');
+      cell.className = 'cal-cell' + (dt.getMonth() !== mo ? ' cal-off' : '') + (iso === today ? ' cal-today' : '');
+      var dnum = document.createElement('div'); dnum.className = 'cal-date'; dnum.textContent = dt.getDate(); cell.appendChild(dnum);
+      var list = byDay[iso] || [];
+      list.sort(function (a, b) { return (a.priority - b.priority); }).slice(0, 4).forEach(function (t) {
+        var chip = document.createElement('button'); chip.className = 'cal-task prio-p' + t.priority;
+        chip.textContent = (t.recurrence ? '🔁 ' : '') + t.text;
+        chip.title = t.text + ' · ' + t.workspaceName + (iso < today ? ' · overdue' : '');
+        if (iso < today) chip.classList.add('overdue');
+        chip.addEventListener('click', function () { openWorkspace(t.workspaceId); });
+        cell.appendChild(chip);
+      });
+      if (list.length > 4) { var more = document.createElement('div'); more.className = 'cal-more'; more.textContent = '+' + (list.length - 4) + ' more'; cell.appendChild(more); }
+      grid.appendChild(cell);
+    }
+  }
+  function calShift(delta) {
+    if (!state.calMonth) { var n = new Date(); state.calMonth = { y: n.getFullYear(), m: n.getMonth() }; }
+    var m = state.calMonth.m + delta, y = state.calMonth.y;
+    state.calMonth = { y: y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 };
+    renderCalendar();
+  }
+  $('navCalendar').addEventListener('click', function () { renderCalendar(); });
+  $('calPrev').addEventListener('click', function () { calShift(-1); });
+  $('calNext').addEventListener('click', function () { calShift(1); });
+  $('calToday').addEventListener('click', function () { var n = new Date(); state.calMonth = { y: n.getFullYear(), m: n.getMonth() }; renderCalendar(); });
 
   async function renderFavorites() {
     showView('favs');
