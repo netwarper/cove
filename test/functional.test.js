@@ -191,6 +191,12 @@ const t = harness('functional');
     r = await c.request('GET', '/api/settings');
     t.eq(r.body.tagBookmarks, ['planning', 'ops'], 'tag bookmarks persist in settings');
 
+    // --- server-owned migration flags cannot be cleared via settings save ---
+    await c.request('PUT', '/api/settings', { tasksMigrated: false, templatesSeeded: false, theme: 'light' });
+    r = await c.request('GET', '/api/settings');
+    t.ok(r.body.tasksMigrated !== false && r.body.templatesSeeded !== false, 'settings save cannot clear server-owned flags');
+    t.eq(r.body.theme, 'light', 'ordinary settings still save alongside');
+
     // --- distinct-tags endpoint (powers tag autocomplete) ---
     r = await c.request('GET', '/api/tags');
     t.ok(r.body.includes('planning') && r.body.includes('Ops'), 'GET /api/tags lists distinct tags across notes');
