@@ -1648,6 +1648,12 @@
       : '';
   }
   $('sttEndpoint').addEventListener('input', updateSttWarn);
+  $('sttLocalBtn').addEventListener('click', function () {
+    $('sttEndpoint').value = 'http://127.0.0.1:8080/v1/audio/transcriptions';
+    $('sttKey').value = '';
+    if (!$('sttModel').value.trim()) $('sttModel').value = 'whisper-1';
+    updateSttWarn();
+  });
   $('saveSttBtn').addEventListener('click', async function () {
     state.settings.transcription = { endpoint: $('sttEndpoint').value.trim(), apiKey: $('sttKey').value, model: $('sttModel').value.trim() || 'whisper-1' };
     await API.saveSettings({ transcription: state.settings.transcription });

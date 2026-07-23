@@ -399,6 +399,8 @@
       <div class="acct-block">
         <h4>Meeting transcription</h4>
         <p class="muted tiny">Recording always stays on this machine (saved as an encrypted attachment). Transcription is optional: point it at a <b>local</b> Whisper server to stay fully private, or a cloud provider (audio for transcription is then sent there). Leave the endpoint blank to record without transcribing.</p>
+        <p class="muted tiny">Running a local Whisper server is <b>opt-in</b> — nothing is installed for you. See <code>docs/local-whisper.md</code> for a 2-minute setup (whisper.cpp / faster-whisper), then click below.</p>
+        <button id="sttLocalBtn" class="sm" type="button" title="Fill in a standard local Whisper endpoint">🖥 Use local Whisper</button>
         <label class="tiny muted">STT endpoint (OpenAI-compatible <code>/audio/transcriptions</code>)</label>
         <input id="sttEndpoint" type="text" placeholder="http://127.0.0.1:8080/v1/audio/transcriptions">
         <label class="tiny muted">API key (only for cloud providers)</label>
