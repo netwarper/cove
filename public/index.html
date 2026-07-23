@@ -494,6 +494,17 @@
       </div>
     </div>
 
+    <div class="modal hidden wide" id="conflictModal">
+      <h3>⚠ This note changed on another device</h3>
+      <p class="muted tiny">For each section, choose which version to keep. Unchanged sections are merged automatically.</p>
+      <div id="conflictFields" class="conflict-fields"></div>
+      <div class="modal-actions">
+        <button id="conflictApply" class="primary">Keep chosen &amp; save</button>
+        <button id="conflictFork" class="sm">Keep both (make a copy)</button>
+        <button id="conflictCancel" class="sm">Cancel</button>
+      </div>
+    </div>
+
     <div class="modal hidden" id="recoveryModal">
       <h3>🔑 Save your recovery key</h3>
       <p class="muted tiny">This is shown once. Store it somewhere safe — it is the only way to regain access if you forget your passphrase.</p>

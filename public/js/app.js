@@ -1312,28 +1312,93 @@
     } catch (ex) {
       if (ex.status === 409) {
         setSaveStatus('⚠ Changed elsewhere');
-        var choice = await dialog.choose(
-          'This note was changed in another tab or device since you opened it.',
-          [
-            { label: 'Keep both', returns: 'fork', primary: true },
-            { label: 'Discard mine', returns: 'discard', danger: true },
-            { label: 'Cancel', returns: 'cancel' },
-          ], { title: 'Conflicting change', cancelValue: 'cancel' });
-        if (choice === 'fork') {
-          var fork = await API.forkNote(state.note.id, {
-            customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
-            meetingNotes: state.note.meetingNotes, tags: state.note.tags,
+        var mine = state.note;
+        var theirs = (ex.data && ex.data.current) ? ex.data.current : await API.getNote(mine.id);
+        var res = await resolveConflict(mine, theirs);
+        if (res.action === 'merge') {
+          var merged = res.merged;
+          var saved2 = await API.saveNote(mine.id, {
+            customTitle: merged.customTitle, todos: theirs.todos, carryover: merged.carryover,
+            meetingNotes: merged.meetingNotes, favorite: mine.favorite,
+            tags: merged.tags, transcript: mine.transcript, baseRev: theirs.rev,
+          });
+          state.note.customTitle = merged.customTitle; state.note.carryover = merged.carryover;
+          state.note.meetingNotes = merged.meetingNotes; state.note.tags = merged.tags;
+          state.note.todos = saved2.todos; state.note.updatedAt = saved2.updatedAt; state.note.rev = saved2.rev;
+          state.lastSaveAt = Date.now();
+          renderNote(); renderNoteList(); setSaveStatus('Merged & saved ✓');
+        } else if (res.action === 'fork') {
+          var fork = await API.forkNote(mine.id, {
+            customTitle: mine.customTitle, todos: mine.todos, carryover: mine.carryover,
+            meetingNotes: mine.meetingNotes, tags: mine.tags,
           });
           await loadWorkspaces(); await openNote(fork.id); setSaveStatus('Saved as a conflict copy ✓');
-        } else if (choice === 'discard') {
-          if (ex.data && ex.data.current) { state.note = ex.data.current; renderNote(); }
-          else await loadCurrentNote();
-          setSaveStatus('Loaded the latest version');
         } // cancel: leave the user's edits in place to retry
       } else { setSaveStatus('Save failed: ' + ex.message); }
     }
   }
   function setSaveStatus(s) { $('saveStatus').textContent = s; }
+
+  // Read-only sanitize for previewing note HTML in the conflict modal.
+  function sanitizeForView(html) {
+    return String(html || '')
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\/\s*\1\s*>/gi, '')
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
+      .replace(/\son\w+\s*=\s*"[^"]*"/gi, '').replace(/\son\w+\s*=\s*'[^']*'/gi, '').replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
+      .replace(/(href|src)\s*=\s*"\s*javascript:[^"]*"/gi, '$1="#"');
+  }
+
+  // Field-by-field merge for a save conflict. Resolves to
+  // {action:'merge', merged} | {action:'fork'} | {action:'cancel'}.
+  function resolveConflict(mine, theirs) {
+    return new Promise(function (resolve) {
+      var fields = [
+        { key: 'customTitle', label: 'Title', rich: false },
+        { key: 'tags', label: 'Tags', rich: false, arr: true },
+        { key: 'carryover', label: 'Carryover Notes', rich: true },
+        { key: 'meetingNotes', label: 'Meeting Notes', rich: true },
+      ];
+      var box = $('conflictFields'); box.innerHTML = '';
+      var picks = {};
+      var anyDiff = false;
+      fields.forEach(function (f) {
+        var mv = mine[f.key], tv = theirs[f.key];
+        var mS = f.arr ? (mv || []).join(', ') : (mv || '');
+        var tS = f.arr ? (tv || []).join(', ') : (tv || '');
+        if (mS === tS) return; // unchanged — auto-merge
+        anyDiff = true;
+        picks[f.key] = 'mine';
+        var row = document.createElement('div'); row.className = 'conflict-row';
+        var head = document.createElement('div'); head.className = 'conflict-fld'; head.textContent = f.label; row.appendChild(head);
+        var cols = document.createElement('div'); cols.className = 'conflict-cols';
+        [['mine', 'Yours', mS, mv], ['theirs', 'Theirs (newer)', tS, tv]].forEach(function (side) {
+          var col = document.createElement('label'); col.className = 'conflict-col' + (side[0] === 'mine' ? ' sel' : '');
+          var cap = document.createElement('div'); cap.className = 'conflict-cap';
+          var r = document.createElement('input'); r.type = 'radio'; r.name = 'cf-' + f.key; r.checked = side[0] === 'mine';
+          r.addEventListener('change', function () {
+            picks[f.key] = side[0];
+            cols.querySelectorAll('.conflict-col').forEach(function (c) { c.classList.remove('sel'); });
+            col.classList.add('sel');
+          });
+          cap.appendChild(r); cap.appendChild(document.createTextNode(' ' + side[1]));
+          var body = document.createElement('div'); body.className = 'conflict-body';
+          if (f.rich) body.innerHTML = sanitizeForView(side[3]); else body.textContent = side[2] || '(empty)';
+          col.appendChild(cap); col.appendChild(body); cols.appendChild(col);
+        });
+        row.appendChild(cols); box.appendChild(row);
+      });
+      if (!anyDiff) box.innerHTML = '<p class="muted tiny">No content differences — keeping the latest is safe.</p>';
+      openModal('conflictModal');
+      function cleanup(result) { closeModals(); resolve(result); }
+      $('conflictApply').onclick = function () {
+        var merged = { customTitle: mine.customTitle, carryover: mine.carryover, meetingNotes: mine.meetingNotes, tags: mine.tags };
+        Object.keys(picks).forEach(function (k) { merged[k] = picks[k] === 'theirs' ? theirs[k] : mine[k]; });
+        cleanup({ action: 'merge', merged: merged });
+      };
+      $('conflictFork').onclick = function () { cleanup({ action: 'fork' }); };
+      $('conflictCancel').onclick = function () { cleanup({ action: 'cancel' }); };
+    });
+  }
   window.addEventListener('beforeunload', function () { if (state.saveTimer) saveNow(); });
 
   // ---------------- Views ----------------
@@ -1777,7 +1842,7 @@
   });
 
   // Modal helpers
-  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal'];
+  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal'];
   function openModal(id) {
     $('modalBackdrop').classList.remove('hidden');
     MODALS.forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });
