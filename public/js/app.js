@@ -1,4 +1,4 @@
-/* Meeting Notes — main application controller. */
+/* Daymark — main application controller. */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
@@ -162,8 +162,8 @@
     if (!window.PublicKeyCredential) throw new Error('WebAuthn is not available in this browser.');
     var cred = await navigator.credentials.create({ publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: 'Meeting Notes' },
-      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'meeting-notes', displayName: 'Meeting Notes' },
+      rp: { name: 'Daymark' },
+      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'meeting-notes', displayName: 'Daymark' },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
       timeout: 60000, extensions: { prf: {} },
@@ -530,7 +530,7 @@
   function showLanding() {
     setNoteHash(null);
     var w = state.workspaces.filter(function (x) { return x.id === state.wsId; })[0];
-    $('landingWs').textContent = w ? w.name : 'Meeting Notes';
+    $('landingWs').textContent = w ? w.name : 'Daymark';
     showView('landing');
   }
   $('landingNewDaily').addEventListener('click', function () { createNewNote({}); });
@@ -1732,7 +1732,7 @@
   function openAccount(focusStt) {
     $('acctMsg').textContent = '';
     var inst = state.instance || {};
-    $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Meeting Notes') + '</b> · v' + esc(inst.version || '') +
+    $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Daymark') + '</b> · v' + esc(inst.version || '') +
       '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
       (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
     $('fontSize').value = state.settings.fontSize || 14;

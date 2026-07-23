@@ -18,7 +18,7 @@ if not exist "%DATA_DIR%\instance.json" if "%PORT%"=="" (
   node server.js --set-domain "%NAME%"
 )
 
-echo Starting Meeting Notes...
+echo Starting Daymark...
 REM Extra args (e.g. --port 8080) are forwarded to the server.
 node server.js --print-config %*
 node server.js %*

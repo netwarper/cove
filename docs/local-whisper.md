@@ -1,6 +1,6 @@
 # Local Whisper transcription (fully private, opt-in)
 
-Meeting Notes can transcribe recordings **entirely on your own machine** by
+Daymark can transcribe recordings **entirely on your own machine** by
 talking to a local Whisper server you run yourself. Nothing is installed for you
 and nothing is sent to any cloud — the audio never leaves your computer.
 

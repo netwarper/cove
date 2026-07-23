@@ -1,6 +1,6 @@
-# 🗒️ Meeting Notes
+# 🗒️ Daymark
 
-A self-contained, **encrypted** meeting-notes application that runs locally with a
+**Daymark** is a self-contained, **encrypted** meeting-notes application that runs locally with a
 one-click launcher — and is ready to be hosted remotely later. It has **zero
 runtime dependencies** (Node core only), so the whole folder can be copied to
 any machine with Node.js and started immediately.

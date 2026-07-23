@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Meeting Notes — zero-dependency HTTP server (Node core only).
+ * Daymark — zero-dependency HTTP server (Node core only).
  *
  * Portability: everything here uses the Node standard library, so the whole
  * project can be copied to any machine with Node >= 18 and started with
@@ -617,7 +617,7 @@ function runCli(argv) {
   const val = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : null; };
 
   if (has('--help') || has('-h')) {
-    console.log(`Meeting Notes ${APP_VERSION}
+    console.log(`Daymark ${APP_VERSION}
 Usage: node server.js [options]
 
   (no options)            Start the server (durable host/port from instance.json + env)
@@ -648,7 +648,7 @@ Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
     const port = config.validPort(val('--set-port'));
     if (!port) { console.error('Provide a port 1–65535, e.g. --set-port 8080'); process.exitCode = 1; return true; }
     const existing = config.readInstance(DATA_DIR) || {};
-    config.writeInstance(DATA_DIR, Object.assign({ name: 'Meeting Notes', host: '127.0.0.1', createdAt: new Date().toISOString() }, existing, { port }));
+    config.writeInstance(DATA_DIR, Object.assign({ name: 'Daymark', host: '127.0.0.1', createdAt: new Date().toISOString() }, existing, { port }));
     console.log(`\n  Port pinned to ${port} for this data directory (saved in instance.json).`);
     console.log(`  Every "node server.js" here now uses it. Override once with --port or PORT=.\n`);
     return true;
@@ -688,7 +688,7 @@ Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
     const existing = config.readInstance(DATA_DIR) || {};
     const port = parseInt(val('--port'), 10) || existing.port || config.derivePort(domain);
     config.writeInstance(DATA_DIR, {
-      name: existing.name || 'Meeting Notes',
+      name: existing.name || 'Daymark',
       domain, host: existing.host || '127.0.0.1', port,
       createdAt: existing.createdAt || new Date().toISOString(),
     });
@@ -728,7 +728,7 @@ function startServer() {
       r.on('end', () => {
         let info = null; try { info = JSON.parse(body); } catch (_e) {}
         if (info && info.app === 'meeting-notes') {
-          console.error(`\n  Meeting Notes ("${info.name}") is already running at ${CFG.url}.`);
+          console.error(`\n  Daymark ("${info.name}") is already running at ${CFG.url}.`);
           console.error(`  Open it in your browser, or give this instance its own durable domain:`);
           console.error(`    node server.js --set-domain <another-name>\n`);
           process.exit(0); // graceful: it's already up
@@ -752,7 +752,7 @@ function startServer() {
     config.writeLock(DATA_DIR, PORT);
     startWatcher();
     startAutoBackup();
-    console.log(`\n  Meeting Notes ${APP_VERSION} running at  ${CFG.url}`);
+    console.log(`\n  Daymark ${APP_VERSION} running at  ${CFG.url}`);
     if (CFG.domain) console.log(`  (also reachable at        http://${HOST}:${PORT})`);
     console.log(`  Data directory:           ${DATA_DIR}`);
     if (AUTO_BACKUP_DIR) console.log(`  Auto-backup:              every ${AUTO_BACKUP_HOURS}h → ${AUTO_BACKUP_DIR} (keep ${AUTO_BACKUP_KEEP})`);

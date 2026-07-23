@@ -28,7 +28,7 @@ fi
 
 # Any extra args (e.g. --port 8080) are forwarded to the server.
 URL="$(node server.js --print-config "$@" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(JSON.parse(d).url)}catch(e){console.log('http://127.0.0.1:3000')}})")"
-echo "Starting Meeting Notes at ${URL}"
+echo "Starting Daymark at ${URL}"
 
 # Try to open a browser (best-effort, non-fatal).
 ( sleep 1
