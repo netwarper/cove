@@ -335,6 +335,25 @@
     });
     // actions
     paletteActions().forEach(function (a) { if (!q || a.label.toLowerCase().indexOf(q) >= 0) items.push(a); });
+    // quick-add a task from anywhere (use the raw, case-preserved input)
+    var rawInput = ($('paletteInput').value || '').trim();
+    if (rawInput) {
+      var pp = window.TaskParse ? window.TaskParse.parse(rawInput) : { text: rawInput, priority: 4 };
+      var w0 = state.workspaces.filter(function (x) { return x.id === state.wsId; })[0];
+      var bits = [];
+      if (pp.due) bits.push(pp.due === todayStr() ? 'today' : pp.due);
+      if (pp.time) bits.push(pp.time);
+      if (pp.priority < 4) bits.push('P' + pp.priority);
+      if (pp.recurrence) bits.push('🔁');
+      items.push({
+        label: '➕ Add task: ' + (pp.text || rawInput),
+        sub: 'to ' + (w0 ? w0.name : 'workspace') + (bits.length ? ' · ' + bits.join(' · ') : ''),
+        run: async function () {
+          var p = window.TaskParse.parse(rawInput);
+          applyTaskResult(await API.addTask(state.wsId, { text: p.text || rawInput, due: p.due, time: p.time, priority: p.priority, recurrence: p.recurrence }));
+        },
+      });
+    }
     // notes (via search) when there's a query
     if (q) {
       try {
@@ -533,6 +552,19 @@
     } catch (e) { $('backlinks').classList.add('hidden'); }
   }
 
+  // Compact relative time, e.g. "just now", "5m ago", "3d ago".
+  function relTime(iso) {
+    var then = new Date(iso).getTime(); if (isNaN(then)) return '';
+    var s = Math.floor((Date.now() - then) / 1000); if (s < 0) s = 0;
+    if (s < 45) return 'just now';
+    var m = Math.floor(s / 60); if (m < 60) return m + 'm ago';
+    var h = Math.floor(m / 60); if (h < 24) return h + 'h ago';
+    var d = Math.floor(h / 24); if (d < 7) return d + 'd ago';
+    var w = Math.floor(d / 7); if (w < 5) return w + 'w ago';
+    var mo = Math.floor(d / 30); if (mo < 12) return mo + 'mo ago';
+    return Math.floor(d / 365) + 'y ago';
+  }
+
   async function renderNoteList() {
     var s = noteSort();
     var notes = await API.listNotes(state.wsId, { sort: s.field, dir: s.dir });
@@ -544,9 +576,10 @@
       var main = document.createElement('div'); main.className = 'nl-main';
       var scratch = nm.kind === 'scratch';
       var doneHere = nm.doneTaskCount ? '<span title="Tasks completed on this note">✓ ' + nm.doneTaskCount + '</span>' : '';
+      var edited = nm.updatedAt ? '<span class="nl-time" title="Edited ' + esc(new Date(nm.updatedAt).toLocaleString()) + '">' + esc(relTime(nm.updatedAt)) + '</span>' : '';
       main.innerHTML =
         '<div class="nl-title">' + (scratch ? '<span class="nl-scratch" title="Scratch note">✏️</span> ' : '') + esc(nm.displayTitle) + '</div>' +
-        '<div class="nl-meta">' + (scratch ? '<span>scratch</span>' : doneHere) +
+        '<div class="nl-meta">' + edited + (scratch ? '<span>scratch</span>' : doneHere) +
         (nm.attachmentCount ? '<span>📎 ' + nm.attachmentCount + '</span>' : '') + tags + '</div>';
       main.addEventListener('click', function () { openNote(nm.id); });
 
@@ -1654,6 +1687,20 @@
           if (inbox.workspaceId === state.wsId && state.view === 'note' && state.note) await loadTasks();
         }
       } catch (_e) { /* ignore */ }
+      // Fire reminders for tasks whose time has arrived (timed tasks only).
+      // Only when notifications are enabled, so we don't silently consume the
+      // one-shot "notifiedFor" marker while the user can't see anything.
+      if (state.notify && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          var due = await API.dueTasks();
+          if (due && due.length) {
+            due.forEach(function (d) {
+              new Notification('⏰ ' + d.text, { body: d.workspaceName + ' · due ' + (d.time || d.due), tag: 'task-' + d.id });
+            });
+            if (state.view === 'note' && state.note && due.some(function (d) { return d.workspaceId === state.wsId; })) await loadTasks();
+          }
+        } catch (_e) { /* ignore */ }
+      }
       maybeSendDailyAgenda();
     } catch (e) { /* ignore transient poll errors */ }
   }

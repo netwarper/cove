@@ -109,6 +109,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .note-list .nl-main { flex: 1; min-width: 0; cursor: pointer; }
 .note-list .nl-title { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 .note-list .nl-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.note-list .nl-time { color: var(--muted); opacity: .85; }
 .note-list .nl-fav { color: #f5a623; }
 .nl-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
 .note-list li:hover .nl-actions, .nl-star.on { opacity: 1; }

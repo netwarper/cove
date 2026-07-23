@@ -106,6 +106,7 @@
     skipTask: (id) => req('POST', '/api/tasks/' + id + '/skip', {}),
     rescheduleTask: (id, due) => req('POST', '/api/tasks/' + id + '/reschedule', { due: due }),
     globalTasks: () => req('GET', '/api/tasks'),
+    dueTasks: () => req('POST', '/api/tasks/due', {}),
     search: (q) => req('GET', '/api/search?q=' + encodeURIComponent(q)),
     allTags: () => req('GET', '/api/tags'),
     importNote: (wsId, payload) => req('POST', '/api/workspaces/' + wsId + '/import', payload),

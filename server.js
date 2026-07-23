@@ -520,6 +520,7 @@ async function route(s, req, res, pathname, query) {
 
   // tasks (unified to-do + reminder)
   if (pathname === '/api/tasks' && m === 'GET') return s.globalTasks();
+  if (pathname === '/api/tasks/due' && m === 'POST') return s.dueTaskNotifications();
   if (seg[1] === 'tasks' && seg[2]) {
     const taskId = safeId(seg[2]);
     if (seg.length === 3 && m === 'PUT') return s.updateTask(taskId, await readBody(req));

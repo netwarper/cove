@@ -350,6 +350,15 @@ const t = harness('functional');
     r = await c.request('DELETE', '/api/tasks/' + recTask);
     t.ok(!r.body.tasks.some((x) => x.id === recTask), 'delete removes the task');
 
+    // --- timed task reminders: fire once per occurrence; date-only never fires ---
+    await c.request('POST', '/api/workspaces/' + twsId + '/tasks', { text: 'ring me', due: today, time: '00:00' });
+    await c.request('POST', '/api/workspaces/' + twsId + '/tasks', { text: 'no-time task', due: today });
+    r = await c.request('POST', '/api/tasks/due', {});
+    t.ok(r.body.some((x) => x.text === 'ring me'), 'a timed task due now is surfaced for notification');
+    t.ok(!r.body.some((x) => x.text === 'no-time task'), 'a date-only task does not fire a reminder');
+    r = await c.request('POST', '/api/tasks/due', {});
+    t.ok(!r.body.some((x) => x.text === 'ring me'), 'a timed task only fires once per occurrence');
+
     // --- search index reflects edits + deletes ---
     r = await c.request('PUT', '/api/notes/' + linker, { meetingNotes: '<p>ZEBRACODE unique token</p>' });
     r = await c.request('GET', '/api/search?q=ZEBRACODE');
