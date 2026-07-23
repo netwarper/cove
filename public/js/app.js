@@ -1339,6 +1339,35 @@
   }
   function setSaveStatus(s) { $('saveStatus').textContent = s; }
 
+  // ---- word-level diff (LCS) for the conflict view ----
+  function diffTokens(s) { return String(s || '').split(/(\s+)/).filter(function (x) { return x !== ''; }); }
+  function stripTags(h) { return String(h || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim(); }
+  function wordDiff(aStr, bStr) {
+    var a = diffTokens(aStr), b = diffTokens(bStr), n = a.length, m = b.length;
+    var out = [], i, j;
+    if (n + m > 6000) { // too large to LCS cheaply — fall back to whole-block replace
+      if (aStr) out.push({ t: 'del', s: aStr });
+      if (bStr) out.push({ t: 'ins', s: bStr });
+      return out;
+    }
+    var dp = []; for (i = 0; i <= n; i++) dp.push(new Array(m + 1).fill(0));
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    i = 0; j = 0;
+    while (i < n && j < m) {
+      if (a[i] === b[j]) { out.push({ t: 'same', s: a[i] }); i++; j++; }
+      else if (dp[i + 1][j] >= dp[i][j + 1]) { out.push({ t: 'del', s: a[i] }); i++; }
+      else { out.push({ t: 'ins', s: b[j] }); j++; }
+    }
+    while (i < n) out.push({ t: 'del', s: a[i++] });
+    while (j < m) out.push({ t: 'ins', s: b[j++] });
+    return out;
+  }
+  function renderWordDiff(aStr, bStr) {
+    var d = wordDiff(aStr, bStr);
+    if (!d.length) return '<span class="muted tiny">(no text)</span>';
+    return d.map(function (p) { var e = esc(p.s); return p.t === 'same' ? e : (p.t === 'del' ? '<del>' + e + '</del>' : '<ins>' + e + '</ins>'); }).join('');
+  }
+
   // Read-only sanitize for previewing note HTML in the conflict modal.
   function sanitizeForView(html) {
     return String(html || '')
@@ -1370,22 +1399,35 @@
         picks[f.key] = 'mine';
         var row = document.createElement('div'); row.className = 'conflict-row';
         var head = document.createElement('div'); head.className = 'conflict-fld'; head.textContent = f.label; row.appendChild(head);
-        var cols = document.createElement('div'); cols.className = 'conflict-cols';
-        [['mine', 'Yours', mS, mv], ['theirs', 'Theirs (newer)', tS, tv]].forEach(function (side) {
-          var col = document.createElement('label'); col.className = 'conflict-col' + (side[0] === 'mine' ? ' sel' : '');
-          var cap = document.createElement('div'); cap.className = 'conflict-cap';
-          var r = document.createElement('input'); r.type = 'radio'; r.name = 'cf-' + f.key; r.checked = side[0] === 'mine';
+        // inline word-level diff of the changed text (yours → theirs), always visible
+        var aText = f.rich ? stripTags(mv) : mS, bText = f.rich ? stripTags(tv) : tS;
+        var diffEl = document.createElement('div'); diffEl.className = 'conflict-diff'; diffEl.innerHTML = renderWordDiff(aText, bText);
+        row.appendChild(diffEl);
+        // pick which side wins (always visible)
+        var pickRow = document.createElement('div'); pickRow.className = 'conflict-pick';
+        [['mine', 'Keep yours'], ['theirs', 'Keep theirs (newer)']].forEach(function (opt) {
+          var lab = document.createElement('label'); lab.className = 'conflict-opt' + (opt[0] === 'mine' ? ' sel' : '');
+          var r = document.createElement('input'); r.type = 'radio'; r.name = 'cf-' + f.key; r.checked = opt[0] === 'mine';
           r.addEventListener('change', function () {
-            picks[f.key] = side[0];
-            cols.querySelectorAll('.conflict-col').forEach(function (c) { c.classList.remove('sel'); });
-            col.classList.add('sel');
+            picks[f.key] = opt[0];
+            pickRow.querySelectorAll('.conflict-opt').forEach(function (c) { c.classList.remove('sel'); });
+            lab.classList.add('sel');
           });
-          cap.appendChild(r); cap.appendChild(document.createTextNode(' ' + side[1]));
-          var body = document.createElement('div'); body.className = 'conflict-body';
-          if (f.rich) body.innerHTML = sanitizeForView(side[3]); else body.textContent = side[2] || '(empty)';
-          col.appendChild(cap); col.appendChild(body); cols.appendChild(col);
+          lab.appendChild(r); lab.appendChild(document.createTextNode(' ' + opt[1])); pickRow.appendChild(lab);
         });
-        row.appendChild(cols); box.appendChild(row);
+        row.appendChild(pickRow);
+        // full versions, collapsed by default
+        var det = document.createElement('details'); det.className = 'conflict-cols-wrap';
+        var sum = document.createElement('summary'); sum.className = 'conflict-toggle'; sum.textContent = 'Show full versions'; det.appendChild(sum);
+        var colsInner = document.createElement('div'); colsInner.className = 'conflict-cols'; det.appendChild(colsInner);
+        [['Yours', mS, mv], ['Theirs (newer)', tS, tv]].forEach(function (side) {
+          var col = document.createElement('div'); col.className = 'conflict-col';
+          var cap = document.createElement('div'); cap.className = 'conflict-cap'; cap.textContent = side[0];
+          var body = document.createElement('div'); body.className = 'conflict-body';
+          if (f.rich) body.innerHTML = sanitizeForView(side[2]); else body.textContent = side[1] || '(empty)';
+          col.appendChild(cap); col.appendChild(body); colsInner.appendChild(col);
+        });
+        row.appendChild(det); box.appendChild(row);
       });
       if (!anyDiff) box.innerHTML = '<p class="muted tiny">No content differences — keeping the latest is safe.</p>';
       openModal('conflictModal');
@@ -1875,12 +1917,26 @@
   });
 
   // ---------------- Notifications + reminder polling ----------------
+  // Show a notification through the service worker when possible — that's the
+  // only path that works in an installed PWA on mobile (iOS Safari has no
+  // Notification constructor at all). Falls back to the constructor on desktop.
+  function notify(title, opts) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    opts = Object.assign({ icon: '/icons/icon-192.png', badge: '/icons/icon-192.png' }, opts || {});
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+        navigator.serviceWorker.ready
+          .then(function (reg) { if (reg && reg.showNotification) reg.showNotification(title, opts); else new Notification(title, opts); })
+          .catch(function () { try { new Notification(title, opts); } catch (_e) {} });
+      } else { new Notification(title, opts); }
+    } catch (_e) { /* ignore */ }
+  }
   $('notifyBtn').addEventListener('click', async function () {
-    if (!('Notification' in window)) { await dialog.alert('Notifications are not supported in this browser.'); return; }
+    if (!('Notification' in window)) { await dialog.alert('Notifications aren’t available here. On iPhone/iPad, install this app to your Home Screen first (Share → Add to Home Screen), then enable them.'); return; }
     var perm = await Notification.requestPermission();
     state.notify = perm === 'granted';
     $('notifyBtn').textContent = state.notify ? '🔔' : '🔕';
-    if (state.notify) pollInbox();
+    if (state.notify) { notify('Notifications on', { body: 'You’ll get reminders for tasks with a time.', tag: 'mn-enabled' }); pollInbox(); }
   });
   function startReminderPolling() { pollInbox(); setInterval(pollInbox, 60 * 1000); }
   async function pollInbox() {
@@ -1889,8 +1945,8 @@
       try {
         var inbox = await API.processInbox();
         if (inbox && inbox.added) {
-          if (state.notify && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification(inbox.added + ' new task' + (inbox.added > 1 ? 's' : '') + ' in your inbox');
+          if (state.notify) {
+            notify('📥 ' + inbox.added + ' new task' + (inbox.added > 1 ? 's' : '') + ' in your inbox', { tag: 'mn-inbox' });
           }
           if (inbox.workspaceId === state.wsId && state.view === 'note' && state.note) await loadTasks();
         }
@@ -1903,7 +1959,7 @@
           var due = await API.dueTasks();
           if (due && due.length) {
             due.forEach(function (d) {
-              new Notification('⏰ ' + d.text, { body: d.workspaceName + ' · due ' + (d.time || d.due), tag: 'task-' + d.id });
+              notify('⏰ ' + d.text, { body: d.workspaceName + ' · due ' + (d.time || d.due), tag: 'task-' + d.id });
             });
             if (state.view === 'note' && state.note && due.some(function (d) { return d.workspaceId === state.wsId; })) await loadTasks();
           }

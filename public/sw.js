@@ -8,7 +8,7 @@
  * stored here; it stays encrypted on the server. */
 'use strict';
 
-const CACHE = 'meeting-notes-shell-v17';
+const CACHE = 'meeting-notes-shell-v18';
 const SHELL = [
   '/', '/index.html', '/manual.html',
   '/css/styles.css',
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('message', (e) => {
   const d = e.data || {};
   if (d.type === 'notify' && self.registration.showNotification) {
-    self.registration.showNotification(d.title || 'Reminder', { body: d.body || '', icon: '/icon.svg', tag: d.tag });
+    self.registration.showNotification(d.title || 'Reminder', { body: d.body || '', icon: '/icons/icon-192.png', badge: '/icons/icon-192.png', tag: d.tag });
   }
 });
 
