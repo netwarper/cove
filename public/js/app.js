@@ -3,7 +3,14 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var API = window.API;
-  var IDLE_MS = 15 * 60 * 1000;
+  var IDLE_DEFAULT_MIN = 15;
+  // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
+  function idleMs() {
+    var m = state.settings && state.settings.idleLockMinutes;
+    if (m === 0) return 0;
+    m = parseInt(m, 10);
+    return (m > 0 ? m : IDLE_DEFAULT_MIN) * 60 * 1000;
+  }
 
   // ---------------- In-app dialogs (replace native alert/confirm/prompt) ----------------
   function showDialog(opts) {
@@ -1989,6 +1996,7 @@
       (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
     $('fontSize').value = state.settings.fontSize || 14;
     $('ocrEnabled').checked = state.settings.ocrEnabled !== false;
+    $('idleLock').value = String(state.settings.idleLockMinutes != null ? state.settings.idleLockMinutes : IDLE_DEFAULT_MIN);
     var tc = state.settings.transcription || {};
     $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
     updateSttWarn();
@@ -2146,6 +2154,11 @@
     state.settings.ocrEnabled = $('ocrEnabled').checked;
     API.saveSettings({ ocrEnabled: state.settings.ocrEnabled });
     if (!state.settings.ocrEnabled && window.OCR) window.OCR.terminate();
+  });
+  $('idleLock').addEventListener('change', function () {
+    state.settings.idleLockMinutes = parseInt($('idleLock').value, 10) || 0;
+    API.saveSettings({ idleLockMinutes: state.settings.idleLockMinutes });
+    resetIdle(); // apply the new timeout immediately
   });
 
   // Backup / restore + bulk export
@@ -2334,7 +2347,7 @@
     ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, resetIdle, { passive: true }); });
     resetIdle();
   }
-  function resetIdle() { clearTimeout(idleTimer); idleTimer = setTimeout(lockNow, IDLE_MS); }
+  function resetIdle() { clearTimeout(idleTimer); var ms = idleMs(); if (ms > 0) idleTimer = setTimeout(lockNow, ms); }
   async function lockNow() { if (state.saveTimer) await saveNow(); try { await API.logout(); } catch (e) {} location.reload(); }
 
   // ---------------- Keyboard shortcuts ----------------
