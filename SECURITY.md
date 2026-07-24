@@ -1,6 +1,6 @@
 # Security Policy
 
-Daymark is a local-first, end-to-end-encrypted notes app. Your notes, tasks and
+Cove is a local-first, end-to-end-encrypted notes app. Your notes, tasks and
 attachments are encrypted with AES-256-GCM under a key wrapped by your passphrase
 (scrypt); plaintext and keys never touch disk and never leave your machine unless
 you explicitly export or sync them. See the **Security model** section of the

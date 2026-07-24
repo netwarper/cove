@@ -1,7 +1,7 @@
 {
-  "name": "Daymark",
-  "short_name": "Daymark",
-  "description": "Daymark — self-contained, encrypted meeting notes.",
+  "name": "Cove",
+  "short_name": "Cove",
+  "description": "Cove — self-contained, encrypted meeting notes.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
