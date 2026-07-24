@@ -1856,7 +1856,11 @@
     $('tourBack').style.visibility = tourIdx === 0 ? 'hidden' : 'visible';
     $('tourNext').textContent = tourIdx === TOUR.length - 1 ? 'Done' : 'Next';
   }
-  function openTour() { tourIdx = 0; renderTour(); openModal('tourModal'); }
+  function openTour() {
+    // Never cover the one-time recovery-key modal — defer until it's dismissed.
+    if (!$('recoveryModal').classList.contains('hidden')) { state.pendingTour = true; return; }
+    tourIdx = 0; renderTour(); openModal('tourModal');
+  }
   function finishTour() {
     closeModals();
     if (!state.settings.onboarded) { state.settings.onboarded = true; API.saveSettings({ onboarded: true }); }
@@ -2148,8 +2152,11 @@
     MODALS.forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });
   }
   function closeModals() {
+    var recoveryWasOpen = !$('recoveryModal').classList.contains('hidden');
     $('modalBackdrop').classList.add('hidden');
     MODALS.forEach(function (m) { $(m).classList.add('hidden'); });
+    // Once the recovery key is saved/dismissed, run the deferred first-run tour.
+    if (recoveryWasOpen && state.pendingTour) { state.pendingTour = false; setTimeout(openTour, 350); }
   }
   document.querySelectorAll('.modal-close').forEach(function (b) { b.addEventListener('click', closeModals); });
   $('modalBackdrop').addEventListener('click', function (e) { if (e.target === $('modalBackdrop')) closeModals(); });

@@ -28,6 +28,12 @@ everything stays on your machine.
 > ⚠️ The passphrase is never stored. If you forget it, the data cannot be
 > recovered — that is the point of encryption at rest.
 
+**Start Cove automatically at login (macOS):** run
+`scripts/macos-service.sh install` — it registers a launchd agent that starts
+Cove at login and restarts it if it stops. See
+[`docs/macos-startup.md`](docs/macos-startup.md) for that plus exactly how Cove
+behaves through sleep / lid-close.
+
 ---
 
 ## Features
