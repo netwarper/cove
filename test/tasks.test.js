@@ -21,6 +21,15 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     t.eq(tasksLib.nextDue('2026-07-22', { type: 'daily', endDate: '2026-07-22' }), null, 'bounded recurrence ends');
     t.eq(tasksLib.normalizeRecurrence({ type: 'none' }), null, 'none recurrence normalizes to null');
 
+    // --- interval recurrence: every N weeks / N months ---
+    t.eq(tasksLib.nextDue('2026-07-22', { type: 'weekly', n: 2 }), '2026-08-05', 'nextDue every 2 weeks = +14d');
+    t.eq(tasksLib.nextDue('2026-07-15', { type: 'monthly', n: 2 }), '2026-09-15', 'nextDue every 2 months = +2 months');
+    t.eq(tasksLib.nextDue('2026-07-22', { type: 'weekly' }), '2026-07-29', 'nextDue plain weekly still = +7d');
+    t.eq(tasksLib.normalizeRecurrence({ type: 'weekly', n: 2 }).n, 2, 'weekly keeps interval n>=2');
+    t.eq(tasksLib.normalizeRecurrence({ type: 'weekly', n: 1 }).n, undefined, 'weekly drops n=1 (backward-compatible)');
+    t.eq(tasksLib.normalizeRecurrence({ type: 'monthly', n: 3 }).n, 3, 'monthly keeps interval n>=2');
+    t.eq(tasksLib.describeRecurrence({ type: 'weekly', n: 2 }), 'every 2 weeks', 'describes every-2-weeks');
+
     // --- migration of legacy to-dos + reminders ---
     const built = c.createVault('pw');
     const store = new Store(DIR, built.dek);

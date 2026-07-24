@@ -18,7 +18,7 @@
   <!-- ---------- Auth gate ---------- -->
   <div id="authGate" class="auth-gate hidden">
     <div class="auth-card">
-      <h1>🗒️ Cove</h1>
+      <h1><img src="/icon.svg" class="brand-logo" alt=""> Cove</h1>
       <p id="authSubtitle" class="muted"></p>
       <form id="authForm">
         <label id="authLabel" for="passphrase">Passphrase</label>
@@ -50,7 +50,7 @@
   <!-- ---------- App ---------- -->
   <div id="app" class="app hidden">
     <header class="topbar">
-      <div class="brand">🗒️ <span>Cove</span></div>
+      <div class="brand"><img src="/icon.svg" class="brand-logo" alt=""> <span>Cove</span></div>
       <div class="search-wrap">
         <input id="globalSearch" type="search" placeholder="Search all notes…  (try tag:planning)" aria-label="Search all notes">
       </div>
@@ -146,13 +146,12 @@
             </div>
             <div class="note-tools">
               <button id="favBtn" class="icon-btn" title="Favorite" aria-label="Favorite">☆</button>
-              <button id="printBtn" class="icon-btn" title="Print" aria-label="Print">🖨</button>
-              <button id="exportBtn" class="icon-btn" title="Export" aria-label="Export">⭱</button>
+              <button id="printBtn" class="icon-btn" title="Print &amp; export" aria-label="Print and export" aria-haspopup="true">🖨</button>
               <div id="exportMenu" class="menu hidden">
-                <button data-fmt="pdf">Save as PDF (print)</button>
-                <button data-fmt="html">Export HTML</button>
-                <button data-fmt="md">Export Markdown</button>
-                <button data-fmt="json">Export JSON</button>
+                <button data-fmt="pdf">🖨 Print / Save as PDF</button>
+                <button data-fmt="html">⭳ Export HTML</button>
+                <button data-fmt="md">⭳ Export Markdown</button>
+                <button data-fmt="json">⭳ Export JSON</button>
               </div>
               <button id="noteMoreBtn" class="icon-btn" title="More note actions" aria-label="More note actions">⋯</button>
               <div id="noteMoreMenu" class="menu hidden">
@@ -185,6 +184,10 @@
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
                   </select>
+                  <span id="qaEvery" class="qa-every hidden">every
+                    <input id="qaRecurN" type="number" min="1" max="52" value="1" class="qa-pill qa-num" title="Interval" aria-label="Repeat interval">
+                    <span id="qaEveryUnit">weeks</span>
+                  </span>
                   <button id="qaAdd" class="sm primary">Add</button>
                 </div>
               </div>
@@ -254,7 +257,7 @@
 
         <section id="landingView" class="view hidden">
           <div class="landing">
-            <h1>🗒️ <span id="landingWs">Cove</span></h1>
+            <h1><img src="/icon.svg" class="brand-logo" alt=""> <span id="landingWs">Cove</span></h1>
             <p class="muted">This workspace has no notes yet. Start one:</p>
             <div class="landing-actions">
               <button id="landingNewDaily" class="primary">＋ New Daily note</button>
@@ -339,7 +342,10 @@
     <div class="modal hidden" id="importModal">
       <h3>Import a note</h3>
       <p class="muted tiny">Upload a note previously exported as JSON, HTML, or Markdown.</p>
-      <input id="importFile" type="file" accept=".json,.html,.htm,.md,.markdown,.txt">
+      <div class="file-picker">
+        <label class="file-btn">Choose file…<input id="importFile" type="file" accept=".json,.html,.htm,.md,.markdown,.txt" hidden></label>
+        <span id="importFileName" class="file-name muted">No file chosen</span>
+      </div>
       <input id="importTitle" placeholder="Optional title">
       <div class="modal-actions">
         <button id="doImportBtn" class="primary">Import</button>
@@ -453,7 +459,10 @@
       <div class="acct-block">
         <h4>Restore</h4>
         <p class="muted tiny">Only works on a fresh install with no vault yet. Copy your backup file’s contents here or use a fresh session.</p>
-        <input id="restoreFile" type="file" accept=".json">
+        <div class="file-picker">
+          <label class="file-btn">Choose file…<input id="restoreFile" type="file" accept=".json" hidden></label>
+          <span id="restoreFileName" class="file-name muted">No file chosen</span>
+        </div>
         <button id="restoreBtn" class="sm">Restore from file</button>
         <div id="restoreMsg" class="tiny" aria-live="polite"></div>
       </div>
@@ -538,7 +547,7 @@
       <div id="recoveryValue" class="recovery-value"></div>
       <div class="modal-actions">
         <button id="copyRecoveryBtn" class="sm">Copy</button>
-        <button class="modal-close primary">I’ve saved it</button>
+        <button id="recoveryConfirmBtn" class="modal-close primary" disabled title="Copy the key first">I’ve saved it</button>
       </div>
     </div>
   </div>

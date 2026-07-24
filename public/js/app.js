@@ -861,7 +861,8 @@
   function recurLabel(rec) {
     if (!rec) return '';
     if (rec.type === 'daily') return 'daily'; if (rec.type === 'weekdays') return 'weekdays';
-    if (rec.type === 'weekly') return 'weekly'; if (rec.type === 'monthly') return 'monthly';
+    if (rec.type === 'weekly') return rec.n > 1 ? 'every ' + rec.n + ' wks' : 'weekly';
+    if (rec.type === 'monthly') return rec.n > 1 ? 'every ' + rec.n + ' mos' : 'monthly';
     if (rec.type === 'everyNDays') return 'every ' + rec.n + 'd'; return '';
   }
   function sortTasks(a, b) { return (a.due || '9999').localeCompare(b.due || '9999') || (a.priority - b.priority) || (a.order - b.order); }
@@ -975,6 +976,17 @@
     $('qaRecur').value = state.qa.recurrence ? state.qa.recurrence.type : 'none';
     $('qaDateLbl').textContent = state.qa.due ? fmtDueShort(state.qa.due) : 'Date';
     $('qaDate').classList.toggle('set', !!state.qa.due);
+    syncEvery();
+  }
+  // The "every N weeks/months" interval field only applies to weekly/monthly.
+  function syncEvery() {
+    var type = state.qa.recurrence ? state.qa.recurrence.type : 'none';
+    var show = type === 'weekly' || type === 'monthly';
+    $('qaEvery').classList.toggle('hidden', !show);
+    if (show) {
+      $('qaEveryUnit').textContent = type === 'weekly' ? 'weeks' : 'months';
+      $('qaRecurN').value = String((state.qa.recurrence && state.qa.recurrence.n) || 1);
+    }
   }
   function resetQa() {
     state.qa = { due: null, time: null, priority: 4, recurrence: null };
@@ -996,7 +1008,23 @@
     syncQa();
   });
   $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; state.qaManual.priority = true; });
-  $('qaRecur').addEventListener('change', function () { var v = $('qaRecur').value; state.qa.recurrence = v === 'none' ? null : { type: v }; state.qaManual.recurrence = true; });
+  $('qaRecur').addEventListener('change', function () {
+    var v = $('qaRecur').value;
+    if (v === 'none') { state.qa.recurrence = null; }
+    else {
+      var rec = { type: v };
+      // Preserve a chosen interval when switching between weekly/monthly.
+      if ((v === 'weekly' || v === 'monthly')) { var n = parseInt($('qaRecurN').value, 10); if (n >= 2) rec.n = n; }
+      state.qa.recurrence = rec;
+    }
+    state.qaManual.recurrence = true; syncEvery();
+  });
+  $('qaRecurN').addEventListener('input', function () {
+    if (!state.qa.recurrence) return;
+    var n = parseInt($('qaRecurN').value, 10);
+    if (n >= 2) state.qa.recurrence.n = n; else delete state.qa.recurrence.n;
+    state.qaManual.recurrence = true;
+  });
   $('qaDate').addEventListener('click', function () {
     openDatePicker($('qaDate'), state.qa.due, function (v) { state.qa.due = v; state.qaManual.due = true; syncQa(); });
   });
@@ -1211,7 +1239,7 @@
     state.note.updatedAt = s.updatedAt; // adopt so the next content save isn't a false conflict
     renderNoteList();
   });
-  $('printBtn').addEventListener('click', function () { window.print(); });
+  $('printBtn').addEventListener('click', function (e) { e.stopPropagation(); $('exportMenu').classList.toggle('hidden'); });
 
   // New-note menu
   $('newNoteBtn').addEventListener('click', function () { createNewNote({}); });
@@ -1317,8 +1345,7 @@
     });
   }
 
-  // Export menu
-  $('exportBtn').addEventListener('click', function (e) { e.stopPropagation(); $('exportMenu').classList.toggle('hidden'); });
+  // Print & export menu (opened from the printer icon)
   $('exportMenu').addEventListener('click', function (e) {
     var fmt = e.target.getAttribute('data-fmt'); if (!fmt) return;
     $('exportMenu').classList.add('hidden');
@@ -1555,8 +1582,8 @@
     else if (rec.type === 'weekdays') { do { dt.setUTCDate(dt.getUTCDate() + 1); } while (dow(dt) === 0 || dow(dt) === 6); next = isoUTC(dt); }
     else if (rec.type === 'weekly') {
       if (rec.days && rec.days.length) { for (var i = 1; i <= 7 && !next; i++) { var c = new Date(dt); c.setUTCDate(c.getUTCDate() + i); if (rec.days.indexOf(dow(c)) >= 0) next = isoUTC(c); } }
-      if (!next) { dt.setUTCDate(dt.getUTCDate() + 7); next = isoUTC(dt); }
-    } else if (rec.type === 'monthly') { dt.setUTCMonth(dt.getUTCMonth() + 1); next = isoUTC(dt); }
+      if (!next) { dt.setUTCDate(dt.getUTCDate() + 7 * (rec.n || 1)); next = isoUTC(dt); }
+    } else if (rec.type === 'monthly') { dt.setUTCMonth(dt.getUTCMonth() + (rec.n || 1)); next = isoUTC(dt); }
     if (rec.endDate && next && next > rec.endDate) return null;
     return next;
   }
@@ -1841,6 +1868,13 @@
 
   // Import
   $('importBtn').addEventListener('click', function () { openModal('importModal'); });
+  // Reflect the chosen filename next to the themed "Choose file" buttons.
+  function showChosenFile(inputId, labelId) {
+    var f = $(inputId).files[0];
+    $(labelId).textContent = f ? f.name : 'No file chosen';
+  }
+  $('importFile').addEventListener('change', function () { showChosenFile('importFile', 'importFileName'); });
+  $('restoreFile').addEventListener('change', function () { showChosenFile('restoreFile', 'restoreFileName'); });
   $('doImportBtn').addEventListener('click', async function () {
     var file = $('importFile').files[0]; if (!file) { await dialog.alert('Choose a file to import.'); return; }
     var text = await file.text();
@@ -1929,15 +1963,33 @@
     } catch (ex) { $('restoreMsg').textContent = 'Restore failed: ' + ex.message; }
   });
 
-  // Recovery-key display modal
+  // Recovery-key display modal. The confirm button stays disabled until the
+  // user clicks Copy — you can't dismiss a one-time key without saving it.
   function showRecovery(key, subtitle) {
     if (subtitle) $('recoveryModal').querySelector('p').textContent = subtitle;
-    $('recoveryValue').textContent = key; openModal('recoveryModal');
+    $('recoveryValue').textContent = key;
+    $('copyRecoveryBtn').textContent = 'Copy';
+    $('recoveryConfirmBtn').disabled = true;
+    openModal('recoveryModal');
   }
   $('copyRecoveryBtn').addEventListener('click', function () {
     var t = $('recoveryValue').textContent;
-    if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { $('copyRecoveryBtn').textContent = 'Copied ✓'; });
+    // Best-effort clipboard write; fall back to selecting the text so the user
+    // can copy manually (e.g. non-secure origins where the API is unavailable).
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).catch(selectRecovery);
+    } else { selectRecovery(); }
+    // The gate is "Copy was clicked", so a clipboard failure never traps the
+    // user out of the one-time modal.
+    $('copyRecoveryBtn').textContent = 'Copied ✓';
+    $('recoveryConfirmBtn').disabled = false;
   });
+  function selectRecovery() {
+    try {
+      var r = document.createRange(); r.selectNodeContents($('recoveryValue'));
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    } catch (_e) { /* ignore */ }
+  }
 
   // Modal helpers
   var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal'];
