@@ -135,18 +135,29 @@
 
   /* Type "/" to open a block menu at the caret. */
   function enableSlashMenu(editor, opts) {
-    var menu = null;
-    function close() { if (menu) { menu.remove(); menu = null; } }
+    var menu = null, anchor = null, onScroll = null;
+    // Keep the menu glued to where the "/" was typed, so it moves with the text
+    // as the note scrolls (rather than floating in a fixed spot on screen).
+    function place() {
+      if (!menu || !anchor) return;
+      var rect = anchor.getBoundingClientRect();
+      if (!rect.width && !rect.height && !rect.top && !rect.left) return; // caret rect unavailable
+      menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+      menu.style.left = (rect.left + window.scrollX) + 'px';
+    }
+    function close() {
+      if (menu) { menu.remove(); menu = null; }
+      anchor = null;
+      if (onScroll) { window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onScroll); onScroll = null; }
+    }
     editor.addEventListener('keyup', function (e) {
       if (e.key === '/') {
         var sel = window.getSelection();
         if (!sel.rangeCount) return;
-        var rect = sel.getRangeAt(0).getBoundingClientRect();
         close();
+        anchor = sel.getRangeAt(0).cloneRange(); // the caret right after the "/"
         menu = document.createElement('div');
         menu.className = 'slash-menu';
-        menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
-        menu.style.left = (rect.left + window.scrollX) + 'px';
         SLASH.forEach(function (s) {
           var b = document.createElement('button');
           b.textContent = s.label;
@@ -160,6 +171,12 @@
           menu.appendChild(b);
         });
         document.body.appendChild(menu);
+        place();
+        // Capture-phase so scrolls inside the note container (which don't bubble)
+        // also reposition the menu.
+        onScroll = place;
+        window.addEventListener('scroll', onScroll, true);
+        window.addEventListener('resize', onScroll);
       } else if (e.key === 'Escape') { close(); }
     });
     editor.addEventListener('blur', function () { setTimeout(close, 200); });
