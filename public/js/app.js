@@ -1086,8 +1086,28 @@
     var b64 = await fileToBase64(file);
     var meta = await API.addAttachment(state.note.id, { name: file.name || 'image.png', mime: file.type || 'image/png', dataB64: b64 });
     state.note.attachments = state.note.attachments || []; state.note.attachments.push(meta); renderAttachments();
+    maybeOcr(file, state.note.id, meta);
     return API.attachmentUrl(state.note.id, meta.id);
   };
+
+  // Extract text from a pasted/attached image (on-device, offline) so it becomes
+  // searchable. Runs in the background; never blocks the paste/insert.
+  state.ocrBusy = {};
+  async function maybeOcr(file, noteId, meta) {
+    if (state.settings.ocrEnabled === false) return;
+    if (!window.OCR || !file || !/^image\//.test(file.type || '')) return;
+    try {
+      if (!(await window.OCR.available())) return;
+      state.ocrBusy[meta.id] = true; renderAttachments();
+      var text = await window.OCR.recognize(file);
+      delete state.ocrBusy[meta.id];
+      if (text) {
+        meta.ocrText = text;
+        try { await API.setAttachmentOcr(noteId, meta.id, text); } catch (_e) { /* non-fatal */ }
+      }
+      renderAttachments();
+    } catch (_e) { delete state.ocrBusy[meta.id]; renderAttachments(); }
+  }
   window.Editor.init($('sections').querySelector('[data-target="carryoverEditor"]'), $('carryoverEditor'), { uploader: function (f) { return meetingUploader(f); }, noteLinkPicker: openNotePicker });
   window.Editor.init($('sections').querySelector('[data-target="meetingEditor"]'), $('meetingEditor'), { uploader: function (f) { return meetingUploader(f); }, noteLinkPicker: openNotePicker });
   $('carryoverEditor').addEventListener('input', function () { state.note.carryover = $('carryoverEditor').innerHTML; scheduleSave(); scheduleWordCount(); });
@@ -1103,6 +1123,7 @@
       var b64 = await fileToBase64(f);
       var meta = await API.addAttachment(state.note.id, { name: f.name, mime: f.type, dataB64: b64 });
       state.note.attachments = state.note.attachments || []; state.note.attachments.push(meta);
+      maybeOcr(f, state.note.id, meta);
     }
     $('attachInput').value = ''; renderAttachments();
   });
@@ -1116,6 +1137,8 @@
       }
       var a1 = document.createElement('a'); a1.href = API.attachmentUrl(state.note.id, a.id); a1.textContent = a.name; a1.target = '_blank'; a1.rel = 'noopener';
       var size = document.createElement('span'); size.className = 'at-size'; size.textContent = fmtSize(a.size);
+      if (state.ocrBusy[a.id]) { var oc = document.createElement('span'); oc.className = 'at-ocr'; oc.textContent = '🔎 reading…'; li.appendChild(oc); }
+      else if (a.ocrText) { var od = document.createElement('span'); od.className = 'at-ocr done'; od.textContent = '🔎 text'; od.title = 'Text extracted — this image is searchable'; li.appendChild(od); }
       var del = document.createElement('button'); del.className = 'at-del'; del.textContent = '✕';
       del.addEventListener('click', async function () {
         await API.deleteAttachment(state.note.id, a.id);
@@ -1808,6 +1831,7 @@
       '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
       (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
     $('fontSize').value = state.settings.fontSize || 14;
+    $('ocrEnabled').checked = state.settings.ocrEnabled !== false;
     var tc = state.settings.transcription || {};
     $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
     updateSttWarn();
@@ -1960,6 +1984,11 @@
   $('fontSize').addEventListener('input', function () {
     var px = parseInt($('fontSize').value, 10) || 14; applyFontSize(px);
     state.settings.fontSize = px; API.saveSettings({ fontSize: px });
+  });
+  $('ocrEnabled').addEventListener('change', function () {
+    state.settings.ocrEnabled = $('ocrEnabled').checked;
+    API.saveSettings({ ocrEnabled: state.settings.ocrEnabled });
+    if (!state.settings.ocrEnabled && window.OCR) window.OCR.terminate();
   });
 
   // Backup / restore + bulk export

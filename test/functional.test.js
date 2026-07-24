@@ -101,6 +101,11 @@ const t = harness('functional');
     t.eq(r.body.size, payload.length, 'attachment size recorded');
     r = await c.request('GET', '/api/notes/' + note3.id + '/attachments/' + attId);
     t.ok(Buffer.compare(r.raw, payload) === 0, 'attachment bytes round-trip correctly');
+    // OCR text on an attachment makes the note findable by that text.
+    r = await c.request('POST', '/api/notes/' + note3.id + '/attachments/' + attId + '/ocr', { text: 'QRXOCRWORD invoice' });
+    t.eq(r.body.ok, true, 'attachment OCR text stored');
+    r = await c.request('GET', '/api/search?q=QRXOCRWORD');
+    t.ok(r.body.some((x) => x.noteId === note3.id), 'OCR text makes the image searchable');
     r = await c.request('DELETE', '/api/notes/' + note3.id + '/attachments/' + attId);
     t.eq(r.body.ok, true, 'attachment deleted');
 

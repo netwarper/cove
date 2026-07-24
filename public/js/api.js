@@ -94,6 +94,7 @@
     slackAgenda: () => req('POST', '/api/slack/agenda', {}),
 
     addAttachment: (noteId, data) => req('POST', '/api/notes/' + noteId + '/attachments', data),
+    setAttachmentOcr: (noteId, attId, text) => req('POST', '/api/notes/' + noteId + '/attachments/' + attId + '/ocr', { text }),
     deleteAttachment: (noteId, attId) => req('DELETE', '/api/notes/' + noteId + '/attachments/' + attId),
     attachmentUrl: (noteId, attId) => '/api/notes/' + noteId + '/attachments/' + attId,
 

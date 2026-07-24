@@ -420,6 +420,11 @@
         <input id="fontSize" type="range" min="13" max="20" step="1" value="14">
       </div>
       <div class="acct-block">
+        <h4>Image text (OCR)</h4>
+        <p class="muted tiny">When you paste or attach a screenshot, Cove reads any text in it <b>on your device</b> (nothing is uploaded) so the image turns up in search. Runs in the background the first time it loads a small local engine.</p>
+        <label class="tiny"><input id="ocrEnabled" type="checkbox" checked> Extract text from pasted images</label>
+      </div>
+      <div class="acct-block">
         <h4>Meeting transcription</h4>
         <p class="muted tiny">Recording always stays on this machine (saved as an encrypted attachment). Transcription is optional: point it at a <b>local</b> Whisper server to stay fully private, or a cloud provider (audio for transcription is then sent there). Leave the endpoint blank to record without transcribing.</p>
         <p class="muted tiny">Running a local Whisper server is <b>opt-in</b> — nothing is installed for you. See <code>docs/local-whisper.md</code> for a 2-minute setup (whisper.cpp / faster-whisper), then click below.</p>
@@ -621,6 +626,7 @@
   <script src="/js/editor.js"></script>
   <script src="/js/recorder.js"></script>
   <script src="/js/taskparse.js"></script>
+  <script src="/js/ocr.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

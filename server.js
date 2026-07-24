@@ -115,6 +115,7 @@ const MIME = {
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png',
   '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2',
+  '.wasm': 'application/wasm', '.gz': 'application/gzip',
 };
 
 function send(res, status, body, headers = {}) {
@@ -124,7 +125,8 @@ function send(res, status, body, headers = {}) {
     'Referrer-Policy': 'no-referrer',
     'Content-Security-Policy':
       "default-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; " +
-      "style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; " +
+      "style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; " +
+      "worker-src 'self' blob:; object-src 'none'; " +
       "base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
   };
   res.writeHead(status, Object.assign(base, headers));
@@ -559,12 +561,14 @@ async function route(s, req, res, pathname, query) {
       return undefined;
     }
     if (seg[3] === 'todos' && seg[4] && m === 'PUT') return s.toggleTodo(noteId, safeId(seg[4]), (await readBody(req)).done);
-    if (seg[3] === 'attachments' && m === 'POST') return s.addAttachment(noteId, await readBody(req));
+    if (seg[3] === 'attachments' && seg.length === 4 && m === 'POST') return s.addAttachment(noteId, await readBody(req));
+    if (seg[3] === 'attachments' && seg[4] && seg[5] === 'ocr' && m === 'POST') return s.setAttachmentOcr(noteId, safeId(seg[4]), (await readBody(req)).text);
     if (seg[3] === 'attachments' && seg[4] && m === 'GET') {
       const { meta, data } = s.getAttachment(noteId, safeId(seg[4]));
       send(res, 200, data, { 'Content-Type': meta.mime, 'Content-Disposition': `inline; filename="${meta.name.replace(/[^\w.\- ]/g, '_')}"` });
       return undefined;
     }
+    if (seg[3] === 'attachments' && seg[4] && seg[5] === 'ocr' && m === 'POST') return s.setAttachmentOcr(noteId, safeId(seg[4]), (await readBody(req)).text);
     if (seg[3] === 'attachments' && seg[4] && m === 'DELETE') return s.deleteAttachment(noteId, safeId(seg[4]));
   }
 

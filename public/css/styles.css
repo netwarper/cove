@@ -280,6 +280,8 @@ select.qa-pill { padding: 4px 6px; }
 .attach-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
 .attach-list a { color: var(--brand); text-decoration: none; flex: 1; word-break: break-all; }
 .attach-list .at-size { color: var(--muted); font-size: 11px; }
+.attach-list .at-ocr { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; }
+.attach-list .at-ocr.done { color: var(--brand); border-color: var(--brand); }
 .attach-list .at-del { border: 0; background: none; color: var(--danger); }
 
 /* ---- Favorites / search lists ---- */

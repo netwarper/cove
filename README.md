@@ -60,6 +60,7 @@ everything stays on your machine.
 | **Move / duplicate** | Move a note to another workspace, or duplicate it. |
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |
 | **Export for AI** | Export a whole **workspace** or a **tag** as clean Markdown to upload to ChatGPT / Claude as knowledge — as one combined file (with a table of contents and open tasks) or a ZIP with one file per note. |
+| **Image text (OCR)** | Paste or attach a screenshot and Cove reads its text **on-device** (via a bundled, offline Tesseract engine — nothing is uploaded) so the image turns up in search. Toggle it off in Settings. |
 | **Import** | Upload a previously exported JSON / HTML / Markdown note into a workspace. |
 | **Encrypted backup** | Download a single encrypted backup file of everything; restore on a fresh install. Bulk-export a whole workspace as a ZIP (HTML/MD/JSON). |
 | **Version history** | Every note keeps automatic snapshots (up to 20); view and restore any earlier version. |
@@ -369,6 +370,16 @@ prompt-version.md      how to regenerate this app from a prompt
 
 ---
 
+## Third-party
+
+On-device OCR is powered by [Tesseract.js](https://github.com/naptha/tesseract.js)
+and the Tesseract engine (both Apache-2.0), vendored under
+`public/vendor/tesseract/` (~10 MB: library, worker, a SIMD LSTM WASM core, and
+the English model). Nothing is fetched from the network — it runs entirely in
+your browser. These are the app's only bundled third-party assets; the server
+and the rest of the client remain zero-dependency (Node core only).
+
 ## License
 
-MIT
+MIT (Cove's own code). Bundled third-party assets keep their own licenses — see
+**Third-party** above.
