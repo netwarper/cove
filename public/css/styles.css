@@ -197,7 +197,15 @@ button.primary { background: var(--brand); color: var(--brand-ink); border-color
 .qa-pill:hover { border-color: var(--brand); }
 select.qa-pill { padding: 4px 6px; }
 .qa-every { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
-.qa-num { width: 3.2em; text-align: center; -moz-appearance: textfield; }
+/* Wide enough that the native spinner arrows don't cover the digits. */
+.qa-num { width: 3.6em; text-align: left; padding: 4px 4px 4px 9px; }
+.qa-dows { display: inline-flex; gap: 3px; }
+.qa-dow {
+  width: 24px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 50%;
+  background: var(--panel-2); color: var(--muted); font-size: 11px; cursor: pointer; line-height: 1;
+}
+.qa-dow:hover { border-color: var(--brand); }
+.qa-dow.on { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 #qaDate.set { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .qa-controls #qaAdd { margin-left: auto; }
 

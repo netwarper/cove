@@ -909,10 +909,14 @@
     if (iso === addDaysStr(todayStr(), 1)) return 'Tomorrow';
     try { return new Date(iso + 'T00:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return iso; }
   }
+  var DOW_ABBR = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
   function recurLabel(rec) {
     if (!rec) return '';
     if (rec.type === 'daily') return 'daily'; if (rec.type === 'weekdays') return 'weekdays';
-    if (rec.type === 'weekly') return rec.n > 1 ? 'every ' + rec.n + ' wks' : 'weekly';
+    if (rec.type === 'weekly') {
+      if (rec.days && rec.days.length) return rec.days.slice().sort(function (a, b) { return a - b; }).map(function (d) { return DOW_ABBR[d]; }).join(' ');
+      return rec.n > 1 ? 'every ' + rec.n + ' wks' : 'weekly';
+    }
     if (rec.type === 'monthly') return rec.n > 1 ? 'every ' + rec.n + ' mos' : 'monthly';
     if (rec.type === 'everyNDays') return 'every ' + rec.n + 'd'; return '';
   }
@@ -1024,20 +1028,35 @@
   // ---- quick-add (natural language + pickers) ----
   function syncQa() {
     $('qaPriority').value = String(state.qa.priority || 4);
-    $('qaRecur').value = state.qa.recurrence ? state.qa.recurrence.type : 'none';
     $('qaDateLbl').textContent = state.qa.due ? fmtDueShort(state.qa.due) : 'Date';
     $('qaDate').classList.toggle('set', !!state.qa.due);
-    syncEvery();
+    syncRecurUI();
   }
-  // The "every N weeks/months" interval field only applies to weekly/monthly.
-  function syncEvery() {
-    var type = state.qa.recurrence ? state.qa.recurrence.type : 'none';
-    var show = type === 'weekly' || type === 'monthly';
-    $('qaEvery').classList.toggle('hidden', !show);
-    if (show) {
-      $('qaEveryUnit').textContent = type === 'weekly' ? 'weeks' : 'months';
-      $('qaRecurN').value = String((state.qa.recurrence && state.qa.recurrence.n) || 1);
+  // Reflect the current recurrence onto the picker: the repeat <select>, the
+  // "every N days/weeks/months" interval, and the weekly day-of-week chips.
+  // Note: an everyNDays recurrence maps back to the "Daily" select option.
+  function syncRecurUI() {
+    var rec = state.qa.recurrence;
+    var type = rec ? rec.type : 'none';
+    $('qaRecur').value = (type === 'everyNDays') ? 'daily' : type;
+    var isDaily = type === 'daily' || type === 'everyNDays';
+    var isWeekly = type === 'weekly';
+    var isMonthly = type === 'monthly';
+    var weeklyByDays = isWeekly && rec.days && rec.days.length;
+    // Interval field applies to daily/monthly and to weekly-by-interval (not
+    // weekly-by-specific-days, where the interval is implicitly 1 week).
+    var showEvery = isDaily || isMonthly || (isWeekly && !weeklyByDays);
+    $('qaEvery').classList.toggle('hidden', !showEvery);
+    if (showEvery) {
+      $('qaEveryUnit').textContent = isDaily ? 'days' : isMonthly ? 'months' : 'weeks';
+      $('qaRecurN').value = String((rec && rec.n) || 1);
     }
+    // Day-of-week chips: weekly only.
+    $('qaDows').classList.toggle('hidden', !isWeekly);
+    var days = (isWeekly && rec.days) ? rec.days : [];
+    Array.prototype.forEach.call($('qaDows').querySelectorAll('.qa-dow'), function (b) {
+      b.classList.toggle('on', days.indexOf(parseInt(b.getAttribute('data-dow'), 10)) >= 0);
+    });
   }
   function resetQa() {
     state.qa = { due: null, time: null, priority: 4, recurrence: null };
@@ -1061,20 +1080,33 @@
   $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; state.qaManual.priority = true; });
   $('qaRecur').addEventListener('change', function () {
     var v = $('qaRecur').value;
+    var n = parseInt($('qaRecurN').value, 10) || 1;
     if (v === 'none') { state.qa.recurrence = null; }
-    else {
-      var rec = { type: v };
-      // Preserve a chosen interval when switching between weekly/monthly.
-      if ((v === 'weekly' || v === 'monthly')) { var n = parseInt($('qaRecurN').value, 10); if (n >= 2) rec.n = n; }
-      state.qa.recurrence = rec;
-    }
-    state.qaManual.recurrence = true; syncEvery();
+    else if (v === 'daily') { state.qa.recurrence = n >= 2 ? { type: 'everyNDays', n: n } : { type: 'daily' }; }
+    else if (v === 'weekly' || v === 'monthly') { var rec = { type: v }; if (n >= 2) rec.n = n; state.qa.recurrence = rec; }
+    else { state.qa.recurrence = { type: v }; } // weekdays
+    state.qaManual.recurrence = true; syncRecurUI();
   });
   $('qaRecurN').addEventListener('input', function () {
-    if (!state.qa.recurrence) return;
+    var rec = state.qa.recurrence; if (!rec) return;
     var n = parseInt($('qaRecurN').value, 10);
-    if (n >= 2) state.qa.recurrence.n = n; else delete state.qa.recurrence.n;
-    state.qaManual.recurrence = true;
+    var t = rec.type;
+    if (t === 'daily' || t === 'everyNDays') { if (n >= 2) { rec.type = 'everyNDays'; rec.n = n; } else { rec.type = 'daily'; delete rec.n; } }
+    else if (t === 'weekly' || t === 'monthly') { if (n >= 2) rec.n = n; else delete rec.n; }
+    state.qaManual.recurrence = true; syncRecurUI();
+  });
+  // Weekly day-of-week chips: toggling specific days switches weekly to a
+  // by-days schedule (and clears any week-interval, which doesn't combine).
+  $('qaDows').addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.qa-dow'); if (!b) return;
+    var rec = state.qa.recurrence; if (!rec || rec.type !== 'weekly') return;
+    var dow = parseInt(b.getAttribute('data-dow'), 10);
+    var days = rec.days ? rec.days.slice() : [];
+    var i = days.indexOf(dow);
+    if (i >= 0) days.splice(i, 1); else days.push(dow);
+    days.sort(function (a, c) { return a - c; });
+    if (days.length) { rec.days = days; delete rec.n; } else { delete rec.days; }
+    state.qaManual.recurrence = true; syncRecurUI();
   });
   $('qaDate').addEventListener('click', function () {
     openDatePicker($('qaDate'), state.qa.due, function (v) { state.qa.due = v; state.qaManual.due = true; syncQa(); });
