@@ -1,7 +1,7 @@
 {
-  "name": "meeting-notes",
-  "version": "1.32.1",
-  "description": "Self-contained, encrypted meeting-notes application. Zero runtime dependencies, portable, works over cloud-sync folders (Google Drive, Box, Dropbox).",
+  "name": "cove",
+  "version": "1.32.2",
+  "description": "Cove — self-contained, encrypted meeting notes. Zero runtime dependencies, portable, works over cloud-sync folders (Google Drive, Box, Dropbox).",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

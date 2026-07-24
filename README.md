@@ -334,8 +334,8 @@ gets only ciphertext.
 ## Docker
 
 ```bash
-docker build -t meeting-notes .
-docker run -p 3000:3000 -v mn-data:/data meeting-notes
+docker build -t cove .
+docker run -p 3000:3000 -v mn-data:/data cove
 ```
 
 A `/api/health` endpoint (also used by the image's `HEALTHCHECK`) returns
