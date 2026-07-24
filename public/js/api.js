@@ -117,6 +117,8 @@
     exportUrl: (noteId, fmt) => '/api/notes/' + noteId + '/export?format=' + fmt,
 
     verifyIntegrity: () => req('GET', '/api/verify'),
+    listConflicts: () => req('GET', '/api/conflicts'),
+    verifyBackup: (bundle) => req('POST', '/api/backup/verify', { bundle }),
     stats: () => req('GET', '/api/stats'),
     getDataDir: () => req('GET', '/api/datadir'),
     saveDataDir: (path) => req('PUT', '/api/datadir', { path }),

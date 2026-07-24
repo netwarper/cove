@@ -615,6 +615,8 @@ async function route(s, req, res, pathname, query) {
     return undefined;
   }
   if (pathname === '/api/verify' && m === 'GET') return s.verifyIntegrity();
+  if (pathname === '/api/conflicts' && m === 'GET') return s.listConflicts();
+  if (pathname === '/api/backup/verify' && m === 'POST') return s.verifyBundle((await readBody(req)).bundle);
   if (pathname === '/api/stats' && m === 'GET') return s.stats();
   if (pathname === '/api/transcribe' && m === 'POST') {
     const body = await readBody(req);

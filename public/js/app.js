@@ -1820,10 +1820,34 @@
     $('moreMenu').classList.add('hidden');
     if (m === 'templates') openTemplateModal();
     else if (m === 'trash') renderTrash();
+    else if (m === 'conflicts') openConflicts();
     else if (m === 'backup') openModal('backupModal');
     else if (m === 'account') openAccount();
     else if (m === 'manual') openManual();
   });
+
+  // Conflict history: a log of "keep both" forks from multi-device edit clashes.
+  async function openConflicts() {
+    openModal('conflictLogModal');
+    var ul = $('conflictLogList'); ul.innerHTML = '<li class="muted tiny">Loading…</li>';
+    var items = [];
+    try { items = await API.listConflicts(); } catch (_e) { items = []; }
+    ul.innerHTML = '';
+    if (!items.length) { ul.innerHTML = '<li class="muted tiny">No conflicts recorded — nice. This fills in only if the same note is edited on two devices at once and you choose “Keep both”.</li>'; return; }
+    items.forEach(function (it) {
+      var li = document.createElement('li'); li.className = 'conflict-log-item';
+      var when = document.createElement('div'); when.className = 'cl-when muted tiny'; when.textContent = new Date(it.at).toLocaleString();
+      var body = document.createElement('div'); body.className = 'cl-body';
+      var orig = document.createElement('a'); orig.href = '#'; orig.className = 'cl-link'; orig.textContent = it.sourceTitle || 'original';
+      orig.addEventListener('click', function (e) { e.preventDefault(); closeModals(); openNote(it.sourceId); });
+      var copy = document.createElement('a'); copy.href = '#'; copy.className = 'cl-link'; copy.textContent = it.forkTitle || 'conflict copy';
+      copy.addEventListener('click', function (e) { e.preventDefault(); closeModals(); openNote(it.forkId); });
+      body.appendChild(document.createTextNode('Kept both: '));
+      body.appendChild(orig); body.appendChild(document.createTextNode(' → '));
+      body.appendChild(copy);
+      li.appendChild(when); li.appendChild(body); ul.appendChild(li);
+    });
+  }
   function openAccount(focusStt) {
     $('acctMsg').textContent = '';
     var inst = state.instance || {};
@@ -2036,6 +2060,19 @@
       $('restoreMsg').textContent = 'Restored. Reloading…'; setTimeout(function () { location.reload(); }, 800);
     } catch (ex) { $('restoreMsg').textContent = 'Restore failed: ' + ex.message; }
   });
+  $('verifyBackupFile').addEventListener('change', function () { showChosenFile('verifyBackupFile', 'verifyBackupName'); });
+  $('verifyBackupBtn').addEventListener('click', async function () {
+    var f = $('verifyBackupFile').files[0]; var msg = $('verifyBackupMsg');
+    if (!f) { msg.style.color = 'var(--danger)'; msg.textContent = 'Choose a backup file first.'; return; }
+    msg.style.color = 'var(--muted)'; msg.textContent = 'Verifying…';
+    try {
+      var bundle = JSON.parse(await f.text());
+      var r = await API.verifyBackup(bundle);
+      if (r.ok) { msg.style.color = 'var(--muted)'; msg.textContent = '✓ Restorable — all ' + r.checked + ' encrypted entries decrypt with your key' + (r.createdAt ? ' (backup from ' + new Date(r.createdAt).toLocaleString() + ')' : '') + '.'; }
+      else if (!r.hasVault) { msg.style.color = 'var(--danger)'; msg.textContent = '⚠ This file has no vault — it is not a complete backup.'; }
+      else { msg.style.color = 'var(--danger)'; msg.textContent = '⚠ ' + r.corrupt.length + ' of ' + r.checked + ' entries FAILED to decrypt: ' + r.corrupt.slice(0, 5).map(function (x) { return x.path; }).join(', ') + (r.corrupt.length > 5 ? '…' : ''); }
+    } catch (ex) { msg.style.color = 'var(--danger)'; msg.textContent = 'Verify failed: ' + ex.message; }
+  });
 
   // Recovery-key display modal. The confirm button stays disabled until the
   // user clicks Copy — you can't dismiss a one-time key without saving it.
@@ -2066,7 +2103,7 @@
   }
 
   // Modal helpers
-  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal'];
+  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal', 'conflictLogModal'];
   function openModal(id) {
     $('modalBackdrop').classList.remove('hidden');
     MODALS.forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });

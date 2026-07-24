@@ -67,6 +67,7 @@
           <div id="moreMenu" class="menu hidden">
             <button data-more="templates">🧩 Templates</button>
             <button data-more="trash">🗑 Trash</button>
+            <button data-more="conflicts">🔀 Conflicts</button>
             <button data-more="backup">💾 Backup &amp; restore</button>
             <button data-more="manual">📖 User manual</button>
             <button data-more="account">⚙️ Settings</button>
@@ -469,6 +470,16 @@
         <button id="downloadBackupBtn" class="sm primary">Download backup</button>
       </div>
       <div class="acct-block">
+        <h4>Verify a backup (restore drill)</h4>
+        <p class="muted tiny">Prove a backup file actually decrypts with your current key — <b>before</b> you ever need it. Nothing is imported or changed; every entry is just decrypt-checked.</p>
+        <div class="file-picker">
+          <label class="file-btn">Choose file…<input id="verifyBackupFile" type="file" accept=".json" hidden></label>
+          <span id="verifyBackupName" class="file-name muted">No file chosen</span>
+        </div>
+        <button id="verifyBackupBtn" class="sm">Verify backup</button>
+        <div id="verifyBackupMsg" class="tiny" aria-live="polite"></div>
+      </div>
+      <div class="acct-block">
         <h4>Restore</h4>
         <p class="muted tiny">Only works on a fresh install with no vault yet. Copy your backup file’s contents here or use a fresh session.</p>
         <div class="file-picker">
@@ -551,6 +562,13 @@
         <button id="conflictFork" class="sm">Keep both (make a copy)</button>
         <button id="conflictCancel" class="sm">Cancel</button>
       </div>
+    </div>
+
+    <div class="modal hidden" id="conflictLogModal">
+      <h3>🔀 Conflict history</h3>
+      <p class="muted tiny">When the same note is edited on two devices at once and you choose <b>Keep both</b>, a conflict copy is made. Those events are logged here so you can find and reconcile them.</p>
+      <ul id="conflictLogList" class="conflict-log"></ul>
+      <div class="modal-actions"><button class="modal-close">Close</button></div>
     </div>
 
     <div class="modal hidden" id="recoveryModal">

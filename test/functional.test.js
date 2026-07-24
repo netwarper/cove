@@ -421,9 +421,23 @@ const t = harness('functional');
     r = await c.request('GET', '/api/search?q=ZEBRACODE');
     t.ok(!r.body.some((x) => x.noteId === linker), 'search index drops a trashed note');
 
-    // --- conflict fork keeps both ---
+    // --- conflict fork keeps both (and is logged in conflict history) ---
     r = await c.request('POST', '/api/notes/' + note3.id + '/fork', { meetingNotes: '<p>my local copy</p>' });
-    t.ok(r.body.id && r.body.id !== note3.id && r.body.meetingNotes.includes('local copy'), 'fork creates a conflict copy');
+    const forkId = r.body.id;
+    t.ok(forkId && forkId !== note3.id && r.body.meetingNotes.includes('local copy'), 'fork creates a conflict copy');
+    r = await c.request('GET', '/api/conflicts');
+    t.ok(Array.isArray(r.body) && r.body.some((x) => x.forkId === forkId && x.sourceId === note3.id && x.kind === 'fork'), 'fork is recorded in the conflict log');
+
+    // --- backup verify drill (verifyBundle) ---
+    r = await c.request('GET', '/api/backup');
+    const goodBundle = JSON.parse(r.raw.toString());
+    r = await c.request('POST', '/api/backup/verify', { bundle: goodBundle });
+    t.ok(r.body.ok === true && r.body.hasVault && r.body.checked > 0, 'verifyBundle: a good backup decrypts fully');
+    const tampered = JSON.parse(JSON.stringify(goodBundle));
+    const encKey = Object.keys(tampered.files).find((k) => k.endsWith('.enc'));
+    tampered.files[encKey] = Buffer.from('corrupted-not-real-ciphertext').toString('base64');
+    r = await c.request('POST', '/api/backup/verify', { bundle: tampered });
+    t.ok(r.body.ok === false && r.body.corrupt.some((x) => x.path === encKey), 'verifyBundle: a tampered entry is flagged');
 
     // --- reminder snooze pulls the current occurrence ---
     r = await c.request('POST', '/api/workspaces/general/reminders', { text: 'snoozable', cadence: { type: 'daily' } });

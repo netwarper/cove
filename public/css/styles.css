@@ -283,6 +283,10 @@ select.qa-pill { padding: 4px 6px; }
 .attach-list .at-ocr { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; }
 .attach-list .at-ocr.done { color: var(--brand); border-color: var(--brand); }
 .attach-list .at-del { border: 0; background: none; color: var(--danger); }
+.conflict-log { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow-y: auto; }
+.conflict-log-item { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.conflict-log .cl-when { margin-bottom: 2px; }
+.conflict-log .cl-link { color: var(--brand); cursor: pointer; }
 
 /* ---- Favorites / search lists ---- */
 .fav-list, .search-results { list-style: none; margin: 12px 0; padding: 0; }
