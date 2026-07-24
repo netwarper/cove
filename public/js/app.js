@@ -215,6 +215,18 @@
     startIdleTimer();
     startReminderPolling();
     startLiveSync();
+    maybeOnboard();
+  }
+
+  // Show the first-run tour once, but only for a genuinely new/empty vault —
+  // existing users (who already have notes) are marked onboarded silently.
+  async function maybeOnboard() {
+    if (state.settings.onboarded) return;
+    try {
+      var st = await API.stats();
+      if (st && st.notes > 0) { state.settings.onboarded = true; API.saveSettings({ onboarded: true }); return; }
+    } catch (_e) { return; }
+    setTimeout(openTour, 400);
   }
 
   // Deep-link to a note via the URL hash (#note/<id>) so a refresh reopens the
@@ -300,6 +312,7 @@
   $('helpLayer').addEventListener('click', function (e) { if (e.target === $('helpLayer')) closeHelp(); });
   document.querySelector('.help-close').addEventListener('click', closeHelp);
   $('manualLink').addEventListener('click', function (e) { e.preventDefault(); closeHelp(); openManual(); });
+  $('tourStartBtn').addEventListener('click', function () { closeHelp(); openTour(); });
 
   // ---------------- Command palette (⌘K / Ctrl-K) ----------------
   var palette = { open: false, items: [], active: 0 };
@@ -1826,6 +1839,32 @@
     else if (m === 'manual') openManual();
   });
 
+  // ---------------- First-run onboarding tour ----------------
+  var TOUR = [
+    { t: '🗒️ Welcome to Cove', h: 'A private, end-to-end-encrypted home for your meeting notes and tasks. Everything stays on your device (or your own cloud-sync folder) — nothing is uploaded.' },
+    { t: '📅 Daily notes carry forward', h: 'Hit <b>＋ New Daily</b> and your <b>Carryover</b> notes come forward from the last daily note — a running thread per workspace. <b>New scratch note</b> is a clean page that doesn’t affect the thread.' },
+    { t: '✅ Tasks in plain English', h: 'In <b>Overdue &amp; Today</b>, type naturally — e.g. <code>email Sam tomorrow p1 every 2 weeks</code>. The date, priority and repeat are parsed for you, locally, with no AI.' },
+    { t: '🔎 Find &amp; connect', h: 'Search with operators like <code>in:work has:attachment</code>, pin a query as a <b>saved search</b>, and type <kbd>[[</kbd> in any note to link to another. Pasted screenshots are read on-device so their text is searchable too.' },
+    { t: '⌘ Do anything fast', h: 'Press <kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd> for the command palette, <kbd>?</kbd> for all keyboard shortcuts, and use the <b>⋮</b> menu for backup, export, and the offline viewer.' },
+  ];
+  var tourIdx = 0;
+  function renderTour() {
+    var s = TOUR[tourIdx];
+    $('tourTitle').innerHTML = s.t;
+    $('tourBody').innerHTML = s.h;
+    $('tourDots').innerHTML = TOUR.map(function (_s, i) { return '<span class="tour-dot' + (i === tourIdx ? ' on' : '') + '"></span>'; }).join('');
+    $('tourBack').style.visibility = tourIdx === 0 ? 'hidden' : 'visible';
+    $('tourNext').textContent = tourIdx === TOUR.length - 1 ? 'Done' : 'Next';
+  }
+  function openTour() { tourIdx = 0; renderTour(); openModal('tourModal'); }
+  function finishTour() {
+    closeModals();
+    if (!state.settings.onboarded) { state.settings.onboarded = true; API.saveSettings({ onboarded: true }); }
+  }
+  $('tourNext').addEventListener('click', function () { if (tourIdx >= TOUR.length - 1) finishTour(); else { tourIdx++; renderTour(); } });
+  $('tourBack').addEventListener('click', function () { if (tourIdx > 0) { tourIdx--; renderTour(); } });
+  $('tourSkip').addEventListener('click', finishTour);
+
   // Conflict history: a log of "keep both" forks from multi-device edit clashes.
   async function openConflicts() {
     openModal('conflictLogModal');
@@ -2103,7 +2142,7 @@
   }
 
   // Modal helpers
-  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal', 'conflictLogModal'];
+  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal', 'conflictLogModal', 'tourModal'];
   function openModal(id) {
     $('modalBackdrop').classList.remove('hidden');
     MODALS.forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });
@@ -2198,12 +2237,34 @@
   async function lockNow() { if (state.saveTimer) await saveNow(); try { await API.logout(); } catch (e) {} location.reload(); }
 
   // ---------------- Keyboard shortcuts ----------------
+  // Move the sidebar selection to the next/previous note and open it.
+  function moveNoteSelection(delta) {
+    var lis = Array.prototype.slice.call($('noteList').querySelectorAll('li[data-note-id]'));
+    if (!lis.length) return;
+    var ids = lis.map(function (li) { return li.getAttribute('data-note-id'); });
+    var cur = state.note ? ids.indexOf(state.note.id) : -1;
+    var next = cur < 0 ? (delta > 0 ? 0 : ids.length - 1) : Math.max(0, Math.min(ids.length - 1, cur + delta));
+    if (ids[next]) openNote(ids[next]);
+  }
+  var gPending = false, gTimer = null;
   document.addEventListener('keydown', function (e) {
     var tag = (e.target.tagName || '').toLowerCase();
     var editable = e.target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select';
     if (editable || e.metaKey || e.ctrlKey || e.altKey) return;
+    // Two-key "g then x" jumps (Gmail-style).
+    if (gPending) {
+      gPending = false; clearTimeout(gTimer);
+      if (e.key === 't') { e.preventDefault(); renderGlobalTasks(); return; }
+      if (e.key === 'c') { e.preventDefault(); renderCalendar(); return; }
+      if (e.key === 'f') { e.preventDefault(); renderFavorites(); return; }
+      if (e.key === 'h') { e.preventDefault(); if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); return; }
+    }
+    if (e.key === 'g') { gPending = true; clearTimeout(gTimer); gTimer = setTimeout(function () { gPending = false; }, 1200); return; }
     if (e.key === '/') { e.preventDefault(); $('globalSearch').focus(); }
     else if (e.key === 'n') { e.preventDefault(); createNewNote({}); }
+    else if (e.key === 'j') { e.preventDefault(); moveNoteSelection(1); }
+    else if (e.key === 'k') { e.preventDefault(); moveNoteSelection(-1); }
+    else if (e.key === 'e') { e.preventDefault(); var ed = $('meetingEditor'); if (ed) { showView('note'); ed.focus(); } }
     else if (e.key === '?') { e.preventDefault(); openHelp(); }
   });
 

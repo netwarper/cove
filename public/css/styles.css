@@ -287,6 +287,11 @@ select.qa-pill { padding: 4px 6px; }
 .conflict-log-item { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .conflict-log .cl-when { margin-bottom: 2px; }
 .conflict-log .cl-link { color: var(--brand); cursor: pointer; }
+.tour-body { font-size: 14px; line-height: 1.5; min-height: 72px; }
+.tour-body code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.tour-dots { display: flex; gap: 6px; justify-content: center; margin: 14px 0 4px; }
+.tour-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.tour-dot.on { background: var(--brand); }
 
 /* ---- Favorites / search lists ---- */
 .fav-list, .search-results { list-style: none; margin: 12px 0; padding: 0; }

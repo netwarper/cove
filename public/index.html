@@ -571,6 +571,18 @@
       <div class="modal-actions"><button class="modal-close">Close</button></div>
     </div>
 
+    <div class="modal hidden" id="tourModal">
+      <h3 id="tourTitle">Welcome</h3>
+      <div id="tourBody" class="tour-body"></div>
+      <div id="tourDots" class="tour-dots" aria-hidden="true"></div>
+      <div class="modal-actions">
+        <button id="tourSkip" class="sm">Skip</button>
+        <span style="flex:1"></span>
+        <button id="tourBack" class="sm">Back</button>
+        <button id="tourNext" class="primary">Next</button>
+      </div>
+    </div>
+
     <div class="modal hidden" id="recoveryModal">
       <h3>🔑 Save your recovery key</h3>
       <p class="muted tiny">This is shown once. Store it somewhere safe — it is the only way to regain access if you forget your passphrase.</p>
@@ -596,6 +608,7 @@
     <div class="help" role="dialog" aria-modal="true" aria-label="Help">
       <div class="help-head"><h3>Help &amp; shortcuts</h3><button class="help-close icon-btn" aria-label="Close">✕</button></div>
       <a id="manualLink" class="help-manual" href="/manual.html" target="_blank" rel="noopener">📖 Open the full user manual →</a>
+      <button id="tourStartBtn" class="help-manual" style="background:none;border:0;cursor:pointer;text-align:left;padding:0">🧭 Take the quick tour</button>
       <div class="help-body">
         <section>
           <h4>Keyboard</h4>
@@ -603,6 +616,9 @@
             <li><kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd><span>Command palette — jump to any note, workspace, or action</span></li>
             <li><kbd>/</kbd><span>Focus search</span></li>
             <li><kbd>n</kbd><span>New daily note</span></li>
+            <li><kbd>j</kbd> / <kbd>k</kbd><span>Next / previous note in the sidebar</span></li>
+            <li><kbd>e</kbd><span>Jump into the meeting-notes editor</span></li>
+            <li><kbd>g</kbd> then <kbd>t</kbd>/<kbd>c</kbd>/<kbd>f</kbd>/<kbd>h</kbd><span>Go to Tasks / Calendar / Favorites / current note</span></li>
             <li><kbd>?</kbd><span>This help</span></li>
             <li><kbd>Esc</kbd><span>Close menus / dialogs</span></li>
           </ul>
