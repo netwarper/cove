@@ -194,9 +194,28 @@
     finally { $('bioUnlockBtn').disabled = false; }
   });
 
-  window.addEventListener('mn-unauthorized', function () { location.reload(); });
+  // A 401 means our session ended (expired, or the server restarted and lost its
+  // in-memory sessions). Do NOT reload — that used to loop forever, hammering the
+  // server and pinning the CPU. Instead lock back to the auth gate in place and
+  // stop every background request. Guarded so a burst of 401s locks only once.
+  var unauthHandling = false;
+  function handleUnauthorized() {
+    if (unauthHandling) return;
+    unauthHandling = true;
+    stopBackground();
+    if (state.saveTimer) { clearTimeout(state.saveTimer); state.saveTimer = null; }
+    API.setCsrf(null);
+    showAuth(state.initialized !== false);
+    $('authSubtitle').textContent = 'Your session ended — enter your passphrase to unlock again.';
+  }
+  window.addEventListener('mn-unauthorized', handleUnauthorized);
+  function stopBackground() {
+    if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+    if (state.sse) { try { state.sse.close(); } catch (_e) {} state.sse = null; }
+  }
 
   async function startApp() {
+    unauthHandling = false;
     $('authGate').classList.add('hidden');
     $('app').classList.remove('hidden');
     state.settings = await API.getSettings();
@@ -252,9 +271,11 @@
   // keep the browser tab in a perpetual "loading" state (a flickering favicon).
   function startLiveSync() {
     if (!('EventSource' in window)) return;
+    if (state.sse) { try { state.sse.close(); } catch (_e) {} state.sse = null; }
     try {
       var es = new EventSource('/api/events');
-      var timer = null, wantNote = false;
+      state.sse = es;
+      var timer = null, wantNote = false, sseErrs = 0;
       function flush() {
         timer = null;
         // Ignore watcher echoes of our own recent writes (incl. cloud-sync
@@ -277,7 +298,16 @@
         if (data.noteId && state.note && data.noteId === state.note.id) wantNote = true;
         clearTimeout(timer); timer = setTimeout(flush, 1000); // coalesce bursts
       });
-      es.onerror = function () { /* browser auto-reconnects (retry is set server-side) */ };
+      es.addEventListener('open', function () { sseErrs = 0; });
+      es.onerror = function () {
+        // Normally the browser just auto-reconnects. But if our session ended,
+        // /api/events keeps 401-ing forever — after a few failures, confirm via
+        // status and lock instead of looping.
+        if (++sseErrs >= 3) {
+          sseErrs = 0;
+          API.status().then(function (st) { if (st && !st.authenticated) handleUnauthorized(); }).catch(function () {});
+        }
+      };
     } catch (e) { /* SSE unsupported */ }
   }
 
@@ -2263,7 +2293,11 @@
     $('notifyBtn').textContent = state.notify ? '🔔' : '🔕';
     if (state.notify) { notify('Notifications on', { body: 'You’ll get reminders for tasks with a time.', tag: 'mn-enabled' }); pollInbox(); }
   });
-  function startReminderPolling() { pollInbox(); setInterval(pollInbox, 60 * 1000); }
+  function startReminderPolling() {
+    if (state.pollTimer) clearInterval(state.pollTimer);
+    pollInbox();
+    state.pollTimer = setInterval(pollInbox, 60 * 1000);
+  }
   async function pollInbox() {
     try {
       // Drain the inbox (Slack etc. → tasks) into the target workspace.
