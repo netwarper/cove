@@ -1062,19 +1062,41 @@
     state.qa = { due: null, time: null, priority: 4, recurrence: null };
     state.qaManual = { due: false, time: false, priority: false, recurrence: false };
   }
+  // The first date (>= today, local) whose day-of-week is in `days` — today only
+  // if today is one of the chosen days. Used so a weekly-by-days task lands on
+  // the right day instead of defaulting to today.
+  function firstDueForDays(days) {
+    if (!days || !days.length) return null;
+    var t = new Date(), base = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    for (var off = 0; off < 7; off++) {
+      var d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + off);
+      if (days.indexOf(d.getDay()) >= 0) return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    return null;
+  }
+  // The due date implied by the current recurrence when the user hasn't picked
+  // one (currently: the next matching day of a weekly-by-days schedule).
+  function recurrenceImpliedDue() {
+    var r = state.qa.recurrence;
+    if (r && r.type === 'weekly' && r.days && r.days.length) return firstDueForDays(r.days);
+    return null;
+  }
   $('taskInput').addEventListener('input', function () {
     var p = window.TaskParse.parse($('taskInput').value);
     var m = p.matched || {};
     // For each field: a token found in the text wins (and un-sticks any manual
     // value); otherwise keep a manually-picked value, else fall back to default.
-    if (p.due != null) { state.qa.due = p.due; state.qaManual.due = false; }        // covers explicit + recurrence-implied dates
-    else if (!state.qaManual.due) { state.qa.due = null; }
+    if (p.recurrence) { state.qa.recurrence = p.recurrence; state.qaManual.recurrence = false; }
+    else if (!state.qaManual.recurrence) { state.qa.recurrence = null; }
+    // Due: an explicit typed date wins; otherwise keep a manually picked date,
+    // else fall back to whatever the current recurrence implies (e.g. the next
+    // matching weekday) rather than plain "today".
+    if (p.due != null) { state.qa.due = p.due; state.qaManual.due = false; }
+    else if (!state.qaManual.due) { state.qa.due = recurrenceImpliedDue(); }
     if (p.time) { state.qa.time = p.time; state.qaManual.time = false; }
     else if (!state.qaManual.time) { state.qa.time = null; }
     if (m.priority) { state.qa.priority = p.priority; state.qaManual.priority = false; }
     else if (!state.qaManual.priority) { state.qa.priority = 4; }
-    if (p.recurrence) { state.qa.recurrence = p.recurrence; state.qaManual.recurrence = false; }
-    else if (!state.qaManual.recurrence) { state.qa.recurrence = null; }
     syncQa();
   });
   $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; state.qaManual.priority = true; });
@@ -1085,7 +1107,9 @@
     else if (v === 'daily') { state.qa.recurrence = n >= 2 ? { type: 'everyNDays', n: n } : { type: 'daily' }; }
     else if (v === 'weekly' || v === 'monthly') { var rec = { type: v }; if (n >= 2) rec.n = n; state.qa.recurrence = rec; }
     else { state.qa.recurrence = { type: v }; } // weekdays
-    state.qaManual.recurrence = true; syncRecurUI();
+    state.qaManual.recurrence = true;
+    if (!state.qaManual.due) state.qa.due = recurrenceImpliedDue();
+    syncQa();
   });
   $('qaRecurN').addEventListener('input', function () {
     var rec = state.qa.recurrence; if (!rec) return;
@@ -1106,7 +1130,11 @@
     if (i >= 0) days.splice(i, 1); else days.push(dow);
     days.sort(function (a, c) { return a - c; });
     if (days.length) { rec.days = days; delete rec.n; } else { delete rec.days; }
-    state.qaManual.recurrence = true; syncRecurUI();
+    state.qaManual.recurrence = true;
+    // Land the task on the next matching day (not today) when the user hasn't
+    // explicitly chosen a date.
+    if (!state.qaManual.due) state.qa.due = recurrenceImpliedDue();
+    syncQa();
   });
   $('qaDate').addEventListener('click', function () {
     openDatePicker($('qaDate'), state.qa.due, function (v) { state.qa.due = v; state.qaManual.due = true; syncQa(); });
@@ -1114,7 +1142,7 @@
   async function addTaskFromInput() {
     var raw = $('taskInput').value.trim(); if (!raw) return;
     var p = window.TaskParse.parse(raw);
-    var payload = { text: p.text || raw, due: state.qa.due, time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
+    var payload = { text: p.text || raw, due: state.qa.due || recurrenceImpliedDue(), time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
     $('taskInput').value = ''; resetQa(); syncQa();
     applyTaskResult(await API.addTask(state.wsId, payload));
   }
