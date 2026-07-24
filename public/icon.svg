@@ -1,11 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="96" fill="#3b6cf6"/>
-  <!-- A sheltered cove: a white crescent of land embracing a blue bay
-       (which also reads as a "C" for Cove). -->
-  <circle cx="242" cy="256" r="178" fill="#ffffff"/>
-  <circle cx="342" cy="256" r="140" fill="#3b6cf6"/>
-  <!-- ripples on the water -->
-  <rect x="300" y="226" width="82" height="16" rx="8" fill="#ffffff" opacity=".85"/>
-  <rect x="286" y="266" width="112" height="16" rx="8" fill="#ffffff" opacity=".85"/>
-  <rect x="300" y="306" width="82" height="16" rx="8" fill="#ffffff" opacity=".85"/>
+  <!-- The calm, sheltered water of a cove: three stacked waves. -->
+  <g fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round">
+    <path d="M104 180 q38 -42 76 0 t76 0 t76 0 t76 0"/>
+    <path d="M104 256 q38 -42 76 0 t76 0 t76 0 t76 0" opacity=".82"/>
+    <path d="M104 332 q38 -42 76 0 t76 0 t76 0 t76 0" opacity=".64"/>
+  </g>
 </svg>
