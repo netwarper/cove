@@ -420,6 +420,15 @@
           <option value="240">4 hours</option>
           <option value="0">Never (until I close the app)</option>
         </select>
+        <label class="tiny muted" for="sessionTtl" style="margin-top:8px">Stay signed in for</label>
+        <p class="muted tiny">How long your unlocked session stays valid on the server (e.g. after closing the tab or sleeping). It refreshes with use; you'll re-enter your passphrase after this much time away.</p>
+        <select id="sessionTtl" class="ws-tpl">
+          <option value="60">1 hour</option>
+          <option value="240">4 hours</option>
+          <option value="480">8 hours</option>
+          <option value="1440">1 day</option>
+          <option value="10080">1 week</option>
+        </select>
       </div>
       <div class="acct-block">
         <h4>This instance</h4>

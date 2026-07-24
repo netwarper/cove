@@ -1997,6 +1997,8 @@
     $('fontSize').value = state.settings.fontSize || 14;
     $('ocrEnabled').checked = state.settings.ocrEnabled !== false;
     $('idleLock').value = String(state.settings.idleLockMinutes != null ? state.settings.idleLockMinutes : IDLE_DEFAULT_MIN);
+    var ttlDefault = (state.instance && state.instance.sessionTtlDefaultMin) || 240;
+    $('sessionTtl').value = String(state.settings.sessionTtlMinutes != null ? state.settings.sessionTtlMinutes : ttlDefault);
     var tc = state.settings.transcription || {};
     $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
     updateSttWarn();
@@ -2159,6 +2161,10 @@
     state.settings.idleLockMinutes = parseInt($('idleLock').value, 10) || 0;
     API.saveSettings({ idleLockMinutes: state.settings.idleLockMinutes });
     resetIdle(); // apply the new timeout immediately
+  });
+  $('sessionTtl').addEventListener('change', function () {
+    state.settings.sessionTtlMinutes = parseInt($('sessionTtl').value, 10) || 240;
+    API.saveSettings({ sessionTtlMinutes: state.settings.sessionTtlMinutes });
   });
 
   // Backup / restore + bulk export

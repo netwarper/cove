@@ -87,16 +87,28 @@ function startWatcher() {
   }
 }
 
-function newSession(key) {
+// Allowed session-lifetime window: 5 minutes to 30 days (in ms), or null.
+function validTtlMinutes(m) {
+  m = parseInt(m, 10);
+  return (Number.isInteger(m) && m >= 5 && m <= 43200) ? m * 60000 : null;
+}
+// Effective session TTL: a per-vault setting (encrypted index) overrides the
+// SESSION_TTL env default. Read once at session creation using the unlocked key.
+function sessionTtlMs(key) {
+  try { return validTtlMinutes(new Store(DATA_DIR, key).getSettings().sessionTtlMinutes) || SESSION_TTL; }
+  catch (_e) { return SESSION_TTL; }
+}
+function newSession(key, ttlMs) {
+  const ttl = ttlMs || SESSION_TTL;
   const token = c.randomToken();
-  sessions.set(token, { key, csrf: c.randomToken(), expires: Date.now() + SESSION_TTL });
+  sessions.set(token, { key, csrf: c.randomToken(), expires: Date.now() + ttl, ttl });
   return token;
 }
 function getSession(token) {
   const s = sessions.get(token);
   if (!s) return null;
   if (s.expires < Date.now()) { sessions.delete(token); return null; }
-  s.expires = Date.now() + SESSION_TTL;
+  s.expires = Date.now() + (s.ttl || SESSION_TTL); // sliding window
   return s;
 }
 
@@ -210,7 +222,9 @@ function isSecureReq(req) {
 }
 function sessionCookie(token, req) {
   const secure = isSecureReq(req) ? '; Secure' : '';
-  return `mn_session=${token}; HttpOnly; Path=/; SameSite=Strict${secure}; Max-Age=${Math.floor(SESSION_TTL / 1000)}`;
+  const s = sessions.get(token);
+  const ttl = (s && s.ttl) || SESSION_TTL;
+  return `mn_session=${token}; HttpOnly; Path=/; SameSite=Strict${secure}; Max-Age=${Math.floor(ttl / 1000)}`;
 }
 
 // ---- static files ------------------------------------------------------
@@ -253,7 +267,7 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, {
         initialized: vaultExists(), authenticated: !!s, csrf: s ? s.csrf : null,
         bio,
-        instance: { name: CFG.name, url: CFG.url, domain: CFG.domain, version: APP_VERSION, dataDir: DATA_DIR, dataDirEnv: !!DATA_DIR_ENV },
+        instance: { name: CFG.name, url: CFG.url, domain: CFG.domain, version: APP_VERSION, dataDir: DATA_DIR, dataDirEnv: !!DATA_DIR_ENV, sessionTtlDefaultMin: Math.round(SESSION_TTL / 60000) },
       });
     }
 
@@ -277,7 +291,7 @@ const server = http.createServer(async (req, res) => {
       }
       loginAttempts.delete(ip);
       new Store(DATA_DIR, dek).ensureInitialized();
-      const token = newSession(dek);
+      const token = newSession(dek, sessionTtlMs(dek));
       return sendJSON(res, 200, { ok: true, csrf: sessions.get(token).csrf }, { 'Set-Cookie': sessionCookie(token, req) });
     }
 
@@ -289,7 +303,7 @@ const server = http.createServer(async (req, res) => {
       const { vault, dek, recoveryKey } = c.createVault(pass);
       writeVault(vault);
       new Store(DATA_DIR, dek).ensureInitialized();
-      const token = newSession(dek);
+      const token = newSession(dek, sessionTtlMs(dek));
       return sendJSON(res, 200, { ok: true, recoveryKey, csrf: sessions.get(token).csrf }, { 'Set-Cookie': sessionCookie(token, req) });
     }
 
@@ -318,7 +332,7 @@ const server = http.createServer(async (req, res) => {
       }
       loginAttempts.delete(ip);
       new Store(DATA_DIR, dek).ensureInitialized();
-      const token = newSession(dek);
+      const token = newSession(dek, sessionTtlMs(dek));
       return sendJSON(res, 200, { ok: true, migratedRecoveryKey, csrf: sessions.get(token).csrf }, { 'Set-Cookie': sessionCookie(token, req) });
     }
 
@@ -331,7 +345,7 @@ const server = http.createServer(async (req, res) => {
       const newPass = String(body.newPassphrase || '');
       if (newPass.length < 8) return sendJSON(res, 400, { error: 'new passphrase must be at least 8 characters' });
       writeVault(c.rewrapPassphrase(vault, dek, newPass));
-      const token = newSession(dek);
+      const token = newSession(dek, sessionTtlMs(dek));
       return sendJSON(res, 200, { ok: true, csrf: sessions.get(token).csrf }, { 'Set-Cookie': sessionCookie(token, req) });
     }
 
@@ -481,7 +495,7 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    const result = await route(s, req, res, pathname, query);
+    const result = await route(s, req, res, pathname, query, session);
     if (result !== undefined) sendJSON(res, 200, result);
   } catch (err) {
     const status = err.status || 500;
@@ -492,12 +506,20 @@ const server = http.createServer(async (req, res) => {
 });
 
 // ---- API routes (authenticated) ---------------------------------------
-async function route(s, req, res, pathname, query) {
+async function route(s, req, res, pathname, query, session) {
   const m = req.method;
   const seg = pathname.split('/').filter(Boolean); // ['api', ...]
 
   if (pathname === '/api/settings' && m === 'GET') return s.getSettings();
-  if (pathname === '/api/settings' && m === 'PUT') return s.saveSettings(await readBody(req));
+  if (pathname === '/api/settings' && m === 'PUT') {
+    const saved = s.saveSettings(await readBody(req));
+    // Apply a changed session lifetime to the live session right away.
+    if (session && saved && saved.sessionTtlMinutes != null) {
+      const ttl = validTtlMinutes(saved.sessionTtlMinutes);
+      if (ttl) { session.ttl = ttl; session.expires = Date.now() + ttl; }
+    }
+    return saved;
+  }
 
   // templates
   if (pathname === '/api/templates' && m === 'GET') return s.listTemplates();
