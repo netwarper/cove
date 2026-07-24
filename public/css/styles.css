@@ -481,6 +481,9 @@ button.gt-ws:hover { border-color: var(--brand); color: var(--brand); }
 .rte.small { min-height: 70px; }
 .acct-block { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
 .acct-block h4 { margin: 0 0 8px; font-size: 13px; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0; }
+.setting-row label { font-size: 13px; color: var(--ink); }
+.setting-row .ws-tpl { flex: 0 0 auto; }
 .recovery-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; letter-spacing: 1px; background: var(--panel-2); border: 1px dashed var(--brand); border-radius: 8px; padding: 14px; text-align: center; word-break: break-all; margin: 10px 0; }
 .ws-tpl { padding: 5px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--ink); max-width: 150px; }
 select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); }

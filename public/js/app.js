@@ -444,10 +444,11 @@
   });
   $('paletteLayer').addEventListener('click', function (e) { if (e.target === $('paletteLayer')) closePalette(); });
 
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
   async function loadStatsInto() {
     try {
       var s = await API.stats();
-      $('statsInfo').textContent = s.workspaces + ' workspaces · ' + s.notes + ' notes · ' + s.attachments + ' attachments · ' + fmtSize(s.bytes) + ' encrypted on disk';
+      $('statsInfo').textContent = plural(s.workspaces, 'workspace') + ' · ' + plural(s.notes, 'note') + ' · ' + plural(s.attachments, 'attachment') + ' · ' + fmtSize(s.bytes) + ' encrypted on disk';
       if (s.inboxDir) $('inboxInfo').textContent = 'Inbox folder: ' + s.inboxDir;
     } catch (e) { $('statsInfo').textContent = ''; }
   }

@@ -409,26 +409,30 @@
         <div id="bioMsg" class="tiny" aria-live="polite"></div>
       </div>
       <div class="acct-block">
-        <h4>Auto-lock</h4>
-        <p class="muted tiny">Lock Cove and require your passphrase (or biometric) after a period of inactivity on this device.</p>
-        <label class="tiny muted" for="idleLock">Lock after</label>
-        <select id="idleLock" class="ws-tpl">
-          <option value="5">5 minutes</option>
-          <option value="15">15 minutes</option>
-          <option value="30">30 minutes</option>
-          <option value="60">1 hour</option>
-          <option value="240">4 hours</option>
-          <option value="0">Never (until I close the app)</option>
-        </select>
-        <label class="tiny muted" for="sessionTtl" style="margin-top:8px">Stay signed in for</label>
-        <p class="muted tiny">How long your unlocked session stays valid on the server (e.g. after closing the tab or sleeping). It refreshes with use; you'll re-enter your passphrase after this much time away.</p>
-        <select id="sessionTtl" class="ws-tpl">
-          <option value="60">1 hour</option>
-          <option value="240">4 hours</option>
-          <option value="480">8 hours</option>
-          <option value="1440">1 day</option>
-          <option value="10080">1 week</option>
-        </select>
+        <h4>Auto-lock &amp; sessions</h4>
+        <div class="setting-row">
+          <label for="idleLock">Lock after inactivity</label>
+          <select id="idleLock" class="ws-tpl">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 hour</option>
+            <option value="240">4 hours</option>
+            <option value="0">Never</option>
+          </select>
+        </div>
+        <p class="muted tiny">Locks Cove on this device after you've been idle; unlock with your passphrase or biometric.</p>
+        <div class="setting-row">
+          <label for="sessionTtl">Stay signed in for</label>
+          <select id="sessionTtl" class="ws-tpl">
+            <option value="60">1 hour</option>
+            <option value="240">4 hours</option>
+            <option value="480">8 hours</option>
+            <option value="1440">1 day</option>
+            <option value="10080">1 week</option>
+          </select>
+        </div>
+        <p class="muted tiny">How long your unlocked session survives while you're away (tab closed or asleep). It refreshes with use; after this long you'll re-enter your passphrase.</p>
       </div>
       <div class="acct-block">
         <h4>This instance</h4>

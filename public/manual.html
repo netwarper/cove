@@ -382,8 +382,8 @@ sync with Alex next tue 3pm</code></pre>
           <li><b>Encryption at rest:</b> AES-256-GCM envelope encryption; the key is derived from your passphrase with scrypt and only lives in server memory while unlocked.</li>
           <li><b>Passphrase &amp; recovery key:</b> change your passphrase or use your recovery key under <b>⚙ Settings</b>.</li>
           <li><b>Biometric unlock:</b> optionally re-unlock with Touch ID / Windows Hello / a device passkey after an auto-lock, instead of retyping your passphrase. It's per-device and opt-in; your passphrase is still required elsewhere. Enable it in <b>⚙ Settings</b>.</li>
-          <li><b>Idle auto-lock:</b> the app locks itself after a period of inactivity. Choose the delay — 5 min to 4 hours, or <b>Never</b> — under <b>⚙ Settings → Auto-lock</b> (default 15 minutes).</li>
-          <li><b>Session lifetime:</b> also under <b>⚙ Settings → Auto-lock</b>, “Stay signed in for” sets how long your unlocked session stays valid on the server (1 hour to 1 week; default 4 hours). It slides with use; after that long away — tab closed or asleep — you re-enter your passphrase. (The <code>SESSION_TTL</code> env var still sets the default.)</li>
+          <li><b>Idle auto-lock:</b> the app locks itself after a period of inactivity. Choose the delay — 5 min to 4 hours, or <b>Never</b> — under <b>⚙ Settings → Auto-lock &amp; sessions</b> (default 15 minutes).</li>
+          <li><b>Session lifetime:</b> also under <b>⚙ Settings → Auto-lock &amp; sessions</b>, “Stay signed in for” sets how long your unlocked session stays valid on the server (1 hour to 1 week; default 4 hours). It slides with use; after that long away — tab closed or asleep — you re-enter your passphrase. (The <code>SESSION_TTL</code> env var still sets the default.)</li>
           <li><b>Hardening:</b> CSRF tokens, session auth, a strict Content-Security-Policy, anti-clickjacking headers, and login rate-limiting.</li>
         </ul>
         <div class="warn"><b>Biometric note:</b> passkeys need a real hostname — <code>localhost</code> or a domain over HTTPS, not a raw <code>127.0.0.1</code> IP address.</div>
