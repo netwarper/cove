@@ -85,6 +85,10 @@
             <button id="manageWs" class="icon-btn" title="Add / rename / delete workspaces" aria-label="Manage workspaces">⚙︎</button>
           </div>
         </div>
+        <div id="savedSearches" class="tag-bookmarks hidden">
+          <div class="tag-bookmarks-head">🔎 Saved searches</div>
+          <ul id="savedSearchList" class="tag-bookmark-list"></ul>
+        </div>
         <div id="tagBookmarks" class="tag-bookmarks hidden">
           <div class="tag-bookmarks-head">🔖 Bookmarked tags</div>
           <ul id="tagBookmarkList" class="tag-bookmark-list"></ul>
@@ -291,7 +295,10 @@
         </section>
 
         <section id="searchView" class="view hidden">
-          <h1>Search results</h1>
+          <div class="tag-view-head">
+            <h1>Search results</h1>
+            <button id="saveSearchBtn" class="sm" title="Pin this search to the sidebar">★ Save this search</button>
+          </div>
           <ul id="searchResults" class="search-results"></ul>
         </section>
 
@@ -581,7 +588,7 @@
           <h4>In the editors</h4>
           <ul class="kbd-list">
             <li><kbd>/</kbd><span>Slash menu — heading, list, table, quote, code</span></li>
-            <li><span class="tool">⧉</span><span>Link to another note (creates a backlink)</span></li>
+            <li><span class="tool">⧉</span> / <kbd>[[</kbd><span>Link to another note (creates a backlink). Type <kbd>[[</kbd> to pick a note inline</span></li>
             <li><span class="tool">▦</span><span>Insert a table · <span class="tool">🖼</span> image (paste works too)</span></li>
           </ul>
         </section>
@@ -591,6 +598,7 @@
             <li><span>📝</span><span>Add a task like “email Sam tomorrow p1 every Friday” — due date, priority &amp; repeat are parsed for you</span></li>
             <li><span>🔁</span><span>Recurring tasks roll forward when you complete them; ⏭ skips one occurrence</span></li>
             <li><span>#tag</span><span>Tag notes; search with <code>tag:name</code></span></li>
+            <li><span>🔎</span><span>Search operators: <code>tag:</code> <code>in:workspace</code> <code>is:favorite</code> <code>is:scratch</code> <code>has:attachment</code> — combine with words</span></li>
             <li><span>⋮</span><span>Templates · Trash · Backup &amp; offline viewer · Settings</span></li>
             <li><span>★</span><span>Hover a note in the sidebar to favorite or delete it</span></li>
           </ul>

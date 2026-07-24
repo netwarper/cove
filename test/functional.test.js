@@ -119,6 +119,22 @@ const t = harness('functional');
     r = await c.request('GET', '/api/search?q=Submit%20report');
     t.ok(r.body.length >= 1, 'search finds todo text');
 
+    // --- search operators (is:/has:/in:) ---
+    r = await c.request('POST', '/api/workspaces/general/notes/new', {});
+    const opNote = r.body;
+    await c.request('PUT', '/api/notes/' + opNote.id, { customTitle: 'Zeppelin ops', tags: ['ops'], meetingNotes: '<p>uniquewordZQOPS</p>', favorite: true });
+    await c.request('POST', '/api/notes/' + opNote.id + '/attachments', { name: 'a.txt', mime: 'text/plain', dataB64: Buffer.from('x').toString('base64') });
+    r = await c.request('GET', '/api/search?q=' + encodeURIComponent('uniquewordZQOPS is:favorite'));
+    t.ok(r.body.some((x) => x.noteId === opNote.id), 'is:favorite operator matches a favorited note');
+    r = await c.request('GET', '/api/search?q=' + encodeURIComponent('uniquewordZQOPS has:attachment'));
+    t.ok(r.body.some((x) => x.noteId === opNote.id), 'has:attachment operator matches a note with an attachment');
+    r = await c.request('GET', '/api/search?q=' + encodeURIComponent('uniquewordZQOPS in:general'));
+    t.ok(r.body.some((x) => x.noteId === opNote.id), 'in:workspace operator matches by workspace name');
+    r = await c.request('GET', '/api/search?q=' + encodeURIComponent('uniquewordZQOPS is:scratch'));
+    t.ok(!r.body.some((x) => x.noteId === opNote.id), 'is:scratch excludes a daily note');
+    r = await c.request('GET', '/api/search?q=is:favorite');
+    t.ok(r.body.some((x) => x.noteId === opNote.id), 'operator-only query (is:favorite) returns matches');
+
     // --- export / import ---
     r = await c.request('GET', '/api/notes/' + note1.id + '/export?format=json');
     const exported = r.raw.toString();

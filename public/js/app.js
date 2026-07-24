@@ -201,12 +201,14 @@
     $('app').classList.remove('hidden');
     state.settings = await API.getSettings();
     state.tagBookmarks = Array.isArray(state.settings.tagBookmarks) ? state.settings.tagBookmarks : [];
+    state.savedSearches = Array.isArray(state.settings.savedSearches) ? state.settings.savedSearches : [];
     state.allTags = [];
     try { state.allTags = await API.allTags(); } catch (_e) { /* non-fatal */ }
     applyFontSize(state.settings.fontSize || 14);
     applyTheme(state.settings.theme || 'auto');
     applySortControl();
     renderTagBookmarks();
+    renderSavedSearches();
     await loadTemplates();
     await loadWorkspaces();
     await routeFromHash();
@@ -793,6 +795,42 @@
     b.textContent = on ? '🔖 Bookmarked' : '🔖 Bookmark tag';
     b.classList.toggle('on', on);
   }
+
+  // ---- saved searches (pinned queries, incl. operators) ----
+  function renderSavedSearches() {
+    var wrap = $('savedSearches'); if (!wrap) return;
+    var list = state.savedSearches || [];
+    wrap.classList.toggle('hidden', !list.length);
+    var ul = $('savedSearchList'); ul.innerHTML = '';
+    list.forEach(function (s) {
+      var li = document.createElement('li');
+      li.className = 'tagbm' + (state.view === 'search' && state.lastQuery === s.query ? ' active' : '');
+      var open = document.createElement('button'); open.className = 'tagbm-open'; open.textContent = '🔎 ' + s.name;
+      open.title = 'Run: ' + s.query;
+      open.addEventListener('click', function () { $('globalSearch').value = s.query; runSearch(s.query); });
+      var rm = document.createElement('button'); rm.className = 'tagbm-rm'; rm.textContent = '✕';
+      rm.title = 'Remove saved search'; rm.setAttribute('aria-label', 'Remove saved search');
+      rm.addEventListener('click', function (e) { e.stopPropagation(); removeSavedSearch(s.id); });
+      li.appendChild(open); li.appendChild(rm); ul.appendChild(li);
+    });
+  }
+  async function persistSavedSearches() {
+    try { await API.saveSettings({ savedSearches: state.savedSearches }); } catch (_e) { /* non-fatal */ }
+  }
+  async function saveCurrentSearch() {
+    var q = (state.lastQuery || $('globalSearch').value || '').trim();
+    if (!q) { await dialog.alert('Run a search first, then save it.'); return; }
+    var name = await dialog.prompt('Name this saved search:', { title: 'Save search', default: q });
+    if (name == null) return;
+    name = String(name).trim().slice(0, 60) || q;
+    state.savedSearches = (state.savedSearches || []).concat({ id: rid(), name: name, query: q });
+    renderSavedSearches(); persistSavedSearches();
+  }
+  function removeSavedSearch(id) {
+    state.savedSearches = (state.savedSearches || []).filter(function (x) { return x.id !== id; });
+    renderSavedSearches(); persistSavedSearches();
+  }
+  $('saveSearchBtn').addEventListener('click', saveCurrentSearch);
 
   // A cross-workspace view of every note carrying a tag.
   async function openTagView(tag) {
@@ -1509,6 +1547,7 @@
     $('navCalendar').classList.toggle('active', v === 'calendar');
     $('navFavs').classList.toggle('active', v === 'favs');
     if (v !== 'tag') { state.activeTag = null; renderTagBookmarks(); }
+    if (v !== 'search') { state.lastQuery = null; renderSavedSearches(); }
     var map = { note: 'noteView', landing: 'landingView', todos: 'todosView', favs: 'favsView', trash: 'trashView', search: 'searchView', tag: 'tagView', calendar: 'calendarView' };
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
@@ -1695,7 +1734,9 @@
     searchTimer = setTimeout(function () { runSearch(q); }, 250);
   });
   async function runSearch(q) {
+    state.lastQuery = q;
     var results = await API.search(q); showView('search');
+    renderSavedSearches();
     var ul = $('searchResults'); ul.innerHTML = '';
     if (!results.length) { ul.innerHTML = '<li class="muted">No matches for “' + esc(q) + '”.</li>'; return; }
     results.forEach(function (r) {
@@ -1706,10 +1747,14 @@
       li.addEventListener('click', function () { openNote(r.noteId); $('globalSearch').value = ''; }); ul.appendChild(li);
     });
   }
-  // escape, then highlight occurrences of the query (ignoring a leading tag: filter)
+  // escape, then highlight occurrences of the free-text query (ignoring operators)
   function hl(text, q) {
     var out = esc(text);
-    var term = String(q || '').replace(/tag:\S+/g, '').trim();
+    var term = String(q || '')
+      .replace(/\b(?:tag|in):\S+/gi, '')
+      .replace(/\bis:(?:favou?rite|daily|scratch)\b/gi, '')
+      .replace(/\bhas:(?:attachment|image|file)s?\b/gi, '')
+      .trim();
     if (!term) return out;
     try {
       var re = new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig');

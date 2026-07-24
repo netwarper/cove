@@ -173,6 +173,25 @@
     });
   }
 
+  /* Wiki-style linking: typing "[[" opens the note picker and inserts a link. */
+  function enableWikiLinks(editor, opts) {
+    if (!opts || !opts.noteLinkPicker) return;
+    editor.addEventListener('input', function () {
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      var node = sel.anchorNode, off = sel.anchorOffset;
+      if (!node || node.nodeType !== 3) return; // only inside a text node
+      var text = node.nodeValue || '';
+      if (off < 2 || text.slice(off - 2, off) !== '[[') return;
+      // Strip the two brackets, then reuse the standard note-link flow.
+      var r = document.createRange(); r.setStart(node, off - 2); r.setEnd(node, off); r.deleteContents();
+      var caret = document.createRange(); caret.setStart(node, off - 2); caret.collapse(true);
+      sel.removeAllRanges(); sel.addRange(caret);
+      fireInput(editor);
+      exec('noteLink', editor, opts);
+    });
+  }
+
   /* Click an inline image to select it; a visible corner handle (or +/-) resizes it. */
   function enableImageResize(editor) {
     var handle = document.createElement('div');
@@ -271,6 +290,7 @@
       enableDropImages(editor, opts.uploader || null);
       enableSlashMenu(editor, opts);
       enableNoteLinks(editor);
+      enableWikiLinks(editor, opts);
       // Reflect the active formatter on the toolbar buttons.
       var refresh = function () { if (editor.contains(document.getSelection().anchorNode)) updateActiveStates(toolbarEl); };
       editor.addEventListener('keyup', refresh);
