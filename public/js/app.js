@@ -1470,6 +1470,30 @@
       if (!pick) return;
       wsId = pick; payload.tags = [state.activeTag];
     }
+    // Don't silently make a second daily note for a day you already have — it'd
+    // carry the same thread forward twice. Offer to open the existing one first.
+    // (Scratch notes are always fresh; a chosen template is a deliberate new note.)
+    if (!opts.scratch && !opts.templateId) {
+      var existing = null;
+      try {
+        var today = todayStr();
+        existing = (await API.listNotes(wsId, { sort: 'created', dir: 'desc' }) || [])
+          .filter(function (n) { return (n.kind || 'daily') !== 'scratch' && typeof n.title === 'string' && n.title >= today; })
+          .sort(function (a, b) { return a.title < b.title ? -1 : a.title > b.title ? 1 : 0; })[0];
+      } catch (_e) { existing = null; }
+      if (existing) {
+        var when = existing.title === todayStr() ? 'today' : 'dated ' + existing.title;
+        var choice = await dialog.choose(
+          'You already have a daily note ' + when + '. Open it instead of starting another?',
+          [
+            { label: 'Open it', returns: 'open', primary: true },
+            { label: 'Create another', returns: 'create' },
+            { label: 'Cancel', returns: null },
+          ], { title: 'Daily note already exists', cancelValue: null });
+        if (choice === null) return;
+        if (choice === 'open') { state.wsId = wsId; $('workspaceSelect').value = wsId; await openNote(existing.id); return; }
+      }
+    }
     state.note = await API.newNote(wsId, payload);
     state.wsId = wsId; $('workspaceSelect').value = wsId;
     showView('note'); renderNote();
