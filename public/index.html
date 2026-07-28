@@ -206,15 +206,18 @@
                   <button id="qaAdd" class="sm primary">Add</button>
                 </div>
               </div>
-              <ul id="todayList" class="task-list"></ul>
-              <div id="nodateWrap" class="task-group hidden">
-                <div class="task-group-label">No date</div>
-                <ul id="nodateList" class="task-list"></ul>
+              <div id="taskScroll" class="task-scroll">
+                <ul id="todayList" class="task-list"></ul>
+                <div id="nodateWrap" class="task-group hidden">
+                  <div class="task-group-label">No date</div>
+                  <ul id="nodateList" class="task-list"></ul>
+                </div>
+                <div id="completedWrap" class="task-group hidden">
+                  <div class="task-group-label">Completed on this note</div>
+                  <ul id="completedList" class="task-list"></ul>
+                </div>
               </div>
-              <div id="completedWrap" class="task-group hidden">
-                <div class="task-group-label">Completed on this note</div>
-                <ul id="completedList" class="task-list"></ul>
-              </div>
+              <div id="taskResize" class="task-resize hidden" title="Drag to resize the list · double-click to reset" role="separator" aria-label="Resize the task list" tabindex="0"></div>
             </div>
 
             <div class="section" data-sec="upcoming">

@@ -231,6 +231,7 @@
     state.allTags = [];
     try { state.allTags = await API.allTags(); } catch (_e) { /* non-fatal */ }
     applyFontSize(state.settings.fontSize || 14);
+    applyTaskListMax(state.settings.taskListMaxHeight || TASK_LIST_MAX_DEFAULT);
     applyTheme(state.settings.theme || 'auto');
     applySortControl();
     renderTagBookmarks();
@@ -321,6 +322,53 @@
   function applyFontSize(px) {
     document.documentElement.style.setProperty('--note-font', px + 'px');
   }
+
+  // Adjustable, persisted height cap for the note's task list. Below the cap a
+  // list sizes naturally; above it, it scrolls. The grip lets users resize it.
+  var TASK_LIST_MAX_DEFAULT = 340, TASK_LIST_MIN = 140, TASK_LIST_MAX = 1400;
+  function taskListMax() {
+    var h = parseInt(state.settings && state.settings.taskListMaxHeight, 10);
+    return h >= TASK_LIST_MIN && h <= TASK_LIST_MAX ? h : TASK_LIST_MAX_DEFAULT;
+  }
+  function applyTaskListMax(px) {
+    document.documentElement.style.setProperty('--task-list-max', Math.round(px) + 'px');
+  }
+  // Show the resize grip only when the list actually overflows its cap.
+  function refreshTaskScroll() {
+    var sc = $('taskScroll'), grip = $('taskResize');
+    if (!sc || !grip) return;
+    grip.classList.toggle('hidden', sc.scrollHeight <= sc.clientHeight + 1);
+  }
+  function saveTaskListMax(px) {
+    px = Math.max(TASK_LIST_MIN, Math.min(TASK_LIST_MAX, Math.round(px)));
+    applyTaskListMax(px);
+    state.settings.taskListMaxHeight = px;
+    clearTimeout(saveTaskListMax._t);
+    saveTaskListMax._t = setTimeout(function () { API.saveSettings({ taskListMaxHeight: px }); }, 300);
+    refreshTaskScroll();
+  }
+  (function initTaskResize() {
+    var grip = $('taskResize'); if (!grip) return;
+    var dragging = false, startY = 0, startH = 0;
+    grip.addEventListener('pointerdown', function (e) {
+      dragging = true; startY = e.clientY;
+      startH = $('taskScroll').getBoundingClientRect().height;
+      try { grip.setPointerCapture(e.pointerId); } catch (_e) { /* synthetic pointer */ }
+      e.preventDefault();
+    });
+    grip.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      applyTaskListMax(Math.max(TASK_LIST_MIN, Math.min(TASK_LIST_MAX, startH + (e.clientY - startY))));
+    });
+    function end() { if (!dragging) return; dragging = false; saveTaskListMax($('taskScroll').getBoundingClientRect().height); }
+    grip.addEventListener('pointerup', end);
+    grip.addEventListener('pointercancel', end);
+    grip.addEventListener('dblclick', function () { saveTaskListMax(TASK_LIST_MAX_DEFAULT); });
+    grip.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowUp') { saveTaskListMax(taskListMax() - 24); e.preventDefault(); }
+      else if (e.key === 'ArrowDown') { saveTaskListMax(taskListMax() + 24); e.preventDefault(); }
+    });
+  })();
 
   // ---------------- Theme (auto / light / dark) ----------------
   function applyTheme(theme) {
@@ -1025,6 +1073,7 @@
 
     $('completedWrap').classList.toggle('hidden', !here.length);
     var cl = $('completedList'); cl.innerHTML = ''; here.forEach(function (t) { cl.appendChild(taskRow(t)); });
+    refreshTaskScroll();
 
     var uw = $('upcomingList'); uw.innerHTML = '';
     if (!upcoming.length) { uw.innerHTML = '<div class="task-empty muted tiny">No upcoming tasks.</div>'; return; }

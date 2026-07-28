@@ -52,6 +52,7 @@ behaves through sleep / lid-close.
 | **Attachments** | Attach files (up to 20 MB) to a note; stored encrypted. |
 | **Titles** | Auto-titled with the date, with an optional specific title. |
 | **Global search** | Search across every note in every workspace. |
+| **Resizable task list** | A long **Overdue & Today** list scrolls at a capped height (so it doesn't push the page down); drag the grip below it to resize, double-click to reset — the size is persisted. |
 | **Tasks page** | One view of every open task across all workspaces, **grouped by due date** (overdue → today → upcoming → no date) and, within a day, by priority then workspace. Complete a task or click its workspace badge to jump there. |
 | **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) mixed into **one `.wav` file** (encrypted like any attachment), with an optional near-live transcript — timestamped and labeled **You** vs **Them** — in its own area below your notes. |
 | **Screen recording** | **🖥 Screen** records the shared screen/window/tab video with its system audio (+ your mic) to one `.webm` video, saved as an encrypted attachment. |
