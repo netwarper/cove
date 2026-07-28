@@ -231,7 +231,7 @@
     state.allTags = [];
     try { state.allTags = await API.allTags(); } catch (_e) { /* non-fatal */ }
     applyFontSize(state.settings.fontSize || 14);
-    applyTaskListMax(state.settings.taskListMaxHeight || TASK_LIST_MAX_DEFAULT);
+    applyListCaps();
     applyTheme(state.settings.theme || 'auto');
     applySortControl();
     renderTagBookmarks();
@@ -323,52 +323,56 @@
     document.documentElement.style.setProperty('--note-font', px + 'px');
   }
 
-  // Adjustable, persisted height cap for the note's task list. Below the cap a
-  // list sizes naturally; above it, it scrolls. The grip lets users resize it.
-  var TASK_LIST_MAX_DEFAULT = 340, TASK_LIST_MIN = 140, TASK_LIST_MAX = 1400;
-  function taskListMax() {
-    var h = parseInt(state.settings && state.settings.taskListMaxHeight, 10);
-    return h >= TASK_LIST_MIN && h <= TASK_LIST_MAX ? h : TASK_LIST_MAX_DEFAULT;
+  // Adjustable, persisted height caps for the note's task lists. Below the cap a
+  // list sizes naturally; above it, it scrolls. A grip (shown only on overflow)
+  // lets users resize the window, and the height persists per device.
+  var RESIZE_MIN = 140, RESIZE_MAX = 1400, RESIZE_DEFAULT = 340;
+  function makeResizableList(o) {
+    // o: { scrollId, gripId, cssVar, settingKey }
+    function cur() {
+      var h = parseInt(state.settings && state.settings[o.settingKey], 10);
+      return h >= RESIZE_MIN && h <= RESIZE_MAX ? h : RESIZE_DEFAULT;
+    }
+    function apply(px) { document.documentElement.style.setProperty(o.cssVar, Math.round(px) + 'px'); }
+    function refresh() {
+      var sc = $(o.scrollId), grip = $(o.gripId);
+      if (!sc || !grip) return;
+      grip.classList.toggle('hidden', sc.scrollHeight <= sc.clientHeight + 1);
+    }
+    var saveT;
+    function save(px) {
+      px = Math.max(RESIZE_MIN, Math.min(RESIZE_MAX, Math.round(px)));
+      apply(px); state.settings[o.settingKey] = px;
+      clearTimeout(saveT);
+      saveT = setTimeout(function () { var p = {}; p[o.settingKey] = px; API.saveSettings(p); }, 300);
+      refresh();
+    }
+    var grip = $(o.gripId);
+    if (grip) {
+      var dragging = false, startY = 0, startH = 0;
+      grip.addEventListener('pointerdown', function (e) {
+        dragging = true; startY = e.clientY; startH = $(o.scrollId).getBoundingClientRect().height;
+        try { grip.setPointerCapture(e.pointerId); } catch (_e) { /* synthetic pointer */ }
+        e.preventDefault();
+      });
+      grip.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        apply(Math.max(RESIZE_MIN, Math.min(RESIZE_MAX, startH + (e.clientY - startY))));
+      });
+      var end = function () { if (!dragging) return; dragging = false; save($(o.scrollId).getBoundingClientRect().height); };
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('pointercancel', end);
+      grip.addEventListener('dblclick', function () { save(RESIZE_DEFAULT); });
+      grip.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowUp') { save(cur() - 24); e.preventDefault(); }
+        else if (e.key === 'ArrowDown') { save(cur() + 24); e.preventDefault(); }
+      });
+    }
+    return { refresh: refresh, applyStored: function () { apply(cur()); } };
   }
-  function applyTaskListMax(px) {
-    document.documentElement.style.setProperty('--task-list-max', Math.round(px) + 'px');
-  }
-  // Show the resize grip only when the list actually overflows its cap.
-  function refreshTaskScroll() {
-    var sc = $('taskScroll'), grip = $('taskResize');
-    if (!sc || !grip) return;
-    grip.classList.toggle('hidden', sc.scrollHeight <= sc.clientHeight + 1);
-  }
-  function saveTaskListMax(px) {
-    px = Math.max(TASK_LIST_MIN, Math.min(TASK_LIST_MAX, Math.round(px)));
-    applyTaskListMax(px);
-    state.settings.taskListMaxHeight = px;
-    clearTimeout(saveTaskListMax._t);
-    saveTaskListMax._t = setTimeout(function () { API.saveSettings({ taskListMaxHeight: px }); }, 300);
-    refreshTaskScroll();
-  }
-  (function initTaskResize() {
-    var grip = $('taskResize'); if (!grip) return;
-    var dragging = false, startY = 0, startH = 0;
-    grip.addEventListener('pointerdown', function (e) {
-      dragging = true; startY = e.clientY;
-      startH = $('taskScroll').getBoundingClientRect().height;
-      try { grip.setPointerCapture(e.pointerId); } catch (_e) { /* synthetic pointer */ }
-      e.preventDefault();
-    });
-    grip.addEventListener('pointermove', function (e) {
-      if (!dragging) return;
-      applyTaskListMax(Math.max(TASK_LIST_MIN, Math.min(TASK_LIST_MAX, startH + (e.clientY - startY))));
-    });
-    function end() { if (!dragging) return; dragging = false; saveTaskListMax($('taskScroll').getBoundingClientRect().height); }
-    grip.addEventListener('pointerup', end);
-    grip.addEventListener('pointercancel', end);
-    grip.addEventListener('dblclick', function () { saveTaskListMax(TASK_LIST_MAX_DEFAULT); });
-    grip.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowUp') { saveTaskListMax(taskListMax() - 24); e.preventDefault(); }
-      else if (e.key === 'ArrowDown') { saveTaskListMax(taskListMax() + 24); e.preventDefault(); }
-    });
-  })();
+  var todayResizer = makeResizableList({ scrollId: 'taskScroll', gripId: 'taskResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight' });
+  var upcomingResizer = makeResizableList({ scrollId: 'upcomingScroll', gripId: 'upcomingResize', cssVar: '--upcoming-max', settingKey: 'upcomingMaxHeight' });
+  function applyListCaps() { todayResizer.applyStored(); upcomingResizer.applyStored(); }
 
   // ---------------- Theme (auto / light / dark) ----------------
   function applyTheme(theme) {
@@ -1073,17 +1077,21 @@
 
     $('completedWrap').classList.toggle('hidden', !here.length);
     var cl = $('completedList'); cl.innerHTML = ''; here.forEach(function (t) { cl.appendChild(taskRow(t)); });
-    refreshTaskScroll();
+    todayResizer.refresh();
 
     var uw = $('upcomingList'); uw.innerHTML = '';
-    if (!upcoming.length) { uw.innerHTML = '<div class="task-empty muted tiny">No upcoming tasks.</div>'; return; }
-    var groups = {}; upcoming.forEach(function (t) { (groups[t.due] = groups[t.due] || []).push(t); });
-    Object.keys(groups).sort().forEach(function (d) {
-      var day = document.createElement('div'); day.className = 'upcoming-day';
-      var lab = document.createElement('div'); lab.className = 'upcoming-date'; lab.textContent = fmtDueLong(d); day.appendChild(lab);
-      var ul = document.createElement('ul'); ul.className = 'task-list'; groups[d].forEach(function (t) { ul.appendChild(taskRow(t)); }); day.appendChild(ul);
-      uw.appendChild(day);
-    });
+    if (!upcoming.length) {
+      uw.innerHTML = '<div class="task-empty muted tiny">No upcoming tasks.</div>';
+    } else {
+      var groups = {}; upcoming.forEach(function (t) { (groups[t.due] = groups[t.due] || []).push(t); });
+      Object.keys(groups).sort().forEach(function (d) {
+        var day = document.createElement('div'); day.className = 'upcoming-day';
+        var lab = document.createElement('div'); lab.className = 'upcoming-date'; lab.textContent = fmtDueLong(d); day.appendChild(lab);
+        var ul = document.createElement('ul'); ul.className = 'task-list'; groups[d].forEach(function (t) { ul.appendChild(taskRow(t)); }); day.appendChild(ul);
+        uw.appendChild(day);
+      });
+    }
+    upcomingResizer.refresh();
   }
 
   // Opens a native date picker anchored under `anchorEl`. The throwaway <input>

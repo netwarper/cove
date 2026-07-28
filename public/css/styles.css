@@ -154,6 +154,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 /* Cap the note's task list so a long list scrolls instead of pushing the rest of
    the page down. The cap is user-adjustable (drag the grip) and persisted. */
 .task-scroll { max-height: var(--task-list-max, 340px); overflow-y: auto; }
+.upcoming-scroll { max-height: var(--upcoming-max, 340px); }
 .task-resize { height: 12px; margin-top: 2px; cursor: ns-resize; display: flex; align-items: center; justify-content: center; touch-action: none; }
 .task-resize::before { content: ''; width: 36px; height: 3px; border-radius: 3px; background: var(--line); transition: background .15s; }
 .task-resize:hover::before, .task-resize:focus-visible::before { background: var(--brand); }
