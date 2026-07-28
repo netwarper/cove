@@ -593,6 +593,9 @@
     var n = state.note;
     var scratch = n.kind === 'scratch';
     $('noteDate').textContent = n.title;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(n.title || '')) $('noteDateInput').value = n.title;
+    $('noteDateInput').classList.add('hidden');
+    $('noteDate').classList.remove('hidden');
     var kind = $('noteKind');
     kind.textContent = scratch ? '✏️ Scratch' : '';
     kind.classList.toggle('hidden', !scratch);
@@ -1405,6 +1408,39 @@
 
   // ---------------- Header actions ----------------
   $('noteCustomTitle').addEventListener('input', function () { state.note.customTitle = $('noteCustomTitle').value; scheduleSave(); });
+
+  // Editable display date: click the date to reveal a picker. Changing it re-dates
+  // the note for display/grouping only — its place in the carry-forward chain
+  // (keyed on creation order) is untouched.
+  function showDateEditor() {
+    if (!state.note) return;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(state.note.title || '')) $('noteDateInput').value = state.note.title;
+    $('noteDate').classList.add('hidden');
+    $('noteDateInput').classList.remove('hidden');
+    $('noteDateInput').focus();
+    if ($('noteDateInput').showPicker) { try { $('noteDateInput').showPicker(); } catch (_e) {} }
+  }
+  function hideDateEditor() { $('noteDateInput').classList.add('hidden'); $('noteDate').classList.remove('hidden'); }
+  var committingDate = false;
+  async function commitNoteDate() {
+    var d = $('noteDateInput').value;
+    if (committingDate) return;
+    if (!state.note || !d || d === state.note.title) { hideDateEditor(); return; }
+    committingDate = true;
+    setSaveStatus('Saving…');
+    try {
+      var saved = await API.saveNote(state.note.id, { date: d });
+      state.note.title = saved.title; state.note.updatedAt = saved.updatedAt; state.note.rev = saved.rev;
+      $('noteDate').textContent = saved.title;
+      setSaveStatus('Saved ✓'); renderNoteList();
+    } catch (ex) { setSaveStatus('Date change failed: ' + ex.message); }
+    committingDate = false;
+    hideDateEditor();
+  }
+  $('noteDate').addEventListener('click', showDateEditor);
+  $('noteDateInput').addEventListener('change', commitNoteDate);
+  $('noteDateInput').addEventListener('blur', commitNoteDate);
+  $('noteDateInput').addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); hideDateEditor(); } });
   $('favBtn').addEventListener('click', async function () {
     state.note.favorite = !state.note.favorite; $('favBtn').textContent = state.note.favorite ? '★' : '☆';
     var s = await API.setFavorite(state.note.id, state.note.favorite);

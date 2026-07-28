@@ -46,6 +46,7 @@ behaves through sleep / lid-close.
 | **Tasks (Todoist-style)** | One unified module for to-dos **and** reminders. Each task is **workspace-level** with a **due date** (defaults to today if you don't set one), **priority (P1–P4)**, and optional **recurrence** (daily / weekdays / weekly / monthly / every-N-days). The note view shows your workspace's **Overdue & Today** and **Upcoming** tasks; complete one and it rolls forward if it repeats, or crosses out **on the note it was completed on** (never on future notes). ⏭ skips a single occurrence. |
 | **Quick-add (no LLM)** | Type naturally — `email Sam tomorrow p1 every Friday` — and the due date, priority, and repeat are parsed locally (deterministic, no model calls), with pickers to adjust. |
 | **Ongoing Notes** | Rich text that **copies into the next daily note**. |
+| **Re-date a note** | Click a note's date to pre-/post-date it — label one you forgot yesterday or prep tomorrow's. Changes the **displayed date only**; the carry-forward order (by creation) is untouched, so the running thread never rewires. |
 | **Meeting Notes** | Rich text that is **not** copied over. |
 | **Rich text** | Bold, italic, underline, strikethrough, bullet & numbered lists, headings, links, and **inline images** you can **resize** (drag the corner handle, or `+`/`-`) and **paste or drag-and-drop** straight in. |
 | **Attachments** | Attach files (up to 20 MB) to a note; stored encrypted. |

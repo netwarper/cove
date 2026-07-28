@@ -135,7 +135,9 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 /* ---- Note header ---- */
 .note-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .title-block { display: flex; flex-direction: column; gap: 2px; }
-.note-date { font-size: 20px; font-weight: 700; }
+.note-date { font-size: 20px; font-weight: 700; background: none; border: 0; padding: 2px 4px; margin: 0 -4px; color: var(--ink); cursor: pointer; border-radius: 6px; font-family: inherit; }
+.note-date:hover { background: var(--panel-2); }
+.note-date-input { font-size: 18px; font-weight: 700; color: var(--ink); background: var(--panel-2); border: 1px solid var(--brand); border-radius: 6px; padding: 1px 6px; font-family: inherit; }
 .custom-title {
   border: 0; border-bottom: 1px dashed var(--line); background: transparent; color: var(--ink);
   padding: 3px 0; font-size: 14px; min-width: 260px;

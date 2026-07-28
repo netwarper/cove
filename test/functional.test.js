@@ -66,6 +66,18 @@ const t = harness('functional');
     t.eq(r.body.todos.map((x) => x.text), ['open task 1', 'open task 2', 'done task'], 'completed todos sink to bottom');
     t.eq(r.body.customTitle, 'Kickoff', 'custom title saved');
 
+    // --- editable display date: re-dates for display, leaves createdAt (chain order) alone ---
+    const origCreated = note1.createdAt;
+    r = await c.request('PUT', '/api/notes/' + note1.id, { date: '2020-01-15' });
+    t.eq(r.status, 200, 'valid display date accepted');
+    t.eq(r.body.title, '2020-01-15', 'note title reflects the new display date');
+    t.eq(r.body.createdAt, origCreated, 'createdAt (carry-forward order) unchanged by re-dating');
+    r = await c.request('PUT', '/api/notes/' + note1.id, { date: '2020-02-30' });
+    t.eq(r.status, 400, 'impossible calendar date rejected');
+    r = await c.request('PUT', '/api/notes/' + note1.id, { date: 'nope' });
+    t.eq(r.status, 400, 'malformed date rejected');
+    await c.request('PUT', '/api/notes/' + note1.id, { date: new Date().toISOString().slice(0, 10) });
+
     // --- create next note copies open todos + carryover, drops meeting notes ---
     r = await c.request('POST', '/api/workspaces/general/notes/new', {});
     const note2 = r.body;

@@ -142,7 +142,8 @@
           <div class="note-header">
             <div class="title-block">
               <div class="title-row">
-                <span id="noteDate" class="note-date"></span>
+                <button id="noteDate" class="note-date" title="Click to change this note’s date" aria-label="Change note date"></button>
+                <input id="noteDateInput" type="date" class="note-date-input hidden" aria-label="Note date">
                 <span id="noteKind" class="note-kind hidden"></span>
               </div>
               <input id="noteCustomTitle" class="custom-title" placeholder="Add a specific title…">
