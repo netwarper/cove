@@ -1613,7 +1613,7 @@
       var fields = [
         { key: 'customTitle', label: 'Title', rich: false },
         { key: 'tags', label: 'Tags', rich: false, arr: true },
-        { key: 'carryover', label: 'Carryover Notes', rich: true },
+        { key: 'carryover', label: 'Ongoing Notes', rich: true },
         { key: 'meetingNotes', label: 'Meeting Notes', rich: true },
       ];
       var box = $('conflictFields'); box.innerHTML = '';
@@ -1940,7 +1940,7 @@
   // ---------------- First-run onboarding tour ----------------
   var TOUR = [
     { t: '🗒️ Welcome to Cove', h: 'A private, end-to-end-encrypted home for your meeting notes and tasks. Everything stays on your device (or your own cloud-sync folder) — nothing is uploaded.' },
-    { t: '📅 Daily notes carry forward', h: 'Hit <b>＋ New Daily</b> and your <b>Carryover</b> notes come forward from the last daily note — a running thread per workspace. <b>New scratch note</b> is a clean page that doesn’t affect the thread.' },
+    { t: '📅 Daily notes carry forward', h: 'Hit <b>＋ New Daily</b> and your <b>Ongoing</b> notes come forward from the last daily note — a running thread per workspace. <b>New scratch note</b> is a clean page that doesn’t affect the thread.' },
     { t: '✅ Tasks in plain English', h: 'In <b>Overdue &amp; Today</b>, type naturally — e.g. <code>email Sam tomorrow p1 every 2 weeks</code>. The date, priority and repeat are parsed for you, locally, with no AI.' },
     { t: '🔎 Find &amp; connect', h: 'Search with operators like <code>in:work has:attachment</code>, pin a query as a <b>saved search</b>, and type <kbd>[[</kbd> in any note to link to another. Pasted screenshots are read on-device so their text is searchable too.' },
     { t: '⌘ Do anything fast', h: 'Press <kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd> for the command palette, <kbd>?</kbd> for all keyboard shortcuts, and use the <b>⋮</b> menu for backup, export, and the offline viewer.' },

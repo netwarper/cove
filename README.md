@@ -5,7 +5,7 @@ one-click launcher — and is ready to be hosted remotely later. It has **zero
 runtime dependencies** (Node core only), so the whole folder can be copied to
 any machine with Node.js and started immediately.
 
-The central idea: **each new daily note is seeded with the carryover notes from
+The central idea: **each new daily note is seeded with the ongoing notes from
 the most recent note in the same workspace**, while the meeting-specific notes
 stay behind. Tasks live at the **workspace** level (Todoist-style, with due
 dates, priorities, and recurrence) and surface on each note as **Overdue &
@@ -41,11 +41,11 @@ behaves through sleep / lid-close.
 | Area | What it does |
 |------|--------------|
 | **Workspaces** | Notes are grouped into **General** plus any workspaces you create. Empty workspaces show a landing page with tips instead of an auto-created note. |
-| **Daily & scratch notes** | **New Daily** starts a note that carries carryover forward from the last **daily** note. **New scratch note** is a clean Meeting Notes page for a quick jot — it never affects the carryover thread. |
-| **Sections** | Overdue & Today · Upcoming · Carryover Notes · Meeting Notes. Scratch notes show only Meeting Notes. |
+| **Daily & scratch notes** | **New Daily** starts a note that carries your ongoing notes forward from the last **daily** note. **New scratch note** is a clean Meeting Notes page for a quick jot — it never affects the ongoing thread. |
+| **Sections** | Overdue & Today · Upcoming · Ongoing Notes · Meeting Notes. Scratch notes show only Meeting Notes. |
 | **Tasks (Todoist-style)** | One unified module for to-dos **and** reminders. Each task is **workspace-level** with a **due date** (defaults to today if you don't set one), **priority (P1–P4)**, and optional **recurrence** (daily / weekdays / weekly / monthly / every-N-days). The note view shows your workspace's **Overdue & Today** and **Upcoming** tasks; complete one and it rolls forward if it repeats, or crosses out **on the note it was completed on** (never on future notes). ⏭ skips a single occurrence. |
 | **Quick-add (no LLM)** | Type naturally — `email Sam tomorrow p1 every Friday` — and the due date, priority, and repeat are parsed locally (deterministic, no model calls), with pickers to adjust. |
-| **Carryover Notes** | Rich text that **copies into the next daily note**. |
+| **Ongoing Notes** | Rich text that **copies into the next daily note**. |
 | **Meeting Notes** | Rich text that is **not** copied over. |
 | **Rich text** | Bold, italic, underline, strikethrough, bullet & numbered lists, headings, links, and **inline images** you can **resize** (drag the corner handle, or `+`/`-`) and **paste or drag-and-drop** straight in. |
 | **Attachments** | Attach files (up to 20 MB) to a note; stored encrypted. |
@@ -61,7 +61,7 @@ behaves through sleep / lid-close.
 | **Favorites** | Star notes; find them in the ★ Favorites view. |
 | **Tags** | Tag notes and filter search with `tag:name`. Click a tag to open a **cross-workspace tag view** of every note carrying it. |
 | **Tag bookmarks** | Bookmark a tag to pin it to a sidebar section that's visible in **every** workspace. Creating a note from a tag view auto-applies the tag and asks which workspace to put it in. |
-| **Templates** | Reusable meeting templates that seed the **Meeting Notes** section of new notes — ships with **1:1**, **Team standup**, **Project update**, and **Interview**, and you can add your own. Carryover still comes from the previous note. Set a per-workspace default or pick one from **New ▾**. |
+| **Templates** | Reusable meeting templates that seed the **Meeting Notes** section of new notes — ships with **1:1**, **Team standup**, **Project update**, and **Interview**, and you can add your own. Ongoing notes still come from the previous note. Set a per-workspace default or pick one from **New ▾**. |
 | **Trash** | Deleted notes go to Trash and can be restored for 30 days before permanent removal. |
 | **Move / duplicate** | Move a note to another workspace, or duplicate it. |
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |

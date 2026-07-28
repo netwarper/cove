@@ -147,7 +147,7 @@
       '<div class="sub">' + esc(state.wsNames[n._ws] || '') + ' · created ' + esc((n.createdAt || '').slice(0, 10)) + '</div>' +
       ((n.tags || []).length ? '<div class="tags">' + n.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</div>' : '') +
       tasksSec +
-      '<div class="sec"><h3>Carryover Notes</h3><div class="rich">' + (withImages(sanitize(n.carryover), n.id) || '<span class="muted">None</span>') + '</div></div>' +
+      '<div class="sec"><h3>Ongoing Notes</h3><div class="rich">' + (withImages(sanitize(n.carryover), n.id) || '<span class="muted">None</span>') + '</div></div>' +
       '<div class="sec"><h3>Meeting Notes</h3><div class="rich">' + (withImages(sanitize(n.meetingNotes), n.id) || '<span class="muted">None</span>') + '</div>' +
       (atNames.length ? '<div class="attach">📎 ' + atNames.join(', ') + ' <span class="muted">(open in the app to download)</span></div>' : '') +
       '</div></div>';

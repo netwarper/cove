@@ -97,7 +97,7 @@
         <div class="sidebar-head">
           <span>Notes</span>
           <div class="new-note-wrap">
-            <button id="newNoteBtn" class="primary sm" title="New daily note — carries carryover forward from the last daily note">＋ New Daily</button>
+            <button id="newNoteBtn" class="primary sm" title="New daily note — carries your ongoing notes forward from the last daily note">＋ New Daily</button>
             <button id="newNoteCaret" class="primary sm caret" title="New note options" aria-label="New note options">▾</button>
             <div id="newNoteMenu" class="menu hidden">
               <button data-new="daily">New daily note</button>
@@ -222,9 +222,9 @@
             </div>
 
             <div class="section" data-sec="carryover">
-              <h2>↻ Carryover Notes</h2>
+              <h2>↻ Ongoing Notes</h2>
               <div class="rte-toolbar" data-target="carryoverEditor"></div>
-              <div id="carryoverEditor" class="rte" contenteditable="true" aria-label="Carryover notes"></div>
+              <div id="carryoverEditor" class="rte" contenteditable="true" aria-label="Ongoing notes"></div>
             </div>
 
             <div class="section" data-sec="meeting">
@@ -278,8 +278,8 @@
               <button id="landingNewScratch" class="sm">✏️ New scratch note</button>
             </div>
             <ul class="landing-tips">
-              <li><b>Daily notes</b> carry your carryover notes forward from the previous daily note — your running thread. Tasks live at the workspace level and show up as Overdue &amp; Today and Upcoming.</li>
-              <li><b>Scratch notes</b> are a clean Meeting Notes page for a quick jot; they don’t affect carryover.</li>
+              <li><b>Daily notes</b> carry your ongoing notes forward from the previous daily note — your running thread. Tasks live at the workspace level and show up as Overdue &amp; Today and Upcoming.</li>
+              <li><b>Scratch notes</b> are a clean Meeting Notes page for a quick jot; they don’t affect the ongoing thread.</li>
               <li>Record meeting audio with <b>🔴 Record</b>; the transcript appears in its own area below your notes.</li>
               <li>Press <kbd>⌘</kbd>/<kbd>Ctrl</kbd> <kbd>K</kbd> for the command palette, or <kbd>?</kbd> for help &amp; shortcuts.</li>
               <li>Tag notes with <code>#tag</code> and search anywhere with <code>tag:name</code>.</li>
@@ -372,7 +372,7 @@
 
     <div class="modal hidden" id="templateModal">
       <h3>Templates</h3>
-      <p class="muted tiny">A template seeds the <b>Meeting Notes</b> section of new notes. Carryover still carries over from the previous note (a template's default carryover fills it only on the first note of a workspace).</p>
+      <p class="muted tiny">A template seeds the <b>Meeting Notes</b> section of new notes. Ongoing notes still carry over from the previous note (a template's default fills them only on the first note of a workspace).</p>
       <ul id="templateList" class="ws-manage-list"></ul>
       <div class="tpl-editor">
         <input id="tplName" placeholder="Template name (e.g. 1:1, Standup, Retro)">
