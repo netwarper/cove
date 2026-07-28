@@ -345,7 +345,7 @@
       apply(px); state.settings[o.settingKey] = px;
       clearTimeout(saveT);
       saveT = setTimeout(function () { var p = {}; p[o.settingKey] = px; API.saveSettings(p); }, 300);
-      refresh();
+      (o.onChange || refresh)();
     }
     var grip = $(o.gripId);
     if (grip) {
@@ -370,9 +370,14 @@
     }
     return { refresh: refresh, applyStored: function () { apply(cur()); } };
   }
-  var todayResizer = makeResizableList({ scrollId: 'taskScroll', gripId: 'taskResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight' });
-  var upcomingResizer = makeResizableList({ scrollId: 'upcomingScroll', gripId: 'upcomingResize', cssVar: '--upcoming-max', settingKey: 'upcomingMaxHeight' });
-  function applyListCaps() { todayResizer.applyStored(); upcomingResizer.applyStored(); }
+  // Both task lists share one height: dragging either grip resizes both, and the
+  // single value persists (taskListMaxHeight → --task-list-max). After a resize,
+  // re-check both grips since the change may make the other list start/stop
+  // overflowing.
+  function refreshTaskLists() { todayResizer.refresh(); upcomingResizer.refresh(); }
+  var todayResizer = makeResizableList({ scrollId: 'taskScroll', gripId: 'taskResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight', onChange: refreshTaskLists });
+  var upcomingResizer = makeResizableList({ scrollId: 'upcomingScroll', gripId: 'upcomingResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight', onChange: refreshTaskLists });
+  function applyListCaps() { todayResizer.applyStored(); }
 
   // ---------------- Theme (auto / light / dark) ----------------
   function applyTheme(theme) {
