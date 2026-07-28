@@ -154,11 +154,11 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 /* Cap the note's task list so a long list scrolls instead of pushing the rest of
    the page down. The cap is user-adjustable (drag the grip) and persisted. */
 .task-scroll { max-height: var(--task-list-max, 340px); overflow-y: auto; }
-/* The Today column carries the quick-add box above its list, so make both task
-   columns flex and pin the grip to the bottom — that lines the two resizers up
-   at the same spot instead of the Upcoming grip floating mid-column. */
-.sections [data-sec="today"], .sections [data-sec="upcoming"] { display: flex; flex-direction: column; }
-.task-resize { height: 12px; margin-top: auto; padding-top: 4px; cursor: ns-resize; display: flex; align-items: center; justify-content: center; touch-action: none; }
+/* The Today column carries the quick-add box above its list, so let the Upcoming
+   list use that same amount of extra height (--qa-h, measured live). Both column
+   bottoms — and the two resize grips — then line up, with no dead gap. */
+.upcoming-scroll { max-height: calc(var(--task-list-max, 340px) + var(--qa-h, 0px)); }
+.task-resize { height: 12px; margin-top: 2px; cursor: ns-resize; display: flex; align-items: center; justify-content: center; touch-action: none; }
 .task-resize::before { content: ''; width: 36px; height: 3px; border-radius: 3px; background: var(--line); transition: background .15s; }
 .task-resize:hover::before, .task-resize:focus-visible::before { background: var(--brand); }
 .task-resize:focus-visible { outline: none; }

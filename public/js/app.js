@@ -374,10 +374,27 @@
   // single value persists (taskListMaxHeight → --task-list-max). After a resize,
   // re-check both grips since the change may make the other list start/stop
   // overflowing.
+  // The Today column's quick-add box pushes its list down; measure that offset so
+  // the Upcoming list can be exactly that much taller and the two column bottoms
+  // (and grips) line up. Stable regardless of the lists' own heights.
+  function updateQaOffset() {
+    var td = $('taskScroll'), up = $('upcomingScroll');
+    if (!td || !up) return;
+    var a = td.getBoundingClientRect(), b = up.getBoundingClientRect();
+    if (!a.height && !b.height) return; // note view not visible — skip
+    var d = Math.round(a.top - b.top);
+    document.documentElement.style.setProperty('--qa-h', (d > 0 ? d : 0) + 'px');
+  }
   function refreshTaskLists() { todayResizer.refresh(); upcomingResizer.refresh(); }
   var todayResizer = makeResizableList({ scrollId: 'taskScroll', gripId: 'taskResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight', onChange: refreshTaskLists });
   var upcomingResizer = makeResizableList({ scrollId: 'upcomingScroll', gripId: 'upcomingResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight', onChange: refreshTaskLists });
   function applyListCaps() { todayResizer.applyStored(); }
+  // Recompute the quick-add offset when the layout reflows (e.g. width changes
+  // wrap the quick-add controls), so the columns stay bottom-aligned.
+  window.addEventListener('resize', function () {
+    clearTimeout(updateQaOffset._t);
+    updateQaOffset._t = setTimeout(function () { updateQaOffset(); refreshTaskLists(); }, 150);
+  });
 
   // ---------------- Theme (auto / light / dark) ----------------
   function applyTheme(theme) {
@@ -1082,6 +1099,7 @@
 
     $('completedWrap').classList.toggle('hidden', !here.length);
     var cl = $('completedList'); cl.innerHTML = ''; here.forEach(function (t) { cl.appendChild(taskRow(t)); });
+    updateQaOffset();
     todayResizer.refresh();
 
     var uw = $('upcomingList'); uw.innerHTML = '';
