@@ -383,6 +383,8 @@ button.gt-ws:hover { border-color: var(--brand); color: var(--brand); }
 .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; width: min(440px, 92vw); box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto; }
 .modal h3 { margin: 0 0 12px; }
 .modal input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); margin-bottom: 10px; }
+.modal input[type="checkbox"], .modal input[type="radio"] { width: auto; padding: 0; margin: 0 6px 0 0; vertical-align: middle; }
+.acct-block label.tiny { display: inline-flex; align-items: center; }
 .modal.wide { width: min(760px, 94vw); }
 .conflict-fields { display: flex; flex-direction: column; gap: 14px; margin: 12px 0; }
 .conflict-row { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
@@ -500,6 +502,7 @@ select.full { width: 100%; padding: 9px; border: 1px solid var(--line); border-r
 .slash-menu { position: absolute; z-index: 60; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 150px; }
 .slash-menu button { text-align: left; padding: 7px 12px; border: 0; background: none; color: var(--ink); }
 .slash-menu button:hover { background: var(--panel-2); }
+.slash-hint { padding: 5px 12px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); }
 
 .backlinks { margin-top: 12px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .backlinks .bl-label { color: var(--muted); font-weight: 600; }

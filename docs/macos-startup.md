@@ -32,6 +32,28 @@ To find the URL to open, run `node server.js --print-config` (or set a durable
 address once with `node server.js --set-domain cove`, which pins a stable
 `cove.localhost` address + port).
 
+### If it doesn't start at login
+
+The installer uses the modern `launchctl bootstrap` API (with a fallback to the
+old `load`/`unload` on pre-2016 macOS). If Cove isn't coming up:
+
+```bash
+scripts/macos-service.sh status     # shows state / pid / last exit code
+tail -n 40 ~/Library/Logs/cove.log  # server's own output and any crash reason
+```
+
+Common causes:
+
+- **`node` isn't on the login PATH.** The agent runs through a login shell
+  (`zsh -lc`) so most setups resolve `node`, but if you installed it via `nvm`
+  the version is only loaded interactively. Either `brew install node`, or point
+  the agent at the exact binary (`which node`) and re-run `install`.
+- **Full Disk / folder permission.** If `DATA_DIR` is in iCloud/Dropbox, grant
+  the terminal app Full Disk Access (System Settings → Privacy & Security) so
+  launchd can write there at login.
+- **Reinstall cleanly.** `scripts/macos-service.sh uninstall && scripts/macos-service.sh install`
+  removes any stale agent registration before loading the new one.
+
 ## What happens when the Mac sleeps (lid close)
 
 **Short version: closing the lid is safe. Cove pauses and resumes cleanly.**

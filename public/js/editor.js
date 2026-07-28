@@ -133,9 +133,9 @@
     { label: 'Code', run: function () { document.execCommand('formatBlock', false, 'PRE'); } },
   ];
 
-  /* Type "/" to open a block menu at the caret. */
+  /* Type "/" at the start of a word to open a block menu at the caret. */
   function enableSlashMenu(editor, opts) {
-    var menu = null, anchor = null, onScroll = null;
+    var menu = null, anchor = null, onScroll = null, onDocDown = null;
     // Keep the menu glued to where the "/" was typed, so it moves with the text
     // as the note scrolls (rather than floating in a fixed spot on screen).
     function place() {
@@ -149,9 +149,21 @@
       if (menu) { menu.remove(); menu = null; }
       anchor = null;
       if (onScroll) { window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onScroll); onScroll = null; }
+      if (onDocDown) { document.removeEventListener('mousedown', onDocDown, true); onDocDown = null; }
+    }
+    // Only treat "/" as a command trigger when it begins a word — i.e. it's at
+    // the very start of the block or right after whitespace. This keeps ordinary
+    // text ("and/or", "http://", "7/28") from popping the menu mid-typing.
+    function slashStartsWord() {
+      var sel = window.getSelection();
+      if (!sel.rangeCount) return false;
+      var node = sel.anchorNode, off = sel.anchorOffset;
+      if (!node || node.nodeType !== 3) return true; // "/" is the block's first char
+      var before = (node.nodeValue || '').charAt(off - 2); // char just before the "/"
+      return before === '' || /\s| /.test(before);
     }
     editor.addEventListener('keyup', function (e) {
-      if (e.key === '/') {
+      if (e.key === '/' && slashStartsWord()) {
         var sel = window.getSelection();
         if (!sel.rangeCount) return;
         close();
@@ -170,6 +182,10 @@
           });
           menu.appendChild(b);
         });
+        var hint = document.createElement('div');
+        hint.className = 'slash-hint';
+        hint.textContent = 'Esc to dismiss';
+        menu.appendChild(hint);
         document.body.appendChild(menu);
         place();
         // Capture-phase so scrolls inside the note container (which don't bubble)
@@ -177,8 +193,13 @@
         onScroll = place;
         window.addEventListener('scroll', onScroll, true);
         window.addEventListener('resize', onScroll);
-      } else if (e.key === 'Escape') { close(); }
+        // Click anywhere outside the menu (including back in the note) dismisses it.
+        onDocDown = function (ev) { if (menu && !menu.contains(ev.target)) close(); };
+        document.addEventListener('mousedown', onDocDown, true);
+      } else if (e.key === 'Escape' && menu) { e.preventDefault(); close(); }
     });
+    // Escape should still dismiss even if focus has shifted off the editor.
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menu) { e.preventDefault(); close(); } });
     editor.addEventListener('blur', function () { setTimeout(close, 200); });
   }
 

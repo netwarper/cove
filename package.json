@@ -1,6 +1,6 @@
 {
   "name": "cove",
-  "version": "1.35.1",
+  "version": "1.35.2",
   "description": "Cove — self-contained, encrypted meeting notes. Zero runtime dependencies, portable, works over cloud-sync folders (Google Drive, Box, Dropbox).",
   "main": "server.js",
   "type": "commonjs",
