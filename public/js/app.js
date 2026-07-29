@@ -1964,6 +1964,18 @@
     if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox'; meta.appendChild(ib); }
     if (meta.childNodes.length) main.appendChild(meta);
     li.appendChild(cb); li.appendChild(main);
+    if ((state.workspaces || []).length > 1) {
+      var actions = document.createElement('div'); actions.className = 'task-actions';
+      var mv = document.createElement('button'); mv.className = 'task-act'; mv.title = 'Move to another workspace'; mv.textContent = '➜';
+      mv.addEventListener('click', async function () {
+        var dest = await pickWorkspace('Move “' + t.text + '” from ' + t.workspaceName + ' to which workspace?', t.workspaceId);
+        if (!dest || dest === t.workspaceId) return;
+        await API.moveTask(t.id, dest);
+        if (t.workspaceId === state.wsId || dest === state.wsId) await loadTasks();
+        renderGlobalTasks();
+      });
+      actions.appendChild(mv); li.appendChild(actions);
+    }
     return li;
   }
 
