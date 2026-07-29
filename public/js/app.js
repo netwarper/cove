@@ -1055,9 +1055,14 @@
   state.tasks = [];
   state.qa = { due: null, time: null, priority: 4, recurrence: null };
   // Which quick-add fields the user set explicitly with a picker. Manually-set
-  // fields are preserved as you keep typing the task text (only tokens the parser
-  // actually finds in the text override them).
+  // fields are preserved as you keep typing the task text (only a token the parser
+  // newly finds — or changes — in the text overrides them).
   state.qaManual = { due: false, time: false, priority: false, recurrence: false };
+  // Last value the PARSER produced for each field. Lets us tell a *newly typed*
+  // token (which should win and un-stick a manual pick) from an unchanged token
+  // still sitting in the text while you edit elsewhere (which must NOT clobber a
+  // date/priority you picked in the picker).
+  state.qaLast = { due: null, time: null, priority: null, recurrence: null };
 
   async function loadTasks() {
     try { state.tasks = await API.listTasks(state.wsId); } catch (_e) { state.tasks = []; }
@@ -1241,6 +1246,22 @@
   function resetQa() {
     state.qa = { due: null, time: null, priority: 4, recurrence: null };
     state.qaManual = { due: false, time: false, priority: false, recurrence: false };
+    state.qaLast = { due: null, time: null, priority: null, recurrence: null };
+  }
+  function qaEq(a, b) { return JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b); }
+  // Reconcile one parsed field against the picker state. A token whose value
+  // CHANGED since the last keystroke wins (and clears the manual flag); an
+  // unchanged token leaves a manual pick alone; no token falls back to the
+  // default unless the user picked one.
+  function reconcileQa(field, present, val, dflt) {
+    if (present) {
+      if (!qaEq(val, state.qaLast[field])) { state.qa[field] = val; state.qaManual[field] = false; }
+      else if (!state.qaManual[field]) { state.qa[field] = val; }
+      state.qaLast[field] = val;
+    } else {
+      if (!state.qaManual[field]) state.qa[field] = dflt;
+      state.qaLast[field] = null;
+    }
   }
   // The first date (>= today, local) whose day-of-week is in `days` — today only
   // if today is one of the chosen days. Used so a weekly-by-days task lands on
@@ -1264,19 +1285,11 @@
   $('taskInput').addEventListener('input', function () {
     var p = window.TaskParse.parse($('taskInput').value);
     var m = p.matched || {};
-    // For each field: a token found in the text wins (and un-sticks any manual
-    // value); otherwise keep a manually-picked value, else fall back to default.
-    if (p.recurrence) { state.qa.recurrence = p.recurrence; state.qaManual.recurrence = false; }
-    else if (!state.qaManual.recurrence) { state.qa.recurrence = null; }
-    // Due: an explicit typed date wins; otherwise keep a manually picked date,
-    // else fall back to whatever the current recurrence implies (e.g. the next
-    // matching weekday) rather than plain "today".
-    if (p.due != null) { state.qa.due = p.due; state.qaManual.due = false; }
-    else if (!state.qaManual.due) { state.qa.due = recurrenceImpliedDue(); }
-    if (p.time) { state.qa.time = p.time; state.qaManual.time = false; }
-    else if (!state.qaManual.time) { state.qa.time = null; }
-    if (m.priority) { state.qa.priority = p.priority; state.qaManual.priority = false; }
-    else if (!state.qaManual.priority) { state.qa.priority = 4; }
+    // Recurrence first: the due default (recurrenceImpliedDue) depends on it.
+    reconcileQa('recurrence', !!p.recurrence, p.recurrence || null, null);
+    reconcileQa('due', p.due != null, p.due != null ? p.due : null, recurrenceImpliedDue());
+    reconcileQa('time', !!p.time, p.time || null, null);
+    reconcileQa('priority', !!m.priority, m.priority ? p.priority : null, 4);
     syncQa();
   });
   $('qaPriority').addEventListener('change', function () { state.qa.priority = parseInt($('qaPriority').value, 10) || 4; state.qaManual.priority = true; });
