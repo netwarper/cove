@@ -1128,6 +1128,9 @@
     if (typeof renderGlobalTasks === 'function' && state.view === 'todos') { try { await renderGlobalTasks(); } catch (_e) {} }
     if (/task not found/i.test(msg)) return dialog.alert('That task is no longer on the server — your list was out of date. It’s been refreshed; if the task is still shown, reload the page.');
     if (/workspace not found/i.test(msg)) return dialog.alert('That workspace no longer exists — the workspace list has been refreshed. Please pick another.');
+    // A bare "not found" is the server's unmatched-route error: the running
+    // server is older than this page and has no move endpoint yet.
+    if (/^\s*not found\s*$/i.test(msg)) return dialog.alert('The Cove server doesn’t recognize the move request — it’s running an older version than this page. Restart the server (stop and re-run “node server.js”, or restart the Cove app / login service), then try again.');
     return dialog.alert('Couldn’t move the task: ' + msg);
   }
   function addDaysStr(iso, n) { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
