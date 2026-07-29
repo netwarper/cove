@@ -1112,6 +1112,13 @@
     if (res && res.tasks && res.workspaceId === state.wsId) { state.tasks = res.tasks; renderTasks(); }
     else loadTasks();
   }
+  function wsName(id) { var w = (state.workspaces || []).find(function (x) { return x.id === id; }); return (w && w.name) || 'workspace'; }
+  // Guard against a stale cached app tab where API.moveTask isn't defined yet —
+  // surface a clear "reload" message instead of a silent failure.
+  function moveTaskTo(taskId, dest) {
+    if (!API || typeof API.moveTask !== 'function') return Promise.reject(new Error('This app tab is out of date — reload the page (or reopen the installed app) to enable moving tasks.'));
+    return API.moveTask(taskId, dest);
+  }
   function addDaysStr(iso, n) { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); }
   function fmtDueShort(iso) {
     if (!iso) return '';
@@ -1180,7 +1187,10 @@
       mv.addEventListener('click', async function () {
         var dest = await pickWorkspace('Move “' + t.text + '” to which workspace?', state.wsId);
         if (!dest || dest === state.wsId) return;
-        applyTaskResult(await API.moveTask(t.id, dest));
+        try {
+          applyTaskResult(await moveTaskTo(t.id, dest));
+          setSaveStatus('Moved to ' + wsName(dest) + ' ✓');
+        } catch (ex) { await dialog.alert('Couldn’t move the task: ' + ex.message); }
       });
       actions.appendChild(mv);
     }
@@ -2007,9 +2017,11 @@
       mv.addEventListener('click', async function () {
         var dest = await pickWorkspace('Move “' + t.text + '” from ' + t.workspaceName + ' to which workspace?', t.workspaceId);
         if (!dest || dest === t.workspaceId) return;
-        await API.moveTask(t.id, dest);
-        if (t.workspaceId === state.wsId || dest === state.wsId) await loadTasks();
-        renderGlobalTasks();
+        try {
+          await moveTaskTo(t.id, dest);
+          if (t.workspaceId === state.wsId || dest === state.wsId) await loadTasks();
+          renderGlobalTasks();
+        } catch (ex) { await dialog.alert('Couldn’t move the task: ' + ex.message); }
       });
       actions.appendChild(mv); li.appendChild(actions);
     }
