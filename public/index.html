@@ -15,6 +15,25 @@
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
+  <!-- ---------- Server-unreachable screen (shown from the cached PWA shell) ---------- -->
+  <div id="serverDown" class="server-down hidden" role="alertdialog" aria-live="polite" aria-label="Cove server not running">
+    <div class="server-down-card">
+      <img src="/icon.svg" class="server-down-logo" alt="">
+      <h2>Cove server isn’t running</h2>
+      <p class="muted">The app is open, but it can’t reach the local Cove server. Start the server and this page continues automatically — a browser tab can’t start it for you.</p>
+      <ul class="server-down-how">
+        <li><b>macOS / Linux:</b> run <code>./start.sh</code> (or <code>npm start</code>) in your Cove folder.</li>
+        <li><b>Windows:</b> double-click <code>start.bat</code> (or run <code>npm start</code>).</li>
+        <li><b>Avoid this:</b> set Cove to start at login — see <a href="/manual.html#faq" target="_blank" rel="noopener">the manual</a>.</li>
+      </ul>
+      <div class="server-down-actions">
+        <button id="serverDownRetry" class="primary" type="button">Retry now</button>
+        <span id="serverDownStatus" class="tiny muted" aria-live="polite"></span>
+      </div>
+      <p class="tiny muted">Your notes stay encrypted on the server — nothing is lost while it’s off.</p>
+    </div>
+  </div>
+
   <!-- ---------- Auth gate ---------- -->
   <div id="authGate" class="auth-gate hidden">
     <div class="auth-card">

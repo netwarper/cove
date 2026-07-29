@@ -33,6 +33,15 @@ body {
 button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; font-size: 14px; }
 
+/* ---- Server-unreachable screen ---- */
+.server-down { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 24px; }
+.server-down-card { width: min(480px, 94vw); text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 28px; }
+.server-down-card h2 { margin: 6px 0 8px; font-size: 20px; }
+.server-down-logo { width: 46px; height: 46px; }
+.server-down-how { text-align: left; font-size: 13px; color: var(--muted); margin: 16px 0; padding-left: 18px; }
+.server-down-how li { margin: 6px 0; }
+.server-down-actions { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 6px 0 12px; }
+
 /* ---- Auth ---- */
 .auth-gate { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 50; }
 .auth-card {

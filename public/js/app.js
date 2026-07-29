@@ -78,8 +78,24 @@
   };
 
   // ---------------- Boot / auth ----------------
+  // When the PWA opens from its cached shell but the local server is down,
+  // /api/status rejects with a network error (no HTTP status). Show a screen
+  // explaining it and keep re-checking so the app continues once it's back.
+  var serverDownTimer = null;
   async function boot() {
-    var st = await API.status();
+    var st;
+    try {
+      st = await API.status();
+    } catch (e) {
+      if (e && e.status) { console.error(e); return; } // a real HTTP error, not connectivity
+      $('serverDown').classList.remove('hidden');
+      $('serverDownRetry').disabled = false;
+      clearTimeout(serverDownTimer);
+      serverDownTimer = setTimeout(boot, 3000); // auto-continue when the server returns
+      return;
+    }
+    clearTimeout(serverDownTimer);
+    $('serverDown').classList.add('hidden');
     state.initialized = st.initialized;
     state.instance = st.instance || null;
     state.bio = st.bio || { enrolled: false, credentials: [] };
@@ -87,6 +103,14 @@
     if (st.authenticated) return startApp();
     showAuth(st.initialized);
   }
+  $('serverDownRetry').addEventListener('click', function () {
+    $('serverDownRetry').disabled = true;
+    $('serverDownStatus').textContent = 'Checking…';
+    clearTimeout(serverDownTimer);
+    boot();
+  });
+  // A regained network connection is a good moment to re-check the local server.
+  window.addEventListener('online', function () { if (!$('serverDown').classList.contains('hidden')) boot(); });
 
   function showAuth(initialized) {
     $('app').classList.add('hidden');

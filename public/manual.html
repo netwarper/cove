@@ -479,6 +479,8 @@ sync with Alex next tue 3pm</code></pre>
         <p>Biometric unlock uses the passkey's <b>PRF</b> extension to wrap your key. If your device creates the passkey but can't produce a PRF secret, enrollment can't finish. PRF for the built-in Touch ID / iCloud&nbsp;Keychain authenticator needs a recent OS + browser (macOS&nbsp;15 / Chrome or Safari current). Until then, your <b>passphrase still works</b>; you can delete the leftover “Cove” passkey in your browser or OS passkey settings.</p>
         <h3>My Slack message didn't become a task.</h3>
         <p>The app drains the inbox about once a minute <b>while it's unlocked</b>. Open and unlock the app, and confirm your glue service is writing into the right <code>inbox/</code> folder. See <code>docs/slack-inbox.md</code>.</p>
+        <h3>The app opens but says “Cove server isn’t running”.</h3>
+        <p>The installed app (PWA) can open from its cached shell, but it still needs the local <code>node server.js</code> running to reach your notes — a browser tab can’t start that itself. Start Cove (<code>./start.sh</code>, <code>start.bat</code>, or <code>npm start</code>) and the screen continues on its own. To avoid it, set Cove to start at login (see <b>Start at login</b> above / <code>docs/macos-startup.md</code>).</p>
         <h3>I see an old version after updating.</h3>
         <p>The app serves the freshest files on reload; a hard refresh clears any cached shell. Installed PWAs update on next launch.</p>
         <h3>Is anything sent to the cloud?</h3>
