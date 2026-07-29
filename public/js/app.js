@@ -291,6 +291,7 @@
     try { state.allTags = await API.allTags(); } catch (_e) { /* non-fatal */ }
     applyFontSize(state.settings.fontSize || 14);
     applyListCaps();
+    applyEditorSizes();
     applyTheme(state.settings.theme || 'auto');
     applySortControl();
     renderTagBookmarks();
@@ -448,6 +449,42 @@
   var todayResizer = makeResizableList({ scrollId: 'taskScroll', gripId: 'taskResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight', onChange: refreshTaskLists });
   var upcomingResizer = makeResizableList({ scrollId: 'upcomingScroll', gripId: 'upcomingResize', cssVar: '--task-list-max', settingKey: 'taskListMaxHeight', onChange: refreshTaskLists });
   function applyListCaps() { todayResizer.applyStored(); }
+
+  // The two main editors (Ongoing Notes, Meeting Notes) are drag-resizable
+  // (native `resize: vertical`) scrolling boxes whose height persists in
+  // settings. applyEditorSizes() sets the stored height; a ResizeObserver saves
+  // a new one after the user drags. Programmatic sets are suppressed so they
+  // don't echo back as a save.
+  var EDITOR_MIN = 90, EDITOR_MAX = 2000, editorSuppressUntil = 0;
+  var EDITORS = [['carryoverEditor', 'ongoingEditorHeight', 200], ['meetingEditor', 'meetingEditorHeight', 260]];
+  function applyEditorSizes() {
+    editorSuppressUntil = Date.now() + 900;
+    EDITORS.forEach(function (e) {
+      var el = $(e[0]); if (!el) return;
+      var h = parseInt(state.settings && state.settings[e[1]], 10);
+      el.style.height = ((h >= EDITOR_MIN && h <= EDITOR_MAX) ? h : e[2]) + 'px';
+    });
+  }
+  (function initEditorResize() {
+    if (typeof ResizeObserver === 'undefined') return;
+    EDITORS.forEach(function (e) {
+      var el = $(e[0]); if (!el) return;
+      var lastH = 0, t;
+      new ResizeObserver(function () {
+        var h = Math.round(el.getBoundingClientRect().height);
+        if (!h) return;
+        if (Date.now() < editorSuppressUntil || !lastH || Math.abs(h - lastH) < 2) { lastH = h; return; }
+        lastH = h;
+        clearTimeout(t);
+        t = setTimeout(function () {
+          var clamped = Math.max(EDITOR_MIN, Math.min(EDITOR_MAX, h));
+          if (clamped === parseInt(state.settings[e[1]], 10)) return;
+          state.settings[e[1]] = clamped;
+          var patch = {}; patch[e[1]] = clamped; API.saveSettings(patch);
+        }, 400);
+      }).observe(el);
+    });
+  })();
   // Recompute the quick-add offset when the layout reflows (e.g. width changes
   // wrap the quick-add controls), so the columns stay bottom-aligned.
   window.addEventListener('resize', function () {

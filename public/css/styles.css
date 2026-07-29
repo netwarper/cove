@@ -300,6 +300,10 @@ select.qa-pill { padding: 4px 6px; }
   background: var(--panel-2); color: var(--ink); overflow: auto;
 }
 .rte:focus { outline: none; border-color: var(--brand); }
+/* The two main note editors are fixed-height, internally-scrolling boxes you can
+   drag to resize (native handle); their height is applied from settings and
+   persisted, so it survives refreshes. */
+#carryoverEditor, #meetingEditor { flex: none; resize: vertical; max-height: none; }
 .rte img { max-width: 100%; cursor: pointer; }
 .rte img.selected { outline: 2px solid var(--brand); }
 .rte ul, .rte ol { padding-left: 22px; }
