@@ -317,6 +317,17 @@
     });
   }
 
+  /* Tab / Shift+Tab indent or outdent instead of moving focus: nests list items
+     and indents paragraphs. */
+  function enableTabIndent(editor) {
+    editor.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
+      e.preventDefault();
+      document.execCommand(e.shiftKey ? 'outdent' : 'indent');
+      fireInput(editor);
+    });
+  }
+
   window.Editor = {
     // opts.uploader(file) -> Promise<url>: inserted images become attachments.
     // opts.noteLinkPicker(insertFn): lets the app supply a note to link to.
@@ -329,6 +340,7 @@
       enableSlashMenu(editor, opts);
       enableNoteLinks(editor);
       enableWikiLinks(editor, opts);
+      enableTabIndent(editor);
       // Reflect the active formatter on the toolbar buttons.
       var refresh = function () { if (editor.contains(document.getSelection().anchorNode)) updateActiveStates(toolbarEl); };
       editor.addEventListener('keyup', refresh);
