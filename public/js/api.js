@@ -109,6 +109,7 @@
     completeTask: (id, noteId) => req('POST', '/api/tasks/' + id + '/complete', { noteId: noteId }),
     skipTask: (id) => req('POST', '/api/tasks/' + id + '/skip', {}),
     rescheduleTask: (id, due) => req('POST', '/api/tasks/' + id + '/reschedule', { due: due }),
+    moveTask: (id, workspaceId) => req('POST', '/api/tasks/' + id + '/move', { workspaceId: workspaceId }),
     globalTasks: () => req('GET', '/api/tasks'),
     dueTasks: () => req('POST', '/api/tasks/due', {}),
     search: (q) => req('GET', '/api/search?q=' + encodeURIComponent(q)),

@@ -62,6 +62,24 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     // migration is idempotent
     store.migrateTasks();
     t.eq(store.listTasks(ws.id).length, tks.length, 'migration does not run twice');
+
+    // --- move a task between workspaces ---
+    const wsB = store.createWorkspace('Other');
+    const movingId = store.addTask(ws.id, { text: 'relocate me', priority: 2, due: '2026-08-01', recurrence: { type: 'weekly' } }).task.id;
+    const mv = store.moveTask(movingId, wsB.id);
+    t.eq(mv.workspaceId, ws.id, 'move returns the SOURCE workspace (so its view refreshes with the task gone)');
+    t.eq(store.listTasks(ws.id).some((x) => x.id === movingId), false, 'task removed from the source workspace');
+    const inDest = store.listTasks(wsB.id).find((x) => x.id === movingId);
+    t.ok(inDest, 'task now lives in the destination workspace');
+    t.eq(inDest && inDest.text, 'relocate me', 'moved task keeps its text');
+    t.eq(inDest && inDest.due, '2026-08-01', 'moved task keeps its due date');
+    t.eq(inDest && inDest.priority, 2, 'moved task keeps its priority');
+    t.ok(inDest && inDest.recurrence && inDest.recurrence.type === 'weekly', 'moved task keeps its recurrence');
+    t.eq(inDest && inDest.workspaceId, wsB.id, 'moved task workspaceId updated to the destination');
+    let threw = false; try { store.moveTask(movingId, 'nope-xyz'); } catch (e) { threw = e.status === 404; }
+    t.ok(threw, 'move to a missing workspace 404s');
+    store.moveTask(movingId, wsB.id); // same-workspace
+    t.eq(store.listTasks(wsB.id).filter((x) => x.id === movingId).length, 1, 'move to the same workspace does not duplicate');
   } catch (ex) {
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {

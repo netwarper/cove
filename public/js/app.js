@@ -1138,6 +1138,15 @@
     var actions = document.createElement('div'); actions.className = 'task-actions';
     if (!t.done && t.recurrence) { var sk = document.createElement('button'); sk.className = 'task-act'; sk.title = 'Skip this occurrence'; sk.textContent = '⏭'; sk.addEventListener('click', async function () { applyTaskResult(await API.skipTask(t.id)); }); actions.appendChild(sk); }
     if (!t.done) { var pr = document.createElement('button'); pr.className = 'task-act'; pr.title = 'Cycle priority'; pr.textContent = '⚑'; pr.addEventListener('click', async function () { applyTaskResult(await API.updateTask(t.id, { priority: t.priority <= 1 ? 4 : t.priority - 1 })); }); actions.appendChild(pr); }
+    if (!t.done && (state.workspaces || []).length > 1) {
+      var mv = document.createElement('button'); mv.className = 'task-act'; mv.title = 'Move to another workspace'; mv.textContent = '➜';
+      mv.addEventListener('click', async function () {
+        var dest = await pickWorkspace('Move “' + t.text + '” to which workspace?', state.wsId);
+        if (!dest || dest === state.wsId) return;
+        applyTaskResult(await API.moveTask(t.id, dest));
+      });
+      actions.appendChild(mv);
+    }
     var del = document.createElement('button'); del.className = 'task-act task-del'; del.title = 'Delete'; del.textContent = '✕';
     del.addEventListener('click', async function () { applyTaskResult(await API.deleteTask(t.id)); });
     actions.appendChild(del);
@@ -1653,8 +1662,10 @@
   }
 
   // Prompt for a target workspace; resolves to a workspace id or null if cancelled.
-  async function pickWorkspace(message) {
-    var buttons = state.workspaces.map(function (w, i) { return { label: w.name, returns: w.id, primary: i === 0 && w.id === state.wsId }; });
+  async function pickWorkspace(message, excludeId) {
+    var buttons = state.workspaces
+      .filter(function (w) { return w.id !== excludeId; })
+      .map(function (w) { return { label: w.name, returns: w.id, primary: w.id === state.wsId }; });
     buttons.push({ label: 'Cancel', returns: null });
     return dialog.choose(message, buttons, { title: 'Choose a workspace', cancelValue: null });
   }

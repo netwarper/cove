@@ -604,6 +604,7 @@ async function route(s, req, res, pathname, query, session) {
     if (seg[3] === 'complete' && m === 'POST') return s.completeTask(taskId, { noteId: (await readBody(req)).noteId });
     if (seg[3] === 'skip' && m === 'POST') return s.skipTask(taskId);
     if (seg[3] === 'reschedule' && m === 'POST') return s.rescheduleTask(taskId, (await readBody(req)).due);
+    if (seg[3] === 'move' && m === 'POST') return s.moveTask(taskId, safeId((await readBody(req)).workspaceId));
   }
 
   // trash
