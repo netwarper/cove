@@ -101,7 +101,7 @@
     $('passphrase2').classList.toggle('hidden', initialized);
     $('toggleRecover').classList.toggle('hidden', !initialized);
     $('passphrase').value = ''; $('passphrase2').value = '';
-    var canBio = !!(state.bio && state.bio.enrolled) && initialized && !!window.PublicKeyCredential;
+    var canBio = !!(state.bio && state.bio.enrolled) && initialized && !!window.PublicKeyCredential && bioHostOk();
     $('bioUnlockBtn').classList.toggle('hidden', !canBio);
   }
 
@@ -149,6 +149,15 @@
   function bufToB64url(buf) { return bufToB64(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
   function b64urlToBuf(s) { s = String(s).replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return b64ToBuf(s); }
   function bioDeviceLabel() { try { return (navigator.platform || 'This device'); } catch (_e) { return 'This device'; } }
+  // WebAuthn RP IDs must be domain names — an IP address (the default
+  // 127.0.0.1:3000 URL) can't be one, so passkeys simply don't work there.
+  // localhost, *.localhost (e.g. cove.localhost) and real HTTPS hosts are fine.
+  function bioHostOk() {
+    var h = location.hostname || '';
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return false; // IPv4
+    if (h.indexOf(':') >= 0 || h.indexOf('[') >= 0) return false; // IPv6
+    return true;
+  }
 
   // One biometric assertion → { credentialId, secret } (the PRF output as base64).
   async function bioAssert(credentialIds) {
@@ -167,19 +176,45 @@
 
   async function bioEnroll() {
     if (!window.PublicKeyCredential) throw new Error('WebAuthn is not available in this browser.');
-    var cred = await navigator.credentials.create({ publicKey: {
-      challenge: crypto.getRandomValues(new Uint8Array(32)),
-      rp: { name: 'Cove' },
-      user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'meeting-notes', displayName: 'Cove' },
-      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
-      timeout: 60000, extensions: { prf: {} },
-    } });
+    if (!bioHostOk()) throw new Error('Passkeys need a hostname, not an IP address. Open Cove at localhost:' + (location.port || '3000') + ' (or a cove.localhost address) instead of 127.0.0.1, then enable biometric unlock.');
+    var cred;
+    try {
+      cred = await navigator.credentials.create({ publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: 'Cove' },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'cove', displayName: 'Cove' },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
+        // Ask the authenticator to evaluate the PRF at creation time so we can read
+        // the secret straight from create() on browsers that support it (Chrome
+        // 116+, Safari 18+) — avoiding a second, flakier get() prompt.
+        timeout: 60000, extensions: { prf: { eval: { first: PRF_SALT } } },
+      } });
+    } catch (ex) { throw webauthnError(ex); }
     var credId = bufToB64url(cred.rawId);
-    // A follow-up assertion is the reliable cross-platform way to read the PRF output.
-    var got = await bioAssert([credId]);
-    if (!got || !got.secret) throw new Error('This browser/device did not return a PRF secret. Biometric unlock needs a platform passkey on a PRF-capable browser (recent Chrome/Edge/Safari) over localhost or HTTPS.');
-    await API.webauthnEnroll({ credentialId: credId, prfSecret: got.secret, prfSalt: 'v1', label: bioDeviceLabel() });
+    var secret = null;
+    try {
+      var ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
+      var f = ext && ext.prf && ext.prf.results && ext.prf.results.first;
+      if (f) secret = bufToB64(f);
+    } catch (_e) { /* fall through to the assertion path */ }
+    if (!secret) {
+      // Older browsers only surface PRF on an assertion — fall back to a get().
+      var got;
+      try { got = await bioAssert([credId]); } catch (ex) { throw webauthnError(ex); }
+      if (got && got.secret) secret = got.secret;
+    }
+    if (!secret) throw new Error('This device created the passkey but didn’t return a PRF secret, so biometric unlock can’t be enabled. It needs a PRF-capable platform authenticator (recent Chrome/Edge/Safari with Touch ID / Windows Hello) over localhost or HTTPS. Your passphrase still works.');
+    await API.webauthnEnroll({ credentialId: credId, prfSecret: secret, prfSalt: 'v1', label: bioDeviceLabel() });
+  }
+  // Turn a WebAuthn DOMException into a message that names the actual failure.
+  function webauthnError(ex) {
+    var name = (ex && ex.name) || 'Error';
+    if (name === 'NotAllowedError') return new Error('The passkey request was cancelled or timed out. Try again and approve the Touch ID / passkey prompt.');
+    if (name === 'InvalidStateError') return new Error('A passkey for Cove already exists on this device. Remove it in your browser/OS passkey settings, then try again.');
+    if (name === 'SecurityError') return new Error('The browser blocked the passkey for this address. Biometric unlock needs localhost or an HTTPS origin (a “cove.localhost” style host counts as secure in Chrome).');
+    if (name === 'NotSupportedError') return new Error('This device has no PRF-capable platform authenticator, so biometric unlock isn’t available here. Your passphrase still works.');
+    return new Error((ex && ex.message) ? (name + ': ' + ex.message) : ('Passkey error (' + name + ').'));
   }
 
   async function bioUnlock(creds) {
@@ -2154,11 +2189,14 @@
 
   function renderBioSettings() {
     var supported = !!window.PublicKeyCredential;
+    var hostOk = bioHostOk();
     var enrolled = !!(state.bio && state.bio.enrolled);
     $('bioStatus').textContent = !supported
       ? 'Not supported in this browser.'
-      : enrolled ? ('Enabled — ' + (((state.bio.credentials || [])[0] || {}).label || 'this device') + '.') : 'Not enabled on this device.';
-    $('bioEnableBtn').classList.toggle('hidden', !supported || enrolled);
+      : !hostOk
+        ? 'Passkeys need a hostname, not an IP. Open Cove at localhost:' + (location.port || '3000') + ' or a cove.localhost address — biometric unlock can’t work on 127.0.0.1.'
+        : enrolled ? ('Enabled — ' + (((state.bio.credentials || [])[0] || {}).label || 'this device') + '.') : 'Not enabled on this device.';
+    $('bioEnableBtn').classList.toggle('hidden', !supported || !hostOk || enrolled);
     $('bioRemoveBtn').classList.toggle('hidden', !enrolled);
     $('bioMsg').textContent = '';
   }

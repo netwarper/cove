@@ -474,7 +474,9 @@ sync with Alex next tue 3pm</code></pre>
         <h3>The calendar / date picker doesn't open.</h3>
         <p>Make sure you're on an up-to-date version. Click the date chip on a task (or “📅 Set date”); the picker opens anchored to the chip. If your browser blocks it, the field still accepts a typed date.</p>
         <h3>Biometric unlock says “invalid domain”.</h3>
-        <p>Passkeys require <code>localhost</code>, a domain, or HTTPS — not a raw <code>127.0.0.1</code> address. Open the app at <code>http://localhost:&lt;port&gt;</code>.</p>
+        <p>Passkeys require <code>localhost</code>, a domain, or HTTPS — not a raw <code>127.0.0.1</code> address. Open the app at <code>http://localhost:&lt;port&gt;</code> or a <code>cove.localhost</code> address (the Enable button is hidden on an IP address for this reason).</p>
+        <h3>It adds the passkey, then errors.</h3>
+        <p>Biometric unlock uses the passkey's <b>PRF</b> extension to wrap your key. If your device creates the passkey but can't produce a PRF secret, enrollment can't finish. PRF for the built-in Touch ID / iCloud&nbsp;Keychain authenticator needs a recent OS + browser (macOS&nbsp;15 / Chrome or Safari current). Until then, your <b>passphrase still works</b>; you can delete the leftover “Cove” passkey in your browser or OS passkey settings.</p>
         <h3>My Slack message didn't become a task.</h3>
         <p>The app drains the inbox about once a minute <b>while it's unlocked</b>. Open and unlock the app, and confirm your glue service is writing into the right <code>inbox/</code> folder. See <code>docs/slack-inbox.md</code>.</p>
         <h3>I see an old version after updating.</h3>
