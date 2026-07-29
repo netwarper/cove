@@ -54,6 +54,29 @@ Common causes:
 - **Reinstall cleanly.** `scripts/macos-service.sh uninstall && scripts/macos-service.sh install`
   removes any stale agent registration before loading the new one.
 
+## Restarting the server (e.g. after an update)
+
+Refreshing the browser reloads the app's static files, but the server's API
+routes are loaded once when `node server.js` starts — so after you pull a new
+version, a running server keeps serving the **old** endpoints until it restarts.
+If a brand-new feature returns "not found," the server needs a restart.
+
+If you launched the server from a terminal or Automator action you can't reach
+anymore, use the restart script — it finds the running instance via its lock
+file (`<DATA_DIR>/instance.lock`) or its port, stops it gracefully (SIGTERM, then
+force only if it doesn't drain), and starts a fresh detached server:
+
+```bash
+scripts/restart.sh
+# or, if you run a non-default data dir:
+DATA_DIR="/path/to/data" scripts/restart.sh
+```
+
+It logs the new server to `~/Library/Logs/cove.log` and waits for `/api/health`
+before reporting success. (If you use the login service above, just
+`scripts/macos-service.sh uninstall && scripts/macos-service.sh install`
+instead — that reloads it cleanly and it will keep restarting itself.)
+
 ## What happens when the Mac sleeps (lid close)
 
 **Short version: closing the lid is safe. Cove pauses and resumes cleanly.**

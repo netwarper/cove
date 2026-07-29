@@ -815,7 +815,17 @@ function startServer() {
     setInterval(run, AUTO_BACKUP_HOURS * 3600 * 1000).unref();
   }
 
-  const shutdown = () => { config.clearLock(DATA_DIR); try { server.close(); } catch (_e) {} process.exit(0); };
+  // Graceful shutdown: stop accepting new connections and let in-flight requests
+  // finish, then exit. A short timeout force-exits if long-lived connections
+  // (e.g. the live-sync SSE stream) keep the socket open.
+  let shuttingDown = false;
+  const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    config.clearLock(DATA_DIR);
+    try { server.close(() => process.exit(0)); } catch (_e) { process.exit(0); }
+    setTimeout(() => process.exit(0), 4000).unref();
+  };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
   process.on('exit', () => config.clearLock(DATA_DIR));
