@@ -783,7 +783,43 @@
     renderBacklinks();
     renderTranscript();
     setNoteHash(n.id);
+    armDailyNudge();
   }
+
+  // Gentle, once-a-day nudge: if you've been working in a note for a while and
+  // haven't started today's daily note (in a workspace you do use dailies in),
+  // show a small dismissible banner — at most once per day, per device.
+  var DAILY_NUDGE_DEFAULT_MS = 4 * 60 * 1000;
+  var dailyNudge = { timer: null, forNoteId: null };
+  function dailyNudgeDelayMs() { return (typeof window !== 'undefined' && window.__coveNudgeMs) || DAILY_NUDGE_DEFAULT_MS; }
+  function dailyNudgeShownToday() { try { return localStorage.getItem('cove.dailyNudge') === todayStr(); } catch (_e) { return false; } }
+  function armDailyNudge() {
+    var n = state.note;
+    if (!n || dailyNudge.forNoteId === n.id) return; // only (re)arm when the note changes
+    dailyNudge.forNoteId = n.id;
+    clearTimeout(dailyNudge.timer); dailyNudge.timer = null;
+    $('dailyNudge').classList.add('hidden');
+    if (dailyNudgeShownToday()) return;
+    var today = todayStr();
+    if (n.kind !== 'scratch' && n.title === today) return; // already on today's daily
+    var wsId = state.wsId;
+    dailyNudge.timer = setTimeout(function () {
+      if (dailyNudgeShownToday() || state.view !== 'note' || state.wsId !== wsId || !state.note) return;
+      if (state.note.kind !== 'scratch' && state.note.title === today) return;
+      API.listNotes(wsId, { sort: 'created', dir: 'desc' }).then(function (notes) {
+        var dailies = (notes || []).filter(function (x) { return (x.kind || 'daily') !== 'scratch'; });
+        var hasToday = dailies.some(function (x) { return x.title === today; });
+        // Only nudge people who actually use daily notes here, and only when
+        // there's still no daily for today.
+        if (dailies.length && !hasToday && state.wsId === wsId && state.view === 'note') {
+          try { localStorage.setItem('cove.dailyNudge', todayStr()); } catch (_e) {}
+          $('dailyNudge').classList.remove('hidden');
+        }
+      }).catch(function () {});
+    }, dailyNudgeDelayMs());
+  }
+  $('dailyNudgeNew').addEventListener('click', function () { $('dailyNudge').classList.add('hidden'); createNewNote({}); });
+  $('dailyNudgeDismiss').addEventListener('click', function () { $('dailyNudge').classList.add('hidden'); });
 
   function updateWordCount() {
     var txt = ($('carryoverEditor').textContent + ' ' + $('meetingEditor').textContent).trim();

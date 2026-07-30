@@ -172,6 +172,14 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .task-resize:hover::before, .task-resize:focus-visible::before { background: var(--brand); }
 .task-resize:focus-visible { outline: none; }
 
+/* A gentle, dismissible once-a-day nudge to start today's daily note. */
+.daily-nudge { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 8px 12px;
+  background: var(--panel-2); background: color-mix(in srgb, var(--brand) 10%, var(--panel)); border: 1px solid var(--brand);
+  border-radius: 8px; font-size: 13px; color: var(--ink); }
+.daily-nudge .dn-text { flex: 1; }
+.daily-nudge .dn-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 6px; }
+.daily-nudge .dn-x:hover { background: var(--panel-2); color: var(--ink); }
+
 /* ---- Sections ---- */
 /* To-Do + Reminders side by side on the first row, then Carryover (full width),
    then Meeting Notes (full width). Scratch notes show only Meeting Notes. */
