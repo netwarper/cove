@@ -41,6 +41,99 @@
       setTimeout(function () { if (opts.input) inp.focus(); else { var pb = btnWrap.querySelector('.primary') || btnWrap.querySelector('button'); if (pb) pb.focus(); } }, 30);
     });
   }
+  // A searchable, keyboard-navigable single-select list — better than a wall of
+  // buttons when the choices are "pick one of these things" (e.g. a destination
+  // workspace). Rows scroll; ↑/↓ move the highlight, Enter picks it, Esc cancels,
+  // and typing filters once there are enough items to warrant a search box.
+  function showListPicker(opts) {
+    opts = opts || {};
+    var items = opts.items || [];
+    var SEARCH_AT = opts.searchThreshold == null ? 7 : opts.searchThreshold;
+    return new Promise(function (resolve) {
+      var layer = $('dialogLayer');
+      $('dialogTitle').textContent = opts.title || '';
+      $('dialogTitle').classList.toggle('hidden', !opts.title);
+      $('dialogMessage').textContent = opts.message || '';
+      $('dialogMessage').classList.toggle('hidden', !opts.message);
+      $('dialogInput').classList.add('hidden');
+      var box = $('dialogList'); box.classList.remove('hidden');
+      var search = $('dialogListSearch');
+      var ul = $('dialogListItems'); ul.innerHTML = '';
+      var useSearch = items.length > SEARCH_AT;
+      search.classList.toggle('hidden', !useSearch);
+      search.value = ''; search.placeholder = opts.searchPlaceholder || 'Filter…';
+      var btnWrap = $('dialogButtons'); btnWrap.innerHTML = '';
+
+      function cleanup() {
+        layer.classList.add('hidden'); box.classList.add('hidden');
+        $('dialogMessage').classList.remove('hidden');
+        document.removeEventListener('keydown', onKey, true);
+        search.removeEventListener('input', onFilter);
+      }
+      function done(val) { cleanup(); resolve(val); }
+
+      var rows = items.map(function (it, i) {
+        var li = document.createElement('li');
+        li.className = 'dl-row' + (it.current ? ' current' : '');
+        li.setAttribute('role', 'option'); li.dataset.i = String(i);
+        var main = document.createElement('span'); main.className = 'dl-name'; main.textContent = it.label;
+        li.appendChild(main);
+        if (it.sublabel) { var sub = document.createElement('span'); sub.className = 'dl-sub'; sub.textContent = it.sublabel; li.appendChild(sub); }
+        if (it.current) { var tag = document.createElement('span'); tag.className = 'dl-current'; tag.textContent = 'current'; li.appendChild(tag); }
+        li.addEventListener('click', function () { done(it.value); });
+        li.addEventListener('mousemove', function () { setActive(i, false); });
+        ul.appendChild(li);
+        return { li: li, item: it, i: i };
+      });
+
+      var active = -1;
+      function visibleRows() { return rows.filter(function (r) { return !r.li.classList.contains('hidden'); }); }
+      function setActive(i, scroll) {
+        rows.forEach(function (r) { r.li.classList.toggle('active', r.i === i); });
+        active = i;
+        if (scroll && i >= 0 && rows[i]) rows[i].li.scrollIntoView({ block: 'nearest' });
+      }
+      function moveActive(delta) {
+        var vis = visibleRows(); if (!vis.length) return;
+        var pos = vis.findIndex(function (r) { return r.i === active; });
+        pos = pos < 0 ? (delta > 0 ? 0 : vis.length - 1) : pos + delta;
+        if (pos < 0) pos = vis.length - 1; if (pos >= vis.length) pos = 0;
+        setActive(vis[pos].i, true);
+      }
+      function onFilter() {
+        var q = search.value.trim().toLowerCase();
+        rows.forEach(function (r) {
+          var hay = (r.item.label + ' ' + (r.item.sublabel || '')).toLowerCase();
+          r.li.classList.toggle('hidden', !!q && hay.indexOf(q) < 0);
+        });
+        var vis = visibleRows();
+        ul.classList.toggle('no-matches', !vis.length);
+        setActive(vis.length ? vis[0].i : -1, true);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') { e.preventDefault(); done(opts.cancelValue == null ? null : opts.cancelValue); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); moveActive(1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(-1); }
+        else if (e.key === 'Enter') { e.preventDefault(); if (active >= 0 && rows[active] && !rows[active].li.classList.contains('hidden')) done(rows[active].item.value); }
+      }
+
+      btnWrap.appendChild((function () {
+        var c = document.createElement('button'); c.className = 'dlg-btn'; c.textContent = opts.cancelLabel || 'Cancel';
+        c.addEventListener('click', function () { done(opts.cancelValue == null ? null : opts.cancelValue); });
+        return c;
+      })());
+
+      if (useSearch) search.addEventListener('input', onFilter);
+      document.addEventListener('keydown', onKey, true);
+      layer.classList.remove('hidden');
+      // Start the highlight on the first item (or the "current" one if present).
+      var startIdx = rows.length ? (rows.filter(function (r) { return r.item.current; })[0] || rows[0]).i : -1;
+      setActive(startIdx, true);
+      setTimeout(function () { if (useSearch) search.focus(); else ul.focus(); }, 30);
+    });
+  }
+  window.showListPicker = showListPicker;
+
   var dialog = {
     alert: function (message, title) { return showDialog({ title: title, message: message, buttons: [{ label: 'OK', returns: true, primary: true }], cancelValue: true }); },
     confirm: function (message, opts) {
@@ -1760,11 +1853,13 @@
 
   // Prompt for a target workspace; resolves to a workspace id or null if cancelled.
   async function pickWorkspace(message, excludeId) {
-    var buttons = state.workspaces
+    var items = state.workspaces
       .filter(function (w) { return w.id !== excludeId; })
-      .map(function (w) { return { label: w.name, returns: w.id, primary: w.id === state.wsId }; });
-    buttons.push({ label: 'Cancel', returns: null });
-    return dialog.choose(message, buttons, { title: 'Choose a workspace', cancelValue: null });
+      .map(function (w) { return { label: w.name, value: w.id, current: w.id === state.wsId }; });
+    return showListPicker({
+      title: 'Move to workspace', message: message, items: items,
+      searchPlaceholder: 'Filter workspaces…', cancelValue: null,
+    });
   }
   function renderTemplatePick() {
     var box = $('templatePickList'); box.innerHTML = '';
