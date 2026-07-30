@@ -77,6 +77,32 @@ before reporting success. (If you use the login service above, just
 `scripts/macos-service.sh uninstall && scripts/macos-service.sh install`
 instead — that reloads it cleanly and it will keep restarting itself.)
 
+`restart.sh` starts the server **detached** and then exits, so it's a good fit
+for a double-clickable launcher: it won't tie the server's lifetime to the thing
+that launched it (which is how a server ends up "stuck" in a terminal you closed),
+and it's safe to run repeatedly — each run just restarts cleanly.
+
+### Launching it from an Automator app
+
+If the login service won't stick, an Automator **Application** that runs
+`restart.sh` is a fine alternative. In Automator: new **Application** → add
+**Run Shell Script** → set **Shell** to `/bin/bash` → paste:
+
+```bash
+COVE_DIR="/Users/you/path/to/cove" "/Users/you/path/to/cove/scripts/restart.sh"
+```
+
+Save it as an app and (optionally) add it to **System Settings → General →
+Login Items**. Double-clicking it starts (or restarts) Cove.
+
+> **Why the login service or a naïve script can fail: `node` isn't found.**
+> Apps launched by launchd or Automator get a minimal `PATH` that usually
+> excludes Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`) and nvm — so a bare
+> `node` fails silently. `restart.sh` now locates `node` in those common spots
+> automatically. If you hit this elsewhere, install Node from
+> [nodejs.org](https://nodejs.org) (it lands in `/usr/local/bin`) or point at the
+> absolute path from `which node`.
+
 ## What happens when the Mac sleeps (lid close)
 
 **Short version: closing the lid is safe. Cove pauses and resumes cleanly.**

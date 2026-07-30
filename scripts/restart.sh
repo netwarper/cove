@@ -14,9 +14,31 @@
 #
 # Logs the new server to $LOG (default ~/Library/Logs/cove.log on macOS).
 set -uo pipefail
-cd "$(dirname "$0")/.."
 
-command -v node >/dev/null 2>&1 || { echo "❌ Node.js was not found in PATH."; exit 1; }
+# Find the Cove folder. When launched from an Automator app / Finder, $0 may not
+# point at this file, so allow COVE_DIR to override and verify server.js is here.
+cd "${COVE_DIR:-$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)}" 2>/dev/null || true
+if [ ! -f server.js ]; then
+  echo "❌ Can't find server.js. Run this from the Cove folder, or set COVE_DIR=/path/to/cove."
+  exit 1
+fi
+
+# GUI launchers (Automator, launchd) start with a minimal PATH that usually
+# excludes Homebrew/nvm, so `node` isn't found. Locate it explicitly.
+find_node() {
+  command -v node 2>/dev/null && return 0
+  for n in /opt/homebrew/bin/node /usr/local/bin/node /usr/bin/node; do [ -x "$n" ] && { echo "$n"; return 0; }; done
+  if [ -d "$HOME/.nvm/versions/node" ]; then
+    local v; v="$(ls -1 "$HOME/.nvm/versions/node" 2>/dev/null | sort -V | tail -1)"
+    [ -n "$v" ] && [ -x "$HOME/.nvm/versions/node/$v/bin/node" ] && { echo "$HOME/.nvm/versions/node/$v/bin/node"; return 0; }
+  fi
+  return 1
+}
+NODE="$(find_node || true)"
+[ -n "$NODE" ] || { echo "❌ Node.js not found. Install Node 18+ (nodejs.org, or 'brew install node')."; exit 1; }
+# Put node's dir first on PATH so every `node` in this script (and the server) resolves.
+PATH="$(dirname "$NODE"):$PATH"; export PATH
+
 [ -f .env ] && { set -a; . ./.env; set +a; }
 
 # Resolve DATA_DIR exactly like server.js (env var > saved pointer > ./data) and
