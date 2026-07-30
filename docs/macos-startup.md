@@ -21,12 +21,22 @@ that:
   Dropbox folder to sync across machines),
 - logs to `~/Library/Logs/cove.log`.
 
+`install` now runs `node` directly (absolute path, no login shell) and, after
+loading the agent, **verifies Cove is actually answering** — if it isn't, it
+prints the recent log and the likely cause instead of failing silently.
+
 Manage it:
 
 ```bash
 scripts/macos-service.sh status      # is it running?
+scripts/macos-service.sh restart     # bounce it (after an update)
 scripts/macos-service.sh uninstall   # remove it
 ```
+
+> **One launcher at a time.** If you already start Cove another way (an Automator
+> app, `start.sh`, a Login Item), quit/remove it before installing this service —
+> otherwise both try to bind the same port and the second one crash-loops. The
+> installer will tell you if the port is already taken.
 
 To find the URL to open, run `node server.js --print-config` (or set a durable
 address once with `node server.js --set-domain cove`, which pins a stable

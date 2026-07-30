@@ -44,16 +44,35 @@ unload_agent() {
     || launchctl unload "$PLIST" 2>/dev/null || true
 }
 
+# Resolve an absolute node path. launchd runs with a minimal PATH, so we bake the
+# full path into the plist rather than relying on it. Covers the nodejs.org
+# installer (/usr/local/bin), Homebrew (/opt/homebrew/bin), and nvm.
+find_node() {
+  command -v node 2>/dev/null && return 0
+  for n in /usr/local/bin/node /opt/homebrew/bin/node /usr/bin/node; do [ -x "$n" ] && { echo "$n"; return 0; }; done
+  if [ -d "$HOME/.nvm/versions/node" ]; then
+    local v; v="$(ls -1 "$HOME/.nvm/versions/node" 2>/dev/null | sort -V | tail -1)"
+    [ -n "$v" ] && [ -x "$HOME/.nvm/versions/node/$v/bin/node" ] && { echo "$HOME/.nvm/versions/node/$v/bin/node"; return 0; }
+  fi
+  return 1
+}
+
 case "$CMD" in
   install)
-    NODE="$(command -v node || true)"
-    [ -z "$NODE" ] && { echo "❌ node was not found in PATH. Install Node 18+ from https://nodejs.org first."; exit 1; }
+    NODE="$(find_node || true)"
+    [ -z "$NODE" ] && { echo "❌ node was not found. Install Node 18+ from https://nodejs.org first."; exit 1; }
     DATA_DIR="${DATA_DIR:-$REPO/data}"
     LOG="$HOME/Library/Logs/cove.log"
-    PREFIX=""
-    if [ "${KEEP_AWAKE:-0}" = "1" ]; then PREFIX="$(command -v caffeinate) -s "; fi
     mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$DATA_DIR"
-    # A login shell (-lc) gives launchd your normal PATH so `node` resolves.
+    # Run node DIRECTLY (no login shell) with absolute paths — avoids the
+    # dotfile-sourcing flakiness of `zsh -lc`. caffeinate wraps it for keep-awake.
+    ARGS="    <string>$NODE</string>
+    <string>$REPO/server.js</string>"
+    if [ "${KEEP_AWAKE:-0}" = "1" ]; then
+      ARGS="    <string>/usr/bin/caffeinate</string>
+    <string>-s</string>
+$ARGS"
+    fi
     cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -62,32 +81,54 @@ case "$CMD" in
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/zsh</string>
-    <string>-lc</string>
-    <string>cd '$REPO' && exec ${PREFIX}'$NODE' server.js</string>
+$ARGS
   </array>
   <key>WorkingDirectory</key><string>$REPO</string>
   <key>EnvironmentVariables</key>
-  <dict><key>DATA_DIR</key><string>$DATA_DIR</string></dict>
+  <dict>
+    <key>DATA_DIR</key><string>$DATA_DIR</string>
+    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+  </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>ProcessType</key><string>Background</string>
   <key>StandardOutPath</key><string>$LOG</string>
   <key>StandardErrorPath</key><string>$LOG</string>
 </dict>
 </plist>
 PLIST
-    if load_agent; then
-      echo "✅ Installed. Cove starts at login and restarts if it stops."
-      echo "   Data:  $DATA_DIR"
-      echo "   Log:   $LOG"
-      echo "   Open:  run 'node server.js --print-config' to see the URL, or check the log."
-      [ "${KEEP_AWAKE:-0}" = "1" ] && echo "   Keep-awake: ON (Mac won't sleep while logged in — see docs/macos-startup.md)."
-    else
-      echo "❌ launchd wouldn't load the agent. Check the log for details:"
-      echo "     tail -n 40 '$LOG'"
-      echo "   and: launchctl print '$SERVICE'"
+    if ! load_agent; then
+      echo "❌ launchd wouldn't load the agent."
+      echo "   launchctl print '$SERVICE':"; launchctl print "$SERVICE" 2>&1 | sed 's/^/     /' | head -20
       exit 1
     fi
+    echo "✅ Installed the login agent. Verifying it starts…"
+    # Verify it actually came up: probe /api/health for a few seconds.
+    PORT="$(DATA_DIR="$DATA_DIR" "$NODE" server.js --print-config 2>/dev/null | "$NODE" -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{process.stdout.write(String(JSON.parse(d).port||"3000"))}catch(e){process.stdout.write("3000")}})')"
+    PORT="${PORT:-3000}"
+    up=""
+    for i in $(seq 1 12); do
+      if curl -fsS "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then up=1; break; fi
+      sleep 0.5
+    done
+    if [ -n "$up" ]; then
+      echo "✅ Cove is running and answering on http://127.0.0.1:$PORT (starts at login, restarts if it stops)."
+      echo "   Data:  $DATA_DIR"
+      echo "   Log:   $LOG"
+      [ "${KEEP_AWAKE:-0}" = "1" ] && echo "   Keep-awake: ON (see docs/macos-startup.md)."
+    else
+      echo "⚠ The agent loaded but Cove isn't answering on port $PORT yet. Most common cause:"
+      echo "   another Cove is already running on that port (e.g. your Automator app) —"
+      echo "   stop it, then: scripts/macos-service.sh restart"
+      echo "   Recent log ($LOG):"
+      tail -n 15 "$LOG" 2>/dev/null | sed 's/^/     /'
+      echo "   State: launchctl print '$SERVICE' | grep -E 'state|last exit'"
+    fi
+    ;;
+  restart)
+    launchctl kickstart -k "$SERVICE" 2>/dev/null && echo "✅ Restarted." \
+      || echo "Couldn't restart — is it installed? Try: scripts/macos-service.sh install"
     ;;
   uninstall)
     unload_agent
@@ -105,7 +146,7 @@ PLIST
     fi
     ;;
   *)
-    echo "Usage: scripts/macos-service.sh {install|uninstall|status}"
+    echo "Usage: scripts/macos-service.sh {install|uninstall|status|restart}"
     echo "  DATA_DIR=... KEEP_AWAKE=1 scripts/macos-service.sh install"
     ;;
 esac
