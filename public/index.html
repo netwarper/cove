@@ -87,7 +87,7 @@
             <button data-more="templates">🧩 Templates</button>
             <button data-more="trash">🗑 Trash</button>
             <button data-more="conflicts">🔀 Conflicts</button>
-            <button data-more="backup">💾 Backup &amp; restore</button>
+            <button data-more="backup">💾 Backup, export &amp; offline viewer</button>
             <button data-more="manual">📖 User manual</button>
             <button data-more="account">⚙️ Settings</button>
           </div>
@@ -466,6 +466,7 @@
 
     <div class="modal hidden" id="accountModal">
       <h3>⚙️ Settings</h3>
+      <div class="acct-grid">
       <div class="acct-block">
         <h4>Change passphrase</h4>
         <input id="oldPass" type="password" placeholder="Current passphrase" autocomplete="current-password">
@@ -586,12 +587,14 @@
         </div>
         <div id="slackMsg" class="tiny" aria-live="polite"></div>
       </div>
+      </div>
       <div id="acctMsg" class="tiny" aria-live="polite"></div>
       <div class="modal-actions"><button class="modal-close">Close</button></div>
     </div>
 
     <div class="modal hidden" id="backupModal">
-      <h3>Backup &amp; restore</h3>
+      <h3>Backup, export &amp; restore</h3>
+      <div class="acct-grid">
       <div class="acct-block">
         <h4>Download encrypted backup</h4>
         <p class="muted tiny">One file containing every note — still encrypted. Restore it on a fresh machine, then unlock with your existing passphrase.</p>
@@ -654,6 +657,7 @@
         <p class="muted tiny">Decrypt-checks every stored file and reports any corruption (e.g. from an interrupted cloud sync).</p>
         <button id="verifyBtn" class="sm">Run check</button>
         <div id="verifyMsg" class="tiny" aria-live="polite"></div>
+      </div>
       </div>
       <div class="modal-actions"><button class="modal-close">Close</button></div>
     </div>
@@ -766,7 +770,7 @@
             <li><span>🔁</span><span>Recurring tasks roll forward when you complete them; ⏭ skips one occurrence</span></li>
             <li><span>#tag</span><span>Tag notes; search with <code>tag:name</code></span></li>
             <li><span>🔎</span><span>Search operators: <code>tag:</code> <code>in:workspace</code> <code>is:favorite</code> <code>is:scratch</code> <code>has:attachment</code> — combine with words</span></li>
-            <li><span>⋮</span><span>Templates · Trash · Backup &amp; offline viewer · Settings</span></li>
+            <li><span>⋮</span><span>Templates · Trash · Backup, export &amp; offline viewer · Settings</span></li>
             <li><span>★</span><span>Hover a note in the sidebar to favorite or delete it</span></li>
           </ul>
         </section>

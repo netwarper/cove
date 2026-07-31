@@ -538,6 +538,12 @@ button.gt-ws:hover { border-color: var(--brand); color: var(--brand); }
 .rte.small { min-height: 70px; }
 .acct-block { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
 .acct-block h4 { margin: 0 0 8px; font-size: 13px; }
+/* Settings / Backup: flow the section cards into responsive columns (masonry via
+   CSS multicol) so a long list of options isn't a cramped single column. Each
+   card stays intact across the column break. */
+#accountModal, #backupModal { width: min(920px, 94vw); }
+.acct-grid { column-width: 300px; column-gap: 14px; }
+.acct-grid > .acct-block { break-inside: avoid; -webkit-column-break-inside: avoid; margin: 0 0 14px; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0; }
 .setting-row label { font-size: 13px; color: var(--ink); }
 .setting-row .ws-tpl { flex: 0 0 auto; }
