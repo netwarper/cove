@@ -111,6 +111,13 @@
     rescheduleTask: (id, due) => req('POST', '/api/tasks/' + id + '/reschedule', { due: due }),
     moveTask: (id, workspaceId) => req('POST', '/api/tasks/' + id + '/move', { workspaceId: workspaceId }),
     globalTasks: () => req('GET', '/api/tasks'),
+    completedTasks: (params) => {
+      var qs = Object.keys(params || {})
+        .filter(function (k) { return params[k]; })
+        .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); })
+        .join('&');
+      return req('GET', '/api/tasks/completed' + (qs ? '?' + qs : ''));
+    },
     dueTasks: () => req('POST', '/api/tasks/due', {}),
     search: (q) => req('GET', '/api/search?q=' + encodeURIComponent(q)),
     allTags: () => req('GET', '/api/tags'),

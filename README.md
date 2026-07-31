@@ -62,6 +62,7 @@ behaves through sleep / lid-close.
 | **Global search** | Search across every note in every workspace. |
 | **Resizable task lists** | Long **Overdue & Today** and **Upcoming** lists scroll at a capped height (so they don't push the page down); drag the grip below either to resize both, double-click to reset — the shared size is persisted. |
 | **Tasks page** | One view of every open task across all workspaces, **grouped by due date** (overdue → today → upcoming → no date) and, within a day, by priority then workspace. Complete a task or click its workspace badge to jump there. |
+| **Completed history** | An **Open / Completed** toggle on the Tasks page. Completed shows finished tasks **grouped by completion date** (newest first), with **text search**, a **date-range** picker (7/30/90 days, this month/year, all time, or custom), and **workspace** + **priority** filters. Reopen a task or delete it from here. |
 | **Meeting recording** | Record your **mic** and the **other side** (shared tab/system audio) mixed into **one `.wav` file** (encrypted like any attachment), with an optional near-live transcript — timestamped and labeled **You** vs **Them** — in its own area below your notes. |
 | **Screen recording** | **🖥 Screen** records the shared screen/window/tab video with its system audio (+ your mic) to one `.webm` video, saved as an encrypted attachment. |
 | **Sort notes** | Sort the sidebar by **Created / Modified / Name**, ascending or descending (persisted). |

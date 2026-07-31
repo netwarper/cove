@@ -320,9 +320,54 @@
         </section>
 
         <section id="todosView" class="view hidden">
-          <h1>Tasks</h1>
-          <p class="muted">Every open task across all workspaces, grouped by due date. Click a workspace badge to jump there.</p>
-          <div id="globalTaskList" class="global-task-list"></div>
+          <div class="tasks-head">
+            <h1>Tasks</h1>
+            <div class="seg" role="tablist" aria-label="Task view">
+              <button id="tasksTabOpen" class="seg-btn active" type="button" role="tab" aria-selected="true">Open</button>
+              <button id="tasksTabDone" class="seg-btn" type="button" role="tab" aria-selected="false">Completed</button>
+            </div>
+          </div>
+
+          <div id="tasksOpenPane">
+            <p class="muted">Every open task across all workspaces, grouped by due date. Click a workspace badge to jump there.</p>
+            <div id="globalTaskList" class="global-task-list"></div>
+          </div>
+
+          <div id="tasksDonePane" class="hidden">
+            <p class="muted">Completed tasks, grouped by the day you finished them. Search, filter, and pick a date range.</p>
+            <div class="done-filters">
+              <input id="doneSearch" class="done-search" type="search" placeholder="🔎 Search completed tasks…" autocomplete="off" aria-label="Search completed tasks">
+              <select id="doneRange" class="done-filter" aria-label="Date range">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="month">This month</option>
+                <option value="year">This year</option>
+                <option value="all">All time</option>
+                <option value="custom">Custom range…</option>
+              </select>
+              <span id="doneCustom" class="done-custom hidden">
+                <input id="doneFrom" class="done-filter" type="date" aria-label="From date">
+                <span class="done-dash">–</span>
+                <input id="doneTo" class="done-filter" type="date" aria-label="To date">
+              </span>
+              <select id="doneWs" class="done-filter" aria-label="Workspace">
+                <option value="">All workspaces</option>
+              </select>
+              <select id="donePrio" class="done-filter" aria-label="Priority">
+                <option value="">Any priority</option>
+                <option value="1">P1</option>
+                <option value="2">P2</option>
+                <option value="3">P3</option>
+                <option value="4">P4</option>
+              </select>
+            </div>
+            <div class="done-summary">
+              <span id="doneCount" class="muted"></span>
+              <button id="doneClear" class="link-btn hidden" type="button">Clear filters</button>
+            </div>
+            <div id="completedTaskList" class="global-task-list"></div>
+          </div>
         </section>
 
         <section id="favsView" class="view hidden">

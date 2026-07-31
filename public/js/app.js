@@ -621,7 +621,7 @@
       { label: '＋ New Daily note', run: function () { createNewNote({}); } },
       { label: '✏️ New scratch note', run: function () { createNewNote({ scratch: true }); } },
       { label: 'Go to: Current note', run: function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); } },
-      { label: 'Go to: Tasks', run: renderGlobalTasks },
+      { label: 'Go to: Tasks', run: openTasksPage },
       { label: 'Go to: Task calendar', run: renderCalendar },
       { label: 'Go to: Favorites', run: renderFavorites },
       { label: 'Open: Templates', run: openTemplateModal },
@@ -1268,7 +1268,7 @@
     var msg = (ex && ex.message) || 'move failed';
     try { await loadWorkspaces(); } catch (_e) { /* non-fatal */ }
     try { await loadTasks(); } catch (_e) { /* non-fatal */ }
-    if (typeof renderGlobalTasks === 'function' && state.view === 'todos') { try { await renderGlobalTasks(); } catch (_e) {} }
+    if (state.view === 'todos') { try { await refreshActiveTasks(); } catch (_e) {} }
     if (/task not found/i.test(msg)) return dialog.alert('That task is no longer on the server — your list was out of date. It’s been refreshed; if the task is still shown, reload the page.');
     if (/workspace not found/i.test(msg)) return dialog.alert('That workspace no longer exists — the workspace list has been refreshed. Please pick another.');
     // A bare "not found" is the server's unmatched-route error: the running
@@ -2115,7 +2115,19 @@
     if (map[v]) $(map[v]).classList.remove('hidden');
   }
   $('navNote').addEventListener('click', function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); });
-  $('navTodos').addEventListener('click', renderGlobalTasks);
+  $('navTodos').addEventListener('click', openTasksPage);
+  $('tasksTabOpen').addEventListener('click', function () { setTasksTab('open'); });
+  $('tasksTabDone').addEventListener('click', function () { setTasksTab('completed'); });
+  $('doneSearch').addEventListener('input', applyDoneFilters);
+  $('doneWs').addEventListener('change', applyDoneFilters);
+  $('donePrio').addEventListener('change', applyDoneFilters);
+  $('doneRange').addEventListener('change', renderCompletedTasks);
+  $('doneFrom').addEventListener('change', function () { if ($('doneRange').value === 'custom') renderCompletedTasks(); });
+  $('doneTo').addEventListener('change', function () { if ($('doneRange').value === 'custom') renderCompletedTasks(); });
+  $('doneClear').addEventListener('click', function () {
+    $('doneSearch').value = ''; $('doneWs').value = ''; $('donePrio').value = '';
+    applyDoneFilters();
+  });
   $('navFavs').addEventListener('click', renderFavorites);
 
   function openWorkspace(wsId) {
@@ -2125,8 +2137,23 @@
   // Global Tasks page: every open task across workspaces, grouped by due date
   // (overdue dates first, then today, then upcoming, then undated), and within
   // each date sorted by priority then workspace. This replaces the old Agenda.
-  async function renderGlobalTasks() {
-    showView('todos');
+  // ---- Tasks page: Open / Completed tabs ----
+  function openTasksPage() { showView('todos'); setTasksTab(state.tasksTab || 'open'); }
+  function setTasksTab(tab) {
+    state.tasksTab = tab;
+    var isOpen = tab !== 'completed';
+    $('tasksTabOpen').classList.toggle('active', isOpen);
+    $('tasksTabOpen').setAttribute('aria-selected', String(isOpen));
+    $('tasksTabDone').classList.toggle('active', !isOpen);
+    $('tasksTabDone').setAttribute('aria-selected', String(!isOpen));
+    $('tasksOpenPane').classList.toggle('hidden', !isOpen);
+    $('tasksDonePane').classList.toggle('hidden', isOpen);
+    if (isOpen) renderGlobalTasksList(); else renderCompletedTasks();
+  }
+  // Refresh whichever Tasks tab is showing (after a complete/move/reopen).
+  function refreshActiveTasks() { if (state.view === 'todos') { if (state.tasksTab === 'completed') renderCompletedTasks(); else renderGlobalTasksList(); } }
+
+  async function renderGlobalTasksList() {
     var box = $('globalTaskList'); box.innerHTML = '<p class="muted">Loading…</p>';
     var tasks = await API.globalTasks();
     box.innerHTML = '';
@@ -2156,7 +2183,7 @@
       li.classList.add('checking');
       await API.completeTask(t.id, (state.note && state.note.workspaceId === t.workspaceId) ? state.note.id : null);
       if (t.workspaceId === state.wsId) await loadTasks();
-      renderGlobalTasks();
+      refreshActiveTasks();
     });
     var main = document.createElement('div'); main.className = 'task-main';
     var line = document.createElement('div'); line.className = 'gt-line';
@@ -2179,11 +2206,132 @@
         try {
           await moveTaskTo(t.id, dest);
           if (t.workspaceId === state.wsId || dest === state.wsId) await loadTasks();
-          renderGlobalTasks();
+          refreshActiveTasks();
         } catch (ex) { await handleMoveError(ex); }
       });
       actions.appendChild(mv); li.appendChild(actions);
     }
+    return li;
+  }
+
+  // ---- Completed tasks (history) ----
+  // Translate the range preset into inclusive from/to dates (by completion day).
+  function doneRangeDates(preset) {
+    var today = todayStr();
+    if (preset === 'all') return { from: '', to: '' };
+    if (preset === 'month') return { from: today.slice(0, 8) + '01', to: today };
+    if (preset === 'year') return { from: today.slice(0, 4) + '-01-01', to: today };
+    if (preset === 'custom') return { from: $('doneFrom').value || '', to: $('doneTo').value || '' };
+    var n = parseInt(preset, 10) || 30;
+    return { from: addDaysStr(today, -(n - 1)), to: today };
+  }
+  function populateDoneWsFilter() {
+    var sel = $('doneWs'); var cur = sel.value;
+    sel.innerHTML = '<option value="">All workspaces</option>';
+    (state.workspaces || []).forEach(function (w) {
+      var o = document.createElement('option'); o.value = w.id; o.textContent = w.name; sel.appendChild(o);
+    });
+    sel.value = cur;
+  }
+  // Fetch the completed set for the chosen date range (server-bounded), then hand
+  // off to the live client-side filters. Only re-fetches when the range changes.
+  async function renderCompletedTasks() {
+    populateDoneWsFilter();
+    var preset = $('doneRange').value;
+    $('doneCustom').classList.toggle('hidden', preset !== 'custom');
+    var range = doneRangeDates(preset);
+    var box = $('completedTaskList');
+    box.innerHTML = '<p class="muted">Loading…</p>';
+    try {
+      state.doneItems = await API.completedTasks({ from: range.from, to: range.to });
+    } catch (_e) {
+      box.innerHTML = '<p class="muted">Couldn’t load completed tasks.</p>'; state.doneItems = []; return;
+    }
+    applyDoneFilters();
+  }
+  function applyDoneFilters() {
+    var items = state.doneItems || [];
+    var q = ($('doneSearch').value || '').trim().toLowerCase();
+    var ws = $('doneWs').value;
+    var prio = $('donePrio').value;
+    var filtered = items.filter(function (t) {
+      if (ws && t.workspaceId !== ws) return false;
+      if (prio && String(t.priority) !== prio) return false;
+      if (q && (t.text + ' ' + (t.workspaceName || '')).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    var hasFilter = !!(q || ws || prio);
+    $('doneClear').classList.toggle('hidden', !hasFilter);
+    $('doneCount').textContent = filtered.length + (filtered.length === 1 ? ' completed task' : ' completed tasks')
+      + (hasFilter ? ' (of ' + items.length + ' in range)' : '');
+    renderCompletedList(filtered);
+  }
+  function fmtDoneDay(iso) {
+    if (iso === todayStr()) return 'Today';
+    if (iso === addDaysStr(todayStr(), -1)) return 'Yesterday';
+    try {
+      var opts = { weekday: 'short', month: 'short', day: 'numeric' };
+      if (iso.slice(0, 4) !== todayStr().slice(0, 4)) opts.year = 'numeric';
+      return new Date(iso + 'T00:00:00').toLocaleDateString([], opts);
+    } catch (e) { return iso; }
+  }
+  function fmtDoneTime(isoTs) {
+    try { return new Date(isoTs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; }
+  }
+  function renderCompletedList(items) {
+    var box = $('completedTaskList'); box.innerHTML = '';
+    if (!items.length) { box.innerHTML = '<p class="muted">No completed tasks match.</p>'; return; }
+    // `items` is already newest-first, so day keys appear in descending order.
+    var groups = {}; var order = [];
+    items.forEach(function (t) {
+      var day = String(t.completedAt).slice(0, 10);
+      if (!groups[day]) { groups[day] = []; order.push(day); }
+      groups[day].push(t);
+    });
+    order.forEach(function (day) {
+      var sec = document.createElement('div'); sec.className = 'task-group';
+      var lab = document.createElement('div'); lab.className = 'upcoming-date';
+      lab.textContent = fmtDoneDay(day) + ' · ' + groups[day].length;
+      sec.appendChild(lab);
+      var ul = document.createElement('ul'); ul.className = 'task-list';
+      groups[day].forEach(function (t) { ul.appendChild(completedTaskRow(t)); });
+      sec.appendChild(ul); box.appendChild(sec);
+    });
+  }
+  function completedTaskRow(t) {
+    var li = document.createElement('li'); li.className = 'task done prio-p' + t.priority;
+    var cb = document.createElement('button'); cb.className = 'task-check checked';
+    cb.title = 'Reopen this task'; cb.setAttribute('aria-label', 'Reopen task');
+    cb.addEventListener('click', async function () {
+      li.classList.add('checking');
+      try { await API.updateTask(t.id, { done: false, workspaceId: t.workspaceId }); }
+      catch (ex) { li.classList.remove('checking'); return dialog.alert('Couldn’t reopen: ' + ((ex && ex.message) || 'error')); }
+      setSaveStatus('Reopened ✓');
+      state.doneItems = (state.doneItems || []).filter(function (x) { return x.id !== t.id; });
+      if (t.workspaceId === state.wsId) loadTasks();
+      applyDoneFilters();
+    });
+    var main = document.createElement('div'); main.className = 'task-main';
+    var line = document.createElement('div'); line.className = 'gt-line';
+    var ws = document.createElement('button'); ws.className = 'gt-ws'; ws.textContent = t.workspaceName; ws.title = 'Open ' + t.workspaceName;
+    ws.addEventListener('click', function () { openWorkspace(t.workspaceId); });
+    var text = document.createElement('span'); text.className = 'task-text'; text.textContent = t.text;
+    line.appendChild(ws); line.appendChild(text); main.appendChild(line);
+    var meta = document.createElement('div'); meta.className = 'task-meta';
+    var done = document.createElement('span'); done.className = 'task-recur'; done.textContent = '✓ ' + fmtDoneTime(t.completedAt); meta.appendChild(done);
+    if (t.due) { var du = document.createElement('span'); du.className = 'task-due'; du.textContent = '📅 was due ' + fmtDueShort(t.due); meta.appendChild(du); }
+    if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox'; meta.appendChild(ib); }
+    main.appendChild(meta);
+    li.appendChild(cb); li.appendChild(main);
+    var actions = document.createElement('div'); actions.className = 'task-actions';
+    var del = document.createElement('button'); del.className = 'task-act task-del'; del.title = 'Delete permanently'; del.textContent = '✕';
+    del.addEventListener('click', async function () {
+      if (!(await dialog.confirm('Delete this completed task permanently?', { okText: 'Delete', danger: true }))) return;
+      try { await API.deleteTask(t.id); } catch (ex) { return dialog.alert('Couldn’t delete: ' + ((ex && ex.message) || 'error')); }
+      state.doneItems = (state.doneItems || []).filter(function (x) { return x.id !== t.id; });
+      applyDoneFilters();
+    });
+    actions.appendChild(del); li.appendChild(actions);
     return li;
   }
 
@@ -2827,7 +2975,7 @@
     // Two-key "g then x" jumps (Gmail-style).
     if (gPending) {
       gPending = false; clearTimeout(gTimer);
-      if (e.key === 't') { e.preventDefault(); renderGlobalTasks(); return; }
+      if (e.key === 't') { e.preventDefault(); openTasksPage(); return; }
       if (e.key === 'c') { e.preventDefault(); renderCalendar(); return; }
       if (e.key === 'f') { e.preventDefault(); renderFavorites(); return; }
       if (e.key === 'h') { e.preventDefault(); if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); return; }

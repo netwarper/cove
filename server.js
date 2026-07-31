@@ -596,6 +596,7 @@ async function route(s, req, res, pathname, query, session) {
 
   // tasks (unified to-do + reminder)
   if (pathname === '/api/tasks' && m === 'GET') return s.globalTasks();
+  if (pathname === '/api/tasks/completed' && m === 'GET') return s.completedTasks({ from: query.from, to: query.to });
   if (pathname === '/api/tasks/due' && m === 'POST') return s.dueTaskNotifications();
   if (seg[1] === 'tasks' && seg[2]) {
     const taskId = safeId(seg[2]);

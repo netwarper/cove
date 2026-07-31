@@ -80,6 +80,25 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     t.ok(threw, 'move to a missing workspace 404s');
     store.moveTask(movingId, wsB.id); // same-workspace
     t.eq(store.listTasks(wsB.id).filter((x) => x.id === movingId).length, 1, 'move to the same workspace does not duplicate');
+
+    // --- completed-tasks history view ---
+    const cA = store.addTask(ws.id, { text: 'ship the thing', priority: 1, due: '2026-07-10' }).task.id;
+    const cB = store.addTask(wsB.id, { text: 'email finance', priority: 3, due: '2026-07-11' }).task.id;
+    store.completeTask(cA, {});
+    store.completeTask(cB, {});
+    const allDone = store.completedTasks();
+    t.ok(allDone.length >= 2, 'completedTasks returns finished tasks across workspaces');
+    t.ok(allDone.every((x) => x.done && x.completedAt), 'every completed entry has done + completedAt');
+    t.ok(allDone.every((x) => x.workspaceName), 'completed entries are tagged with workspaceName');
+    // newest-first ordering
+    for (let i = 1; i < allDone.length; i++) t.ok(allDone[i - 1].completedAt >= allDone[i].completedAt, 'completed sorted newest-first');
+    t.eq(store.completedTasks().some((x) => x.id === cA), true, 'a just-completed task appears in the history');
+    // date-range bound (completion happened today → an ancient window excludes it)
+    t.eq(store.completedTasks({ to: '2000-01-01' }).length, 0, 'to-bound in the past excludes today’s completions');
+    t.ok(store.completedTasks({ from: '2000-01-01' }).length >= 2, 'from-bound in the past includes today’s completions');
+    // reopening removes it from history
+    store.updateTask(cA, { done: false });
+    t.eq(store.completedTasks().some((x) => x.id === cA), false, 'reopened task leaves the completed history');
   } catch (ex) {
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {

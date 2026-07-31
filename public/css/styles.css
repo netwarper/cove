@@ -291,6 +291,26 @@ select.qa-pill { padding: 4px 6px; }
 
 .inbox-badge { font-size: 11px; align-self: center; }
 .slack-daily { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+
+/* Completed-task rows: filled check that offers "reopen" on hover. */
+.task.done .task-check.checked::after { content: '✓'; color: #fff; font-size: 11px; }
+.task.done .task-check.checked:hover { background: none; border-color: var(--brand); }
+.task.done .task-check.checked:hover::after { content: '↩'; color: var(--brand); }
+
+/* Tasks page: Open / Completed segmented control + filter bar. */
+.tasks-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); padding: 2px; }
+.seg-btn { border: 0; background: none; color: var(--muted); font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: 6px; cursor: pointer; }
+.seg-btn:hover { color: var(--ink); }
+.seg-btn.active { background: var(--brand); color: var(--brand-ink); }
+.done-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 6px; }
+.done-search { flex: 1 1 220px; min-width: 160px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); }
+.done-filter { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 13px; }
+.done-custom { display: inline-flex; align-items: center; gap: 6px; }
+.done-dash { color: var(--muted); }
+.done-summary { display: flex; align-items: center; gap: 10px; min-height: 20px; margin-bottom: 4px; }
+.link-btn { border: 0; background: none; color: var(--brand); cursor: pointer; font-size: 12px; padding: 0; }
+.link-btn:hover { text-decoration: underline; }
 .slack-daily input[type="checkbox"] { width: auto; margin: 0; }
 .slack-daily input[type="time"] { width: auto; margin: 0; }
 .slack-actions { display: flex; gap: 8px; margin-top: 8px; }
