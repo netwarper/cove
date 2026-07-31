@@ -53,6 +53,10 @@ const COOKIE_SECURE = (process.env.COOKIE_SECURE || 'auto').toLowerCase();
 const AUTO_BACKUP_DIR = process.env.AUTO_BACKUP_DIR ? path.resolve(process.env.AUTO_BACKUP_DIR) : null;
 const AUTO_BACKUP_HOURS = parseFloat(process.env.AUTO_BACKUP_HOURS) || 24;
 const AUTO_BACKUP_KEEP = parseInt(process.env.AUTO_BACKUP_KEEP, 10) || 7;
+// Keep a fresh read-only offline viewer (meeting-notes-viewer.html) in the data
+// dir so a synced copy (Google Drive/Box/Dropbox) is openable on any device
+// without the server. On by default; set VIEWER_AUTOWRITE=0 to disable.
+const VIEWER_AUTOWRITE = !/^(0|false|off|no)$/i.test(process.env.VIEWER_AUTOWRITE || '');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const VAULT_PATH = path.join(DATA_DIR, 'vault.json');
 let APP_VERSION = '0.0.0';
@@ -85,6 +89,24 @@ function startWatcher() {
     // recursive watch may be unsupported on some platforms — live-sync simply
     // stays off; the optimistic-concurrency guard still prevents lost writes.
   }
+}
+
+// Write the standalone offline viewer into the data dir (keyless: all note/task
+// text, no inline images — those need the session key and come from the in-app
+// export). Best effort; never throws into a request.
+function writeViewerSafe() {
+  if (!VIEWER_AUTOWRITE) return;
+  try { if (fs.existsSync(VAULT_PATH)) viewer.writeViewer(DATA_DIR, viewer.collectData(DATA_DIR)); } catch (_e) { /* best effort */ }
+}
+// Coalesce bursts of edits into a single rebuild shortly after the last change,
+// so the synced copy on your other devices stays current without rewriting a
+// large file on every keystroke-save.
+let _viewerTimer = null;
+function scheduleViewerRefresh() {
+  if (!VIEWER_AUTOWRITE) return;
+  clearTimeout(_viewerTimer);
+  _viewerTimer = setTimeout(writeViewerSafe, 45000);
+  if (_viewerTimer.unref) _viewerTimer.unref();
 }
 
 // Allowed session-lifetime window: 5 minutes to 30 days (in ms), or null.
@@ -497,6 +519,8 @@ const server = http.createServer(async (req, res) => {
 
     const result = await route(s, req, res, pathname, query, session);
     if (result !== undefined) sendJSON(res, 200, result);
+    // A successful data change → refresh the synced offline viewer (debounced).
+    if (req.method !== 'GET' && req.method !== 'HEAD') scheduleViewerRefresh();
   } catch (err) {
     const status = err.status || 500;
     if (status === 500) console.error('server error:', err.message);
@@ -794,10 +818,12 @@ function startServer() {
     config.writeLock(DATA_DIR, PORT);
     startWatcher();
     startAutoBackup();
+    if (VIEWER_AUTOWRITE) setTimeout(writeViewerSafe, 3000).unref(); // drop a fresh offline copy shortly after boot
     console.log(`\n  Cove ${APP_VERSION} running at  ${CFG.url}`);
     if (CFG.domain) console.log(`  (also reachable at        http://${HOST}:${PORT})`);
     console.log(`  Data directory:           ${DATA_DIR}`);
     if (AUTO_BACKUP_DIR) console.log(`  Auto-backup:              every ${AUTO_BACKUP_HOURS}h → ${AUTO_BACKUP_DIR} (keep ${AUTO_BACKUP_KEEP})`);
+    if (VIEWER_AUTOWRITE) console.log(`  Offline viewer:           ${path.join(DATA_DIR, viewer.OUTPUT_NAME)} (open on any device; unlock with your passphrase)`);
     console.log(`  (encrypted at rest — set DATA_DIR to a Drive/Box/Dropbox folder to sync)\n`);
   });
 
@@ -808,9 +834,6 @@ function startServer() {
         const r = backup.runAutoBackup(DATA_DIR, AUTO_BACKUP_DIR, AUTO_BACKUP_KEEP);
         console.log(`auto-backup written: ${path.basename(r.file)}${r.removed.length ? ` (pruned ${r.removed.length})` : ''}`);
       } catch (e) { console.error('auto-backup failed:', e.message); }
-      // Keep a fresh offline viewer in the (synced) data dir. Keyless build, so
-      // it omits inline attachment images; the in-app download includes them.
-      try { viewer.writeViewer(DATA_DIR, viewer.collectData(DATA_DIR)); } catch (_e) { /* best effort */ }
     };
     setTimeout(run, 5000).unref(); // first backup shortly after startup
     setInterval(run, AUTO_BACKUP_HOURS * 3600 * 1000).unref();
@@ -823,6 +846,7 @@ function startServer() {
   const shutdown = () => {
     if (shuttingDown) return;
     shuttingDown = true;
+    writeViewerSafe(); // leave a fresh synced copy behind on stop/restart
     config.clearLock(DATA_DIR);
     try { server.close(() => process.exit(0)); } catch (_e) { process.exit(0); }
     setTimeout(() => process.exit(0), 4000).unref();

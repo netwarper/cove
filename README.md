@@ -242,19 +242,25 @@ the decryptor, the UI, and your *encrypted* notes — is inlined into that one
 file, so it reveals nothing without your passphrase.
 
 **Get it:**
-- In the app: **⋮ → Backup / restore → Download offline viewer**, or
-- `node server.js --build-viewer` (set `MN_PASSPHRASE` to also embed inline images), or
-- automatically: whenever scheduled backups run (`AUTO_BACKUP_DIR`), a fresh copy
-  is written into your data folder so it syncs to your phone on its own.
+- **Automatically (default):** Cove keeps a fresh `meeting-notes-viewer.html` in
+  your data folder — rewritten on startup, shortly after each edit, and on
+  shutdown — so it syncs to your phone on its own with no action from you. The
+  auto-saved copy omits inline images (they need the unlock key). Turn it off
+  with `VIEWER_AUTOWRITE=0`.
+- In the app, for a copy **with inline images**: **⋮ → Backup, export & offline
+  viewer → Download viewer (with images)**.
+- Or on the CLI: `node server.js --build-viewer` (set `MN_PASSPHRASE` to also
+  embed inline images).
 
 **Open it on iPhone/iPad:** in the Google Drive / Box / Files app, tap
 `meeting-notes-viewer.html` → open in Safari → enter your passphrase. It works
 as a local file with no server, because it ships a **pure-JavaScript crypto
 fallback** for the case where iOS Safari doesn't expose WebCrypto on `file://`.
 
-It's **read-only** (viewing, search, workspaces, inline images). To edit, use
-the full app. The snapshot is only as current as your folder last synced, so
-grab a fresh copy before you head offline.
+It's **read-only** (viewing, search, workspaces; images only in the
+with-images copy). To edit, use the full app. It's a point-in-time snapshot —
+the auto-saved copy refreshes itself after edits, but it's still only as current
+as your folder last synced, so give sync a moment before you head offline.
 
 ## Portability
 

@@ -409,11 +409,16 @@ sync with Alex next tue 3pm</code></pre>
         <p>If the same note is edited on two devices at once and you choose <b>Keep both</b> during a sync conflict, a copy is
         made and the event is logged under <b>⋮ → 🔀 Conflicts</b>, with links to the original and the copy so you can
         reconcile them later.</p>
-        <h3>Export your whole vault (offline site)</h3>
-        <p><b>⋮ → Backup, export &amp; offline viewer → Export whole vault</b> produces a single self-contained HTML file with <b>every note,
-        task, and image</b> across all workspaces. It decrypts on-device with your passphrase — no server, no network — so
-        you can browse and search everything from Google Drive / Box / Files on any device. A fresh copy is also written
-        into your data folder.</p>
+        <h3>Offline viewer — read your notes on your phone, no network</h3>
+        <p>Cove keeps a self-contained <code>meeting-notes-viewer.html</code> in your <b>data folder</b>, refreshed
+        automatically (on startup, shortly after edits, and on shutdown). It's a single read-only HTML file with
+        <b>every note &amp; task</b> that decrypts <b>on-device</b> with your passphrase — no server, no network. So if your
+        data folder is a synced folder (Google&nbsp;Drive / Box / Dropbox / iCloud), the file lands on your phone too:
+        open it there (download it and open in your browser if the Drive/Files preview won't run it), enter your passphrase,
+        and browse and search everything — even when the Cove app itself isn't reachable.</p>
+        <p>The auto-saved copy omits inline images to stay small. For a copy <b>including images</b>, use
+        <b>⋮ → Backup, export &amp; offline viewer → Download viewer (with images)</b>. Both are point-in-time snapshots;
+        the auto-saved one refreshes itself, and you can set <code>VIEWER_AUTOWRITE=0</code> to turn the auto-write off.</p>
         <h3>Export &amp; import a note</h3>
         <p>Export any note to <b>PDF (print), HTML, Markdown, or JSON</b>. Import a previously exported JSON / HTML /
         Markdown note back into a workspace.</p>
