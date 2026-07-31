@@ -488,6 +488,21 @@
         <input id="fontSize" type="range" min="13" max="20" step="1" value="14">
       </div>
       <div class="acct-block">
+        <h4>Daily-note reminder</h4>
+        <p class="muted tiny">If you've been working in an older note this long without a daily note for today, Cove shows a quiet, dismissible nudge to start one — at most once a day, on this device.</p>
+        <div class="setting-row">
+          <label for="dailyNudgeDelay">Remind me after</label>
+          <select id="dailyNudgeDelay" class="ws-tpl">
+            <option value="1">1 minute</option>
+            <option value="2">2 minutes</option>
+            <option value="4">4 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="20">20 minutes</option>
+            <option value="0">Never</option>
+          </select>
+        </div>
+      </div>
+      <div class="acct-block">
         <h4>Image text (OCR)</h4>
         <p class="muted tiny">When you paste or attach a screenshot, Cove reads any text in it <b>on your device</b> (nothing is uploaded) so the image turns up in search. Runs in the background the first time it loads a small local engine.</p>
         <label class="tiny"><input id="ocrEnabled" type="checkbox" checked> Extract text from pasted images</label>

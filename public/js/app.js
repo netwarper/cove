@@ -882,9 +882,16 @@
   // Gentle, once-a-day nudge: if you've been working in a note for a while and
   // haven't started today's daily note (in a workspace you do use dailies in),
   // show a small dismissible banner — at most once per day, per device.
-  var DAILY_NUDGE_DEFAULT_MS = 4 * 60 * 1000;
+  var DAILY_NUDGE_DEFAULT_MIN = 4;
   var dailyNudge = { timer: null, forNoteId: null };
-  function dailyNudgeDelayMs() { return (typeof window !== 'undefined' && window.__coveNudgeMs) || DAILY_NUDGE_DEFAULT_MS; }
+  // Resolves to the delay in ms, or 0 when the reminder is turned off. Minutes
+  // come from settings (per-account); the test hook wins when present.
+  function dailyNudgeDelayMs() {
+    if (typeof window !== 'undefined' && window.__coveNudgeMs) return window.__coveNudgeMs;
+    var m = state.settings && state.settings.dailyNudgeMinutes;
+    if (m == null) m = DAILY_NUDGE_DEFAULT_MIN;
+    return m > 0 ? m * 60 * 1000 : 0;
+  }
   function dailyNudgeShownToday() { try { return localStorage.getItem('cove.dailyNudge') === todayStr(); } catch (_e) { return false; } }
   function armDailyNudge() {
     var n = state.note;
@@ -892,6 +899,8 @@
     dailyNudge.forNoteId = n.id;
     clearTimeout(dailyNudge.timer); dailyNudge.timer = null;
     $('dailyNudge').classList.add('hidden');
+    var delay = dailyNudgeDelayMs();
+    if (delay <= 0) return; // reminder turned off
     if (dailyNudgeShownToday()) return;
     var today = todayStr();
     if (n.kind !== 'scratch' && n.title === today) return; // already on today's daily
@@ -909,7 +918,7 @@
           $('dailyNudge').classList.remove('hidden');
         }
       }).catch(function () {});
-    }, dailyNudgeDelayMs());
+    }, delay);
   }
   $('dailyNudgeNew').addEventListener('click', function () { $('dailyNudge').classList.add('hidden'); createNewNote({}); });
   $('dailyNudgeDismiss').addEventListener('click', function () { $('dailyNudge').classList.add('hidden'); });
@@ -2426,6 +2435,7 @@
       (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
     $('fontSize').value = state.settings.fontSize || 14;
     $('ocrEnabled').checked = state.settings.ocrEnabled !== false;
+    $('dailyNudgeDelay').value = String(state.settings.dailyNudgeMinutes != null ? state.settings.dailyNudgeMinutes : DAILY_NUDGE_DEFAULT_MIN);
     $('idleLock').value = String(state.settings.idleLockMinutes != null ? state.settings.idleLockMinutes : IDLE_DEFAULT_MIN);
     var ttlDefault = (state.instance && state.instance.sessionTtlDefaultMin) || 240;
     $('sessionTtl').value = String(state.settings.sessionTtlMinutes != null ? state.settings.sessionTtlMinutes : ttlDefault);
@@ -2598,6 +2608,11 @@
   $('sessionTtl').addEventListener('change', function () {
     state.settings.sessionTtlMinutes = parseInt($('sessionTtl').value, 10) || 240;
     API.saveSettings({ sessionTtlMinutes: state.settings.sessionTtlMinutes });
+  });
+  $('dailyNudgeDelay').addEventListener('change', function () {
+    state.settings.dailyNudgeMinutes = parseInt($('dailyNudgeDelay').value, 10) || 0;
+    API.saveSettings({ dailyNudgeMinutes: state.settings.dailyNudgeMinutes });
+    dailyNudge.forNoteId = null; armDailyNudge(); // re-arm the current note with the new delay
   });
 
   // Backup / restore + bulk export
