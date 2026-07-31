@@ -21,11 +21,13 @@ You need [Node.js](https://nodejs.org) v18 or newer. Then:
 - **Windows:** double-click `start.bat`
 - **Any platform:** `npm start` (equivalently `node server.js`)
 
-`start.sh` launches the server **detached in the background** and waits until it's
-answering, so you can **close the terminal** and Cove keeps running. To stop it,
-run `./stop.sh`; to reload it in place (e.g. after `git pull`), run
-`scripts/restart.sh`. All three find the right process via the instance's lock
-file and stop it gracefully (SIGTERM, then SIGKILL only if needed).
+`start.sh` (and `start.bat`) launches the server **detached in the background**
+and waits until it's answering, so you can **close the terminal/window** and Cove
+keeps running. To stop it, run `./stop.sh` (`stop.bat` on Windows); to reload it
+in place (e.g. after `git pull`), run `scripts/restart.sh`. They all delegate to
+one cross-platform engine, `scripts/cove.js`, which finds the running process via
+the instance's lock file and stops it gracefully (SIGTERM, then a forced kill
+only if needed).
 
 Your browser opens at **http://127.0.0.1:3000**. On first run you set a
 **passphrase** that encrypts all your data. There is no account and no cloud —
@@ -378,10 +380,11 @@ public/js/taskparse.js natural-language quick-add parser (no LLM)
 public/                frontend (index.html, css, vanilla JS)
 test/                  functional + security suites
 scripts/check-quality.js  syntax + static checks
-scripts/_cove-lib.sh   shared start/stop/restart helpers (node discovery, lock/port, health)
+scripts/cove.js        cross-platform engine: detached start / stop / restart + health
 scripts/restart.sh     stop + start a fresh detached server (reload after an update)
-start.sh / stop.sh     start (detached) / stop the background server
-start.bat              Windows one-click launcher
+scripts/_cove-lib.sh   shell helper (node discovery) for the launchers
+start.sh / stop.sh     macOS/Linux start (detached) / stop the background server
+start.bat / stop.bat   Windows start (detached) / stop the background server
 prompt-version.md      how to regenerate this app from a prompt
 ```
 

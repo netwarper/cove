@@ -1,25 +1,23 @@
 @echo off
 REM One-click launcher for Windows. Double-click this file to run.
+REM
+REM Starts Cove as a DETACHED background server (via scripts\cove.js) so it keeps
+REM running after you close this window. It waits until the server is answering,
+REM opens your browser, and prints the URL. Stop it later with stop.bat.
+REM
+REM Extra args (e.g. --port 8080) are forwarded. DATA_DIR / PORT are read from a
+REM local .env if present.
 cd /d "%~dp0"
 
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Node.js is required but was not found. Install it from https://nodejs.org (v18+).
+  echo Node.js is required but was not found. Install it from https://nodejs.org ^(v18+^).
   pause
   exit /b 1
 )
 
-if "%DATA_DIR%"=="" set DATA_DIR=.\data
-
-REM First run: offer to pick a durable local domain for this instance.
-if not exist "%DATA_DIR%\instance.json" if "%PORT%"=="" (
-  set /p NAME="Pick a durable local domain for this instance [meeting-notes]: "
-  if "%NAME%"=="" set NAME=meeting-notes
-  node server.js --set-domain "%NAME%"
-)
-
-echo Starting Cove...
-REM Extra args (e.g. --port 8080) are forwarded to the server.
-node server.js --print-config %*
-node server.js %*
+node "%~dp0scripts\cove.js" start %*
+set "RC=%ERRORLEVEL%"
+echo.
 pause
+exit /b %RC%
