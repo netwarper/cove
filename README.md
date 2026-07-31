@@ -94,13 +94,13 @@ variable. Point it at a cloud-sync folder to keep an **encrypted** copy synced:
 
 ```bash
 # macOS / Linux
-DATA_DIR="/Users/you/Google Drive/MeetingNotes" ./start.sh
-DATA_DIR="/Users/you/Dropbox/MeetingNotes"      ./start.sh
+DATA_DIR="/Users/you/Google Drive/Cove" ./start.sh
+DATA_DIR="/Users/you/Dropbox/Cove"      ./start.sh
 ```
 
 ```bat
 :: Windows
-set DATA_DIR=C:\Users\you\Box\MeetingNotes
+set DATA_DIR=C:\Users\you\Box\Cove
 start.bat
 ```
 
@@ -378,7 +378,10 @@ public/js/taskparse.js natural-language quick-add parser (no LLM)
 public/                frontend (index.html, css, vanilla JS)
 test/                  functional + security suites
 scripts/check-quality.js  syntax + static checks
-start.sh / start.bat   one-click launchers
+scripts/_cove-lib.sh   shared start/stop/restart helpers (node discovery, lock/port, health)
+scripts/restart.sh     stop + start a fresh detached server (reload after an update)
+start.sh / stop.sh     start (detached) / stop the background server
+start.bat              Windows one-click launcher
 prompt-version.md      how to regenerate this app from a prompt
 ```
 

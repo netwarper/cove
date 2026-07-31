@@ -92,6 +92,13 @@ for a double-clickable launcher: it won't tie the server's lifetime to the thing
 that launched it (which is how a server ends up "stuck" in a terminal you closed),
 and it's safe to run repeatedly — each run just restarts cleanly.
 
+For everyday use outside the login service, the repo also has `./start.sh` and
+`./stop.sh` (in the Cove folder). `start.sh` launches the server **detached** —
+so you can close the terminal — and is idempotent (if one's already up it just
+points you at it); `stop.sh` stops it gracefully. All three share the same logic
+(`scripts/_cove-lib.sh`): they locate `node`, resolve the port from the lock
+file, and stop with SIGTERM before ever force-killing.
+
 ### Launching it from an Automator app
 
 If the login service won't stick, an Automator **Application** that runs
