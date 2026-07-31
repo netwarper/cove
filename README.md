@@ -21,6 +21,12 @@ You need [Node.js](https://nodejs.org) v18 or newer. Then:
 - **Windows:** double-click `start.bat`
 - **Any platform:** `npm start` (equivalently `node server.js`)
 
+`start.sh` launches the server **detached in the background** and waits until it's
+answering, so you can **close the terminal** and Cove keeps running. To stop it,
+run `./stop.sh`; to reload it in place (e.g. after `git pull`), run
+`scripts/restart.sh`. All three find the right process via the instance's lock
+file and stop it gracefully (SIGTERM, then SIGKILL only if needed).
+
 Your browser opens at **http://127.0.0.1:3000**. On first run you set a
 **passphrase** that encrypts all your data. There is no account and no cloud —
 everything stays on your machine.
