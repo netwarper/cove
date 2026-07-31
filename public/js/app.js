@@ -2244,8 +2244,15 @@
     box.innerHTML = '<p class="muted">Loading…</p>';
     try {
       state.doneItems = await API.completedTasks({ from: range.from, to: range.to });
-    } catch (_e) {
-      box.innerHTML = '<p class="muted">Couldn’t load completed tasks.</p>'; state.doneItems = []; return;
+    } catch (ex) {
+      state.doneItems = [];
+      // A 404 / "not found" here means the running server predates this endpoint
+      // (routes load at startup) — the page updated but the server didn't. Say so.
+      var stale = ex && (ex.status === 404 || /not found/i.test(ex.message || ''));
+      box.innerHTML = stale
+        ? '<p class="muted">The Cove server is running an older version than this page, so it doesn’t have the completed-tasks endpoint yet. Restart it — <code>scripts/restart.sh</code> (or <code>./stop.sh</code> then <code>./start.sh</code>) — and reload.</p>'
+        : '<p class="muted">Couldn’t load completed tasks: ' + esc((ex && ex.message) || 'error') + '</p>';
+      return;
     }
     applyDoneFilters();
   }
