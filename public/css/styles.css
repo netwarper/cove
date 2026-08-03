@@ -207,6 +207,8 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .summary-action .sa-text { flex: 1; min-width: 0; font-size: 13px; }
 .summary-action button[disabled] { opacity: .55; }
 
+.help-version { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); text-align: center; }
+
 /* ---- Mini toast (transient confirmations, e.g. "task added") ---- */
 .mini-toast {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(8px);

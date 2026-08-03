@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = 'v73';
+  var APP_BUILD = '1.53.2'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -378,11 +378,13 @@
         rp: { name: 'Cove' },
         user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'cove', displayName: 'Cove' },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-        authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
-        // Request PRF and evaluate it at create() so browsers that support it
-        // (Chrome 116+, Safari 18+) can hand back the secret in one prompt; others
-        // return only `enabled` and we derive it from the assertion below.
-        timeout: 60000, extensions: { prf: { eval: { first: PRF_SALT } } },
+        authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' },
+        // Request PRF support at registration WITHOUT eval. Some authenticators
+        // report prf.enabled=false when asked to evaluate at create() time even
+        // though PRF works on a later assertion — so we enable it here and derive
+        // the secret from the get() below (the reliable, cross-platform path). A
+        // discoverable (resident) credential also improves PRF availability.
+        timeout: 60000, extensions: { prf: {} },
       } });
     } catch (ex) { console.error('[bio] create() failed:', ex && ex.name, ex && ex.message, ex); throw webauthnError(ex); }
     var credId = bufToB64url(cred.rawId);
@@ -391,23 +393,16 @@
     try { ext = (cred.getClientExtensionResults ? cred.getClientExtensionResults() : {}) || {}; } catch (_e) { ext = {}; }
     var prfEnabled = ext.prf ? ext.prf.enabled : undefined;
     console.log('[bio] passkey created; prf.enabled=' + prfEnabled, ext);
-    // Some browsers (with eval) return the secret straight from create(); use it if so.
-    try { var f = ext.prf && ext.prf.results && ext.prf.results.first; if (f) secret = bufToB64(f); } catch (_e) { /* fall through */ }
-    // `prf.enabled === false` is a hard authenticator/OS limitation — a get() won't help.
-    if (!secret && prfEnabled === false) {
-      console.warn('[bio] PRF/hmac-secret NOT supported by this authenticator:', ext);
-      throw new Error('This device’s authenticator doesn’t support the PRF / hmac-secret extension, so biometric unlock can’t be enabled here. This is a platform limitation (common on some Windows Hello / older-TPM setups, and on plug-in security keys). Your passphrase still works; you can remove the leftover “Cove” passkey in your browser’s passkey settings.');
-    }
+    if (prfEnabled === false) console.log('[bio] registration reported prf.enabled=false — trying an assertion anyway (this flag is not always authoritative).');
+    // The authoritative test is whether an assertion returns a PRF result. Always
+    // try it — even when registration reported enabled=false — before giving up.
+    var got = null;
+    try { got = await bioAssert([credId]); } catch (ex) { console.error('[bio] assertion get() failed:', ex && ex.name, ex && ex.message, ex); throw webauthnError(ex); }
+    console.log('[bio] assertion done; secret ' + (got && got.secret ? 'obtained' : 'MISSING'));
+    if (got && got.secret) secret = got.secret;
     if (!secret) {
-      // Derive the PRF secret via an assertion (this is the reliable path).
-      var got = null;
-      try { got = await bioAssert([credId]); } catch (ex) { console.error('[bio] assertion get() failed:', ex && ex.name, ex && ex.message, ex); throw webauthnError(ex); }
-      console.log('[bio] assertion done; secret ' + (got && got.secret ? 'obtained' : 'MISSING'));
-      if (got && got.secret) secret = got.secret;
-    }
-    if (!secret) {
-      console.warn('[bio] no PRF secret. create() ext=', ext, '(prf.enabled=' + prfEnabled + ')');
-      throw new Error('This device created the passkey but didn’t return a PRF secret, so biometric unlock can’t be enabled. It needs a PRF-capable PLATFORM authenticator (built-in Touch ID / Windows Hello, or a synced passkey) over localhost or HTTPS — a plug-in security key won’t work. Your passphrase still works. (Diagnostics were logged to the console — F12 → Console — please share the “[bio]” lines.)');
+      console.warn('[bio] no PRF secret after assertion. create() ext=', ext, '(prf.enabled=' + prfEnabled + ')');
+      throw new Error('This device’s authenticator didn’t return a PRF secret even on a direct check, so biometric unlock can’t be enabled here. This is a platform limitation — it needs a PRF / hmac-secret-capable PLATFORM authenticator (built-in Touch ID / Windows Hello on a recent OS, or a synced passkey), not a plug-in security key, over localhost or HTTPS. Your passphrase still works; you can remove the leftover “Cove” passkey in your browser’s passkey settings. (Diagnostics were logged to the console — please share the “[bio]” lines.)');
     }
     console.log('[bio] enrolling credential with server');
     await API.webauthnEnroll({ credentialId: credId, prfSecret: secret, prfSalt: 'v1', label: bioDeviceLabel() });
@@ -736,7 +731,13 @@
   });
 
   // ---------------- Help / shortcuts overlay ----------------
-  function openHelp() { $('helpLayer').classList.remove('hidden'); }
+  function openHelp() { $('helpVersion').textContent = versionLabel(); $('helpLayer').classList.remove('hidden'); }
+  // Human-readable version for "about"-style surfaces. Shows the server app version
+  // and the client build so a stale cached UI is easy to spot when they differ.
+  function versionLabel() {
+    var sv = (state.instance && state.instance.version) || '';
+    return 'Cove' + (sv ? ' v' + sv : '') + ' · app build ' + APP_BUILD;
+  }
   function closeHelp() { $('helpLayer').classList.add('hidden'); }
   // Open the full user manual, matching the app's current theme.
   function openManual() {
@@ -2820,7 +2821,7 @@
   function openAccount(focusStt) {
     $('acctMsg').textContent = '';
     var inst = state.instance || {};
-    $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Cove') + '</b> · v' + esc(inst.version || '') +
+    $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Cove') + '</b> · server v' + esc(inst.version || '') + ' · app build ' + esc(APP_BUILD) +
       '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
       (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
     $('fontSize').value = state.settings.fontSize || 14;
