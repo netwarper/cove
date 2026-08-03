@@ -507,7 +507,13 @@ sync with Alex next tue 3pm</code></pre>
         <h3>Biometric unlock says “invalid domain”.</h3>
         <p>Passkeys require <code>localhost</code>, a domain, or HTTPS — not a raw <code>127.0.0.1</code> address. Open the app at <code>http://localhost:&lt;port&gt;</code> or a <code>cove.localhost</code> address (the Enable button is hidden on an IP address for this reason).</p>
         <h3>It adds the passkey, then errors.</h3>
-        <p>Biometric unlock uses the passkey's <b>PRF</b> extension to wrap your key. If your device creates the passkey but can't produce a PRF secret, enrollment can't finish. PRF for the built-in Touch ID / iCloud&nbsp;Keychain authenticator needs a recent OS + browser (macOS&nbsp;15 / Chrome or Safari current). Until then, your <b>passphrase still works</b>; you can delete the leftover “Cove” passkey in your browser or OS passkey settings.</p>
+        <p>Biometric unlock uses the passkey's <b>PRF</b> extension (a.k.a. <code>hmac-secret</code>) to wrap your key. If your device creates the passkey but can't produce a PRF secret, enrollment can't finish. A few things to check:</p>
+        <ul>
+          <li>Use a <b>platform authenticator</b> (built-in Touch&nbsp;ID / Windows&nbsp;Hello / a synced passkey) — a plug-in <b>security key</b> won't provide PRF here.</li>
+          <li>PRF needs a recent OS + browser: macOS&nbsp;15 / Chrome or Safari current for Touch&nbsp;ID&nbsp;/&nbsp;iCloud&nbsp;Keychain; current Chrome/Edge for Windows&nbsp;Hello. Some older Windows&nbsp;Hello / TPM combinations simply don't expose it.</li>
+          <li>Open over <code>localhost</code> or HTTPS (not a raw IP).</li>
+        </ul>
+        <p>When it fails, Cove now logs the authenticator's exact response to the browser console (<b>F12 → Console</b>) — that line tells you whether PRF was <i>enabled</i> at all. Either way your <b>passphrase still works</b>, and you can delete the leftover “Cove” passkey in your browser or OS passkey settings.</p>
         <h3>My Slack message didn't become a task.</h3>
         <p>The app drains the inbox about once a minute <b>while it's unlocked</b>. Open and unlock the app, and confirm your glue service is writing into the right <code>inbox/</code> folder. See <code>docs/slack-inbox.md</code>.</p>
         <h3>The app opens but says “Cove server isn’t running”.</h3>

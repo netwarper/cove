@@ -138,6 +138,12 @@ try {
   await sp.keyboard.press('Escape');
   ok(await sp.locator('#accountModal').isVisible() === false, 'Escape closes modal');
 
+  // --- new-task feedback (toast + scroll-into-view) ---
+  await sp.fill('#taskInput', 'harness upcoming task next friday');
+  await sp.press('#taskInput', 'Enter');
+  await sp.waitForSelector('#miniToast.show', { timeout: 4000 });
+  ok(/Task added/.test(await sp.textContent('#miniToast') || ''), 'new-task toast shown');
+
   // --- AI summary + action item -> task ---
   const tasksBefore = await sp.evaluate(async () => (await window.API.globalTasks()).length);
   await sp.click('#summarizeBtn');

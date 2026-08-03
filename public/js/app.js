@@ -382,18 +382,29 @@
     } catch (ex) { throw webauthnError(ex); }
     var credId = bufToB64url(cred.rawId);
     var secret = null;
+    var ext = {};
+    try { ext = (cred.getClientExtensionResults ? cred.getClientExtensionResults() : {}) || {}; } catch (_e) { ext = {}; }
+    // `prf.enabled === false` means the authenticator itself can't do PRF/hmac-secret
+    // (a hardware/OS limitation) — a follow-up get() won't help, so don't prompt again.
+    var prfEnabled = ext.prf ? ext.prf.enabled : undefined;
     try {
-      var ext = cred.getClientExtensionResults ? cred.getClientExtensionResults() : {};
-      var f = ext && ext.prf && ext.prf.results && ext.prf.results.first;
+      var f = ext.prf && ext.prf.results && ext.prf.results.first; // fast path (Chrome 116+/Safari 18+)
       if (f) secret = bufToB64(f);
     } catch (_e) { /* fall through to the assertion path */ }
+    if (!secret && prfEnabled === false) {
+      console.warn('WebAuthn PRF not enabled by authenticator:', ext);
+      throw new Error('This device’s authenticator doesn’t support the PRF / hmac-secret extension, so biometric unlock can’t be enabled here. This is usually a platform limitation (some Windows Hello / older TPM or browser combinations). Your passphrase still works, and the passkey itself was created — you can remove it in your browser’s passkey settings.');
+    }
     if (!secret) {
-      // Older browsers only surface PRF on an assertion — fall back to a get().
-      var got;
+      // Most platforms only surface the PRF secret on an assertion — do a get().
+      var got = null;
       try { got = await bioAssert([credId]); } catch (ex) { throw webauthnError(ex); }
       if (got && got.secret) secret = got.secret;
     }
-    if (!secret) throw new Error('This device created the passkey but didn’t return a PRF secret, so biometric unlock can’t be enabled. It needs a PRF-capable platform authenticator (recent Chrome/Edge/Safari with Touch ID / Windows Hello) over localhost or HTTPS. Your passphrase still works.');
+    if (!secret) {
+      console.warn('WebAuthn PRF secret unavailable. create() extension results:', ext, '(prf.enabled=' + prfEnabled + ')');
+      throw new Error('This device created the passkey but didn’t return a PRF secret, so biometric unlock can’t be enabled. It needs a PRF-capable platform authenticator (recent Chrome/Edge/Safari with Touch ID / Windows Hello) over localhost or HTTPS — and a security-key style authenticator won’t work. Your passphrase still works. (Details were logged to the browser console — F12 → Console — if you’d like to share them.)');
+    }
     await API.webauthnEnroll({ credentialId: credId, prfSecret: secret, prfSalt: 'v1', label: bioDeviceLabel() });
   }
   // Turn a WebAuthn DOMException into a message that names the actual failure.
@@ -1425,6 +1436,7 @@
   function taskRow(t) {
     var li = document.createElement('li');
     li.className = 'task prio-p' + t.priority + (t.done ? ' done' : '');
+    li.dataset.id = t.id;
     var today = todayStr();
     if (!t.done && t.due && t.due < today) li.classList.add('overdue');
 
@@ -1670,7 +1682,36 @@
     var p = window.TaskParse.parse(raw);
     var payload = { text: p.text || raw, due: state.qa.due || recurrenceImpliedDue(), time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
     $('taskInput').value = ''; resetQa(); syncQa();
-    applyTaskResult(await API.addTask(state.wsId, payload));
+    var res = await API.addTask(state.wsId, payload);
+    applyTaskResult(res);
+    announceNewTask(res && res.task);
+  }
+
+  // A new task usually lands lower in the list (sorted by date/priority), where a
+  // capped-height scroll box can hide it. Scroll it into view, flash it, and show a
+  // brief toast that says where it went — so adding a task always gives feedback.
+  var miniToastTimer = null;
+  function showMiniToast(msg) {
+    var t = $('miniToast');
+    if (!t) { t = document.createElement('div'); t.id = 'miniToast'; t.className = 'mini-toast'; document.body.appendChild(t); }
+    t.textContent = msg;
+    // restart the enter transition even on rapid repeats
+    t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+    clearTimeout(miniToastTimer);
+    miniToastTimer = setTimeout(function () { t.classList.remove('show'); }, 1900);
+  }
+  function announceNewTask(task) {
+    if (!task || !task.id) return;
+    requestAnimationFrame(function () {
+      var el = document.querySelector('#noteView .task[data-id="' + task.id + '"]');
+      if (el) {
+        try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_e) { el.scrollIntoView(); }
+        el.classList.remove('task-flash'); void el.offsetWidth; el.classList.add('task-flash');
+        setTimeout(function () { el.classList.remove('task-flash'); }, 1300);
+      }
+    });
+    var where = !task.due ? 'no date' : (task.due <= todayStr() ? 'Overdue & Today' : ('due ' + fmtDueShort(task.due)));
+    showMiniToast('✓ Task added · ' + where);
   }
   $('qaAdd').addEventListener('click', addTaskFromInput);
   $('taskInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addTaskFromInput(); } });

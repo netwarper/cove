@@ -207,6 +207,22 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .summary-action .sa-text { flex: 1; min-width: 0; font-size: 13px; }
 .summary-action button[disabled] { opacity: .55; }
 
+/* ---- Mini toast (transient confirmations, e.g. "task added") ---- */
+.mini-toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(8px);
+  background: var(--ink); color: var(--bg); padding: 8px 15px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow); opacity: 0; pointer-events: none; z-index: 300;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.mini-toast.show { opacity: .96; transform: translateX(-50%) translateY(0); }
+
+/* Briefly highlight a freshly-added task row so the eye can find it. */
+@keyframes taskFlash {
+  0% { background: color-mix(in srgb, var(--brand) 32%, transparent); }
+  100% { background: transparent; }
+}
+.task.task-flash { animation: taskFlash 1.2s ease; }
+
 /* ---- New-version toast ---- */
 .update-toast {
   position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 210;
