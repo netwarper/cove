@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.53.3'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.53.4'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -402,7 +402,7 @@
     if (got && got.secret) secret = got.secret;
     if (!secret) {
       console.warn('[bio] no PRF secret after assertion. create() ext=', ext, '(prf.enabled=' + prfEnabled + ')');
-      throw new Error('This device’s authenticator didn’t return a PRF secret even on a direct check, so biometric unlock can’t be enabled here. This is a platform limitation — it needs a PRF / hmac-secret-capable PLATFORM authenticator (built-in Touch ID / Windows Hello on a recent OS, or a synced passkey), not a plug-in security key, over localhost or HTTPS. Your passphrase still works; you can remove the leftover “Cove” passkey in your browser’s passkey settings. (Diagnostics were logged to the console — please share the “[bio]” lines.)');
+      throw new Error('The passkey was created but didn’t return a PRF secret, so biometric unlock can’t be enabled. The most common cause is a password-manager passkey provider — 1Password, Bitwarden, Dashlane, etc. — handling the passkey; those don’t support the PRF/hmac-secret extension Cove needs. Fix: turn off your password manager’s passkey/“save passkey” handling for this site (or pick “this device” / the built-in option in the passkey prompt) so the passkey is created with your device’s own Touch ID / Windows Hello / iCloud Keychain, then try again. Also delete the leftover “Cove” passkey from your password manager. Your passphrase still works meanwhile.');
     }
     console.log('[bio] enrolling credential with server');
     await API.webauthnEnroll({ credentialId: credId, prfSecret: secret, prfSalt: 'v1', label: bioDeviceLabel() });

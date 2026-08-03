@@ -509,6 +509,7 @@ sync with Alex next tue 3pm</code></pre>
         <h3>It adds the passkey, then errors.</h3>
         <p>Biometric unlock uses the passkey's <b>PRF</b> extension (a.k.a. <code>hmac-secret</code>) to wrap your key. If your device creates the passkey but can't produce a PRF secret, enrollment can't finish. A few things to check:</p>
         <ul>
+          <li><b>A password manager is handling your passkeys.</b> This is the most common cause: <b>1Password, Bitwarden, Dashlane</b> and similar intercept passkey creation, and their passkeys <b>don't support the PRF / hmac-secret extension</b> Cove needs. Turn off your password manager's passkey / “offer to save” handling for this site (or choose “this device” / the built-in option in the passkey prompt) so the passkey is created with your <b>device's own</b> Touch&nbsp;ID / Windows&nbsp;Hello / iCloud&nbsp;Keychain — then delete the leftover “Cove” passkey from the password manager and try again.</li>
           <li>Use a <b>platform authenticator</b> (built-in Touch&nbsp;ID / Windows&nbsp;Hello / a synced passkey) — a plug-in <b>security key</b> won't provide PRF here.</li>
           <li>PRF needs a recent OS + browser: macOS&nbsp;15 / Chrome or Safari current for Touch&nbsp;ID&nbsp;/&nbsp;iCloud&nbsp;Keychain; current Chrome/Edge for Windows&nbsp;Hello. Some older Windows&nbsp;Hello / TPM combinations simply don't expose it.</li>
           <li>Open over <code>localhost</code> or HTTPS (not a raw IP).</li>
