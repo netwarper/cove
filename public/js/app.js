@@ -422,7 +422,28 @@
 
   // Service worker (offline app shell + notifications)
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+    // If a page was already controlled by a service worker at load, a later
+    // controllerchange means a NEW version took over while the app stayed open —
+    // its freshly-loaded JS/CSS is stale until reload, so offer a reload.
+    var hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (hadController) showUpdateToast();
+    });
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').then(function (reg) {
+        // Check for a new deploy hourly while the app stays open.
+        setInterval(function () { reg.update().catch(function () {}); }, 60 * 60 * 1000);
+      }).catch(function () {});
+    });
+  }
+  function showUpdateToast() {
+    var t = $('updateToast');
+    if (!t || !t.classList.contains('hidden')) return;
+    t.classList.remove('hidden');
+  }
+  if ($('updateReloadBtn')) {
+    $('updateReloadBtn').addEventListener('click', function () { location.reload(); });
+    $('updateDismissBtn').addEventListener('click', function () { $('updateToast').classList.add('hidden'); });
   }
 
   // Live-sync: refresh when note files change on disk (e.g. another device via a
@@ -1972,16 +1993,61 @@
 
   // ---------------- Save (with conflict guard) ----------------
   function scheduleSave() { setSaveStatus('Saving…'); clearTimeout(state.saveTimer); state.saveTimer = setTimeout(saveNow, 600); }
+
+  // ---- Durable save queue: never silently drop edits on a flaky/offline network ----
+  // A failed save (network down, server 5xx) parks the note payload in localStorage
+  // and keeps retrying — on reconnect, on an interval, when the tab becomes visible,
+  // and warns via beforeunload while anything is still unsynced. Survives reloads.
+  var PENDING_KEY = 'cove.pendingSaves';
+  var flushTimer = null;
+  function loadPending() { try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '{}'); } catch (_e) { return {}; } }
+  function writePending(map) {
+    try {
+      if (map && Object.keys(map).length) localStorage.setItem(PENDING_KEY, JSON.stringify(map));
+      else localStorage.removeItem(PENDING_KEY);
+    } catch (_e) { /* storage full / disabled — best effort */ }
+  }
+  function queuePending(id, payload) { var m = loadPending(); m[id] = payload; writePending(m); }
+  function clearPending(id) { var m = loadPending(); if (m[id]) { delete m[id]; writePending(m); } }
+  function hasPending() { return Object.keys(loadPending()).length > 0; }
+  function isTransient(ex) { return !ex.status || ex.status >= 500; } // offline or server hiccup — retriable
+  function scheduleFlush(ms) { clearTimeout(flushTimer); flushTimer = setTimeout(flushPending, ms || 8000); }
+
+  async function flushPending() {
+    clearTimeout(flushTimer); flushTimer = null;
+    if (navigator.onLine === false) return; // wait for the 'online' event
+    if (!hasPending()) return;
+    // The active note (if queued) goes through saveNow so conflicts get the full UI
+    // and the freshest in-memory edits win.
+    if (state.note && loadPending()[state.note.id]) { await saveNow(); }
+    // Any other parked notes (user navigated away before reconnecting): push them
+    // directly, and on a conflict fork to a copy so nothing is lost.
+    var m = loadPending();
+    var ids = Object.keys(m).filter(function (id) { return !state.note || id !== state.note.id; });
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      try { await API.saveNote(id, m[id]); clearPending(id); }
+      catch (ex) {
+        if (ex.status === 409) { try { await API.forkNote(id, m[id]); } catch (_e) {} clearPending(id); }
+        else if (isTransient(ex)) { scheduleFlush(); return; }
+        else { clearPending(id); }
+      }
+    }
+    if (hasPending()) scheduleFlush();
+  }
+
   async function saveNow() {
     if (!state.note) return;
+    var payload = {
+      customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
+      meetingNotes: state.note.meetingNotes, favorite: state.note.favorite,
+      tags: state.note.tags, transcript: state.note.transcript, baseRev: state.note.rev,
+    };
     try {
-      var saved = await API.saveNote(state.note.id, {
-        customTitle: state.note.customTitle, todos: state.note.todos, carryover: state.note.carryover,
-        meetingNotes: state.note.meetingNotes, favorite: state.note.favorite,
-        tags: state.note.tags, transcript: state.note.transcript, baseRev: state.note.rev,
-      });
+      var saved = await API.saveNote(state.note.id, payload);
       state.note.todos = saved.todos; state.note.updatedAt = saved.updatedAt; state.note.rev = saved.rev;
       state.lastSaveAt = Date.now(); // suppress the live-sync echo of our own write
+      clearPending(state.note.id);
       setSaveStatus('Saved ✓'); renderNoteList();
     } catch (ex) {
       if (ex.status === 409) {
@@ -2008,6 +2074,11 @@
           });
           await loadWorkspaces(); await openNote(fork.id); setSaveStatus('Saved as a conflict copy ✓');
         } // cancel: leave the user's edits in place to retry
+      } else if (isTransient(ex)) {
+        // Offline or server unreachable — park the edit and keep trying; don't lose it.
+        queuePending(state.note.id, payload);
+        setSaveStatus('Offline — save pending ⏳');
+        scheduleFlush(4000);
       } else { setSaveStatus('Save failed: ' + ex.message); }
     }
   }
@@ -2115,7 +2186,18 @@
       $('conflictCancel').onclick = function () { cleanup({ action: 'cancel' }); };
     });
   }
-  window.addEventListener('beforeunload', function () { if (state.saveTimer) saveNow(); });
+  window.addEventListener('beforeunload', function (e) {
+    if (state.saveTimer) saveNow();
+    // If a save couldn't reach the server, edits are safe in localStorage but not yet
+    // synced — warn so the user knows to reconnect before relying on another device.
+    if (hasPending()) { e.preventDefault(); e.returnValue = ''; return ''; }
+  });
+  // Retry parked saves whenever we plausibly regain connectivity.
+  window.addEventListener('online', function () { flushPending(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && hasPending()) flushPending();
+  });
+  setInterval(function () { if (hasPending()) flushPending(); }, 15000);
 
   // ---------------- Views ----------------
   function showView(v) {

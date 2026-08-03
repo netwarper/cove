@@ -442,6 +442,11 @@ sync with Alex next tue 3pm</code></pre>
         <h2 class="sec">13. Install &amp; offline</h2>
         <p>Cove ships as a <b>PWA</b> — installable from your browser as an app, with an offline app shell so the
         interface loads even without a connection. Your note data still comes from the local server when it's running.</p>
+        <p><b>Offline-safe edits:</b> if a save can't reach the server (network drop, server briefly down), your change
+        isn't lost — the indicator shows <i>“Offline — save pending ⏳”</i> and the edit is stored on your device and
+        retried automatically when you reconnect (and if you try to close the tab while a save is still pending, the
+        browser warns you first). When a newer version of the app takes over while a tab is open, a small
+        <i>“A new version is ready — Reload”</i> prompt appears rather than leaving you on stale code.</p>
         <p>To install: use your browser's <i>Install app</i> / <i>Add to Home Screen</i> option while viewing the app.</p>
         <p><b>On a phone,</b> the layout adapts: the note list collapses into a drawer you open with the <b>☰</b> button
         (top-left), the search bar drops to its own row, and row actions (star, delete, reschedule) are always tappable

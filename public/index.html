@@ -34,6 +34,13 @@
     </div>
   </div>
 
+  <!-- ---------- New-version toast (a newer app shell took over while this tab was open) ---------- -->
+  <div id="updateToast" class="update-toast hidden" role="status">
+    <span class="ut-text">A new version of Cove is ready.</span>
+    <button id="updateReloadBtn" class="sm primary" type="button">Reload</button>
+    <button id="updateDismissBtn" class="ut-x" type="button" aria-label="Dismiss" title="Dismiss">✕</button>
+  </div>
+
   <!-- ---------- Auth gate ---------- -->
   <div id="authGate" class="auth-gate hidden">
     <div class="auth-card">
