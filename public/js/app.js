@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.53.5'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.53.6'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -394,10 +394,15 @@
     // Fast path: some authenticators hand back the PRF secret straight from create()
     // — one prompt, no second Touch ID.
     try { var f0 = ext.prf && ext.prf.results && ext.prf.results.first; if (f0) { secret = bufToB64(f0); console.log('[bio] PRF secret obtained from create() (single prompt)'); } } catch (_e) { /* fall through */ }
+    // If registration explicitly reports PRF unsupported, don't fire a second
+    // (doomed) Touch ID prompt — fail now with guidance.
+    var noPrfMsg = 'The passkey was created but its provider doesn’t support the PRF/hmac-secret extension Cove needs, so biometric unlock can’t use it. On a Mac, Chrome’s built-in “this device” passkey provider is the usual culprit — it can’t do PRF; iCloud Keychain can. Fix: open Cove in a normal Chrome browser tab (not the installed app window), click “Enable biometric unlock”, and in the passkey prompt choose “Save another way” → iCloud Keychain (or your iPhone). On Windows, pick Windows Hello. Then delete the leftover “Cove” passkey (chrome://settings/passkeys) and try again. Your passphrase still works meanwhile.';
+    if (!secret && prfEnabled === false) {
+      console.warn('[bio] prf.enabled=false — provider does not support PRF; not prompting again.');
+      throw new Error(noPrfMsg);
+    }
     if (!secret) {
-      // The authoritative test is whether an assertion returns a PRF result — try it
-      // even when registration reported enabled=false (that flag isn't always right).
-      if (prfEnabled === false) console.log('[bio] registration reported prf.enabled=false — trying an assertion anyway (this flag is not always authoritative).');
+      // Provider may only surface PRF on an assertion — do a get() to fetch it.
       var got = null;
       try { got = await bioAssert([credId]); } catch (ex) { console.error('[bio] assertion get() failed:', ex && ex.name, ex && ex.message, ex); throw webauthnError(ex); }
       console.log('[bio] assertion done; secret ' + (got && got.secret ? 'obtained' : 'MISSING'));
@@ -405,7 +410,7 @@
     }
     if (!secret) {
       console.warn('[bio] no PRF secret. create() ext=', ext, '(prf.enabled=' + prfEnabled + ')');
-      throw new Error('The passkey was created but didn’t return a PRF secret, so biometric unlock can’t be enabled with it. The passkey provider you used doesn’t support the PRF/hmac-secret extension Cove needs — on a Mac, Chrome’s built-in “this device” provider is a common example, and password managers (1Password, Bitwarden, …) are another. Fix: when the passkey prompt appears, choose “Save another way” → iCloud Keychain (or your iPhone) on a Mac, or “this device / Windows Hello” on Windows — those support PRF. Then delete the leftover “Cove” passkey from wherever it was saved and try again. Your passphrase still works meanwhile.');
+      throw new Error(noPrfMsg);
     }
     console.log('[bio] enrolling credential with server');
     await API.webauthnEnroll({ credentialId: credId, prfSecret: secret, prfSalt: 'v1', label: bioDeviceLabel() });
