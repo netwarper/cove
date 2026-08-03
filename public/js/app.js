@@ -3,6 +3,10 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var API = window.API;
+  // Bumped with the service-worker cache; logged at load so you can confirm the
+  // browser is actually running the latest build (not a stale cached app.js).
+  var APP_BUILD = 'v73';
+  try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
   function idleMs() {
@@ -364,6 +368,7 @@
   }
 
   async function bioEnroll() {
+    console.log('[bio] enroll start; build ' + APP_BUILD + '; host ' + location.hostname);
     if (!window.PublicKeyCredential) throw new Error('WebAuthn is not available in this browser.');
     if (!bioHostOk()) throw new Error('Passkeys need a hostname, not an IP address. Open Cove at localhost:' + (location.port || '3000') + ' (or a cove.localhost address) instead of 127.0.0.1, then enable biometric unlock.');
     var cred;
@@ -374,42 +379,44 @@
         user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'cove', displayName: 'Cove' },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
         authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required' },
-        // Ask the authenticator to evaluate the PRF at creation time so we can read
-        // the secret straight from create() on browsers that support it (Chrome
-        // 116+, Safari 18+) — avoiding a second, flakier get() prompt.
+        // Request PRF and evaluate it at create() so browsers that support it
+        // (Chrome 116+, Safari 18+) can hand back the secret in one prompt; others
+        // return only `enabled` and we derive it from the assertion below.
         timeout: 60000, extensions: { prf: { eval: { first: PRF_SALT } } },
       } });
-    } catch (ex) { throw webauthnError(ex); }
+    } catch (ex) { console.error('[bio] create() failed:', ex && ex.name, ex && ex.message, ex); throw webauthnError(ex); }
     var credId = bufToB64url(cred.rawId);
     var secret = null;
     var ext = {};
     try { ext = (cred.getClientExtensionResults ? cred.getClientExtensionResults() : {}) || {}; } catch (_e) { ext = {}; }
-    // `prf.enabled === false` means the authenticator itself can't do PRF/hmac-secret
-    // (a hardware/OS limitation) — a follow-up get() won't help, so don't prompt again.
     var prfEnabled = ext.prf ? ext.prf.enabled : undefined;
-    try {
-      var f = ext.prf && ext.prf.results && ext.prf.results.first; // fast path (Chrome 116+/Safari 18+)
-      if (f) secret = bufToB64(f);
-    } catch (_e) { /* fall through to the assertion path */ }
+    console.log('[bio] passkey created; prf.enabled=' + prfEnabled, ext);
+    // Some browsers (with eval) return the secret straight from create(); use it if so.
+    try { var f = ext.prf && ext.prf.results && ext.prf.results.first; if (f) secret = bufToB64(f); } catch (_e) { /* fall through */ }
+    // `prf.enabled === false` is a hard authenticator/OS limitation — a get() won't help.
     if (!secret && prfEnabled === false) {
-      console.warn('WebAuthn PRF not enabled by authenticator:', ext);
-      throw new Error('This device’s authenticator doesn’t support the PRF / hmac-secret extension, so biometric unlock can’t be enabled here. This is usually a platform limitation (some Windows Hello / older TPM or browser combinations). Your passphrase still works, and the passkey itself was created — you can remove it in your browser’s passkey settings.');
+      console.warn('[bio] PRF/hmac-secret NOT supported by this authenticator:', ext);
+      throw new Error('This device’s authenticator doesn’t support the PRF / hmac-secret extension, so biometric unlock can’t be enabled here. This is a platform limitation (common on some Windows Hello / older-TPM setups, and on plug-in security keys). Your passphrase still works; you can remove the leftover “Cove” passkey in your browser’s passkey settings.');
     }
     if (!secret) {
-      // Most platforms only surface the PRF secret on an assertion — do a get().
+      // Derive the PRF secret via an assertion (this is the reliable path).
       var got = null;
-      try { got = await bioAssert([credId]); } catch (ex) { throw webauthnError(ex); }
+      try { got = await bioAssert([credId]); } catch (ex) { console.error('[bio] assertion get() failed:', ex && ex.name, ex && ex.message, ex); throw webauthnError(ex); }
+      console.log('[bio] assertion done; secret ' + (got && got.secret ? 'obtained' : 'MISSING'));
       if (got && got.secret) secret = got.secret;
     }
     if (!secret) {
-      console.warn('WebAuthn PRF secret unavailable. create() extension results:', ext, '(prf.enabled=' + prfEnabled + ')');
-      throw new Error('This device created the passkey but didn’t return a PRF secret, so biometric unlock can’t be enabled. It needs a PRF-capable platform authenticator (recent Chrome/Edge/Safari with Touch ID / Windows Hello) over localhost or HTTPS — and a security-key style authenticator won’t work. Your passphrase still works. (Details were logged to the browser console — F12 → Console — if you’d like to share them.)');
+      console.warn('[bio] no PRF secret. create() ext=', ext, '(prf.enabled=' + prfEnabled + ')');
+      throw new Error('This device created the passkey but didn’t return a PRF secret, so biometric unlock can’t be enabled. It needs a PRF-capable PLATFORM authenticator (built-in Touch ID / Windows Hello, or a synced passkey) over localhost or HTTPS — a plug-in security key won’t work. Your passphrase still works. (Diagnostics were logged to the console — F12 → Console — please share the “[bio]” lines.)');
     }
+    console.log('[bio] enrolling credential with server');
     await API.webauthnEnroll({ credentialId: credId, prfSecret: secret, prfSalt: 'v1', label: bioDeviceLabel() });
+    console.log('[bio] enroll complete ✓');
   }
   // Turn a WebAuthn DOMException into a message that names the actual failure.
   function webauthnError(ex) {
     var name = (ex && ex.name) || 'Error';
+    console.warn('[bio] webauthn error mapped:', name, ex && ex.message);
     if (name === 'NotAllowedError') return new Error('The passkey request was cancelled or timed out. Try again and approve the Touch ID / passkey prompt.');
     if (name === 'InvalidStateError') return new Error('A passkey for Cove already exists on this device. Remove it in your browser/OS passkey settings, then try again.');
     if (name === 'SecurityError') return new Error('The browser blocked the passkey for this address. Biometric unlock needs localhost or an HTTPS origin (a “cove.localhost” style host counts as secure in Chrome).');
@@ -2861,8 +2868,10 @@
       await bioEnroll();
       var st = await API.status(); state.bio = st.bio || state.bio;
       renderBioSettings(); bioMsg('Biometric unlock enabled ✓', false);
-    } catch (ex) { bioMsg(ex.message, true); }
-    finally { $('bioEnableBtn').disabled = false; }
+    } catch (ex) {
+      console.error('[bio] enroll failed:', ex && ex.name, ex && ex.message, ex);
+      bioMsg(ex.message, true);
+    } finally { $('bioEnableBtn').disabled = false; }
   });
   $('bioRemoveBtn').addEventListener('click', async function () {
     if (!(await dialog.confirm('Remove biometric unlock from this vault? Your passphrase still works.', { okText: 'Remove', danger: true }))) return;
