@@ -599,6 +599,22 @@
     applyTheme(next); API.saveSettings({ theme: next });
   });
 
+  // ---------------- Mobile sidebar drawer ----------------
+  // The sidebar is an off-canvas drawer below 760px (see styles.css). These helpers
+  // slide it in/out and are no-ops visually on desktop (the media query keeps it inline).
+  function sidebarEl() { return document.querySelector('.sidebar'); }
+  function setDrawer(open) {
+    sidebarEl().classList.toggle('open', open);
+    $('sidebarBackdrop').classList.toggle('hidden', !open);
+    $('menuBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function closeDrawer() { setDrawer(false); }
+  $('menuBtn').addEventListener('click', function () { setDrawer(!sidebarEl().classList.contains('open')); });
+  $('sidebarBackdrop').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && sidebarEl().classList.contains('open')) closeDrawer();
+  });
+
   // ---------------- Help / shortcuts overlay ----------------
   function openHelp() { $('helpLayer').classList.remove('hidden'); }
   function closeHelp() { $('helpLayer').classList.add('hidden'); }
@@ -809,7 +825,7 @@
     });
   }
   $('workspaceSelect').addEventListener('change', async function () {
-    state.wsId = $('workspaceSelect').value; showView('note'); await loadCurrentNote();
+    state.wsId = $('workspaceSelect').value; showView('note'); closeDrawer(); await loadCurrentNote();
   });
 
   // ---------------- Note sort control ----------------
@@ -840,7 +856,7 @@
   async function openNote(id) {
     state.note = await API.getNote(id);
     state.wsId = state.note.workspaceId; $('workspaceSelect').value = state.wsId;
-    showView('note'); renderNote(); renderNoteList(); loadTasks();
+    showView('note'); renderNote(); renderNoteList(); loadTasks(); closeDrawer();
   }
 
   function showLanding() {

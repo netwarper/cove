@@ -678,6 +678,53 @@ button.mini.ghost:hover { color: var(--ink); }
 .tr-you .tr-who { background: var(--brand); color: #fff; }
 .tr-them .tr-who { background: #7c5cff; color: #fff; }
 
+/* ---- Responsive: phone / narrow tablet shell ---- */
+/* Hamburger + backdrop exist in the DOM always but only show at the breakpoint. */
+.menu-toggle { display: none; }
+.sidebar-backdrop { display: none; }
+
+/* On touch devices (no hover), row actions that normally appear on hover must be
+   visible so they're reachable by tap. */
+@media (hover: none) {
+  .nl-actions, .task-actions { opacity: 1; }
+  .task-due.nodate { opacity: .75; }
+}
+
+@media (max-width: 760px) {
+  .menu-toggle { display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+  .topbar { flex-wrap: wrap; gap: 8px 8px; padding: 8px 10px; }
+  .brand span { display: none; }                 /* keep the logo, drop the wordmark to save room */
+  .search-wrap { order: 5; flex-basis: 100%; }   /* search drops to its own full-width row */
+  #globalSearch { max-width: none; }
+  .top-actions { gap: 3px; margin-left: auto; }
+  #workspaceSelect { max-width: 150px; }
+
+  /* Sidebar becomes an off-canvas drawer. */
+  .body { position: relative; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 60; width: 84vw; max-width: 320px;
+    transform: translateX(-100%); transition: transform .22s ease; box-shadow: 2px 0 18px rgba(0,0,0,.3);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.44); }
+  .main { padding: 14px 14px; }
+
+  /* Reveal hover-only row actions on touch. */
+  .nl-actions, .task-actions { opacity: 1; }
+  .task-due.nodate { opacity: .75; }
+
+  /* Comfortable touch targets. */
+  .icon-btn, .tab, .seg-btn { min-height: 40px; }
+  .icon-btn, .tab { min-width: 40px; }
+  .task-check { width: 22px; height: 22px; }
+  .nl-act, .task-act { min-width: 34px; min-height: 34px; }
+
+  /* 16px inputs stop iOS Safari from auto-zooming on focus. */
+  #globalSearch, .add-row input, .add-row select, .quick-add > input, .done-search,
+  .done-filter, .custom-title, .note-date-input,
+  .modal input, .modal select, .modal textarea { font-size: 16px; }
+}
+
 /* ---- Print ---- */
 @media print {
   .topbar, .sidebar, .note-tools, .rte-toolbar, .quick-add, .task-actions, .rec-controls, .transcript-region, .attach-head label { display: none !important; }
