@@ -42,6 +42,25 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .server-down-how li { margin: 6px 0; }
 .server-down-actions { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 6px 0 12px; }
 
+/* ---- Offline reader (read-only cached notes) ---- */
+.offline-reader { position: fixed; inset: 0; z-index: 220; background: var(--bg); display: flex; flex-direction: column; }
+.or-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.or-title { font-weight: 700; }
+.or-body { flex: 1; display: flex; min-height: 0; }
+.or-list { list-style: none; margin: 0; padding: 8px; width: 260px; border-right: 1px solid var(--line); overflow: auto; background: var(--panel); }
+.or-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; border: 1px solid transparent; }
+.or-item:hover { background: var(--panel-2); }
+.or-item.active { background: var(--panel-2); border-color: var(--brand); }
+.or-content { flex: 1; overflow: auto; padding: 20px 24px; }
+.or-content h2 { font-size: 20px; margin: 0 0 8px; }
+.or-content h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 6px; }
+.or-rte img { max-width: 100%; height: auto; }
+.or-tags { margin-bottom: 8px; }
+@media (max-width: 680px) {
+  .or-body { flex-direction: column; }
+  .or-list { width: auto; max-height: 38vh; border-right: 0; border-bottom: 1px solid var(--line); }
+}
+
 /* ---- Auth ---- */
 .auth-gate { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); z-index: 50; }
 .auth-card {

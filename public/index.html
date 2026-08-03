@@ -28,9 +28,22 @@
       </ul>
       <div class="server-down-actions">
         <button id="serverDownRetry" class="primary" type="button">Retry now</button>
+        <button id="serverDownCached" class="sm hidden" type="button">📖 Read cached notes</button>
         <span id="serverDownStatus" class="tiny muted" aria-live="polite"></span>
       </div>
       <p class="tiny muted">Your notes stay encrypted on the server — nothing is lost while it’s off.</p>
+    </div>
+  </div>
+
+  <!-- ---------- Offline reader (read-only cached notes; opt-in feature) ---------- -->
+  <div id="offlineReader" class="offline-reader hidden" role="dialog" aria-modal="true" aria-label="Cached notes (read-only)">
+    <div class="or-bar">
+      <button id="orBack" class="sm" type="button">← Back</button>
+      <span class="or-title">📖 Cached notes <span class="muted tiny">(read-only · server offline)</span></span>
+    </div>
+    <div class="or-body">
+      <ul id="orList" class="or-list"></ul>
+      <div id="orContent" class="or-content"></div>
     </div>
   </div>
 
@@ -542,6 +555,12 @@
         <h4>Display</h4>
         <label class="tiny muted">Note text size</label>
         <input id="fontSize" type="range" min="13" max="20" step="1" value="14">
+      </div>
+      <div class="acct-block">
+        <h4>Offline reading</h4>
+        <p class="muted tiny">Keep a readable copy of recently-opened notes in <b>this browser</b> so you can still read them when the Cove server is unreachable (a <b>📖 Read cached notes</b> button then appears on the “server isn’t running” screen). Copies are read-only.</p>
+        <p class="muted tiny"><b>Privacy:</b> unlike your vault, these copies are stored <b>unencrypted</b> in this browser and readable by anyone who can use this device. Leave off unless you want that trade-off. Turning it off clears the cache.</p>
+        <label class="tiny"><input id="offlineCache" type="checkbox"> Keep offline copies of opened notes (this device)</label>
       </div>
       <div class="acct-block">
         <h4>Daily-note reminder</h4>

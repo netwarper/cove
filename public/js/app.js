@@ -183,6 +183,7 @@
       if (e && e.status) { console.error(e); return; } // a real HTTP error, not connectivity
       $('serverDown').classList.remove('hidden');
       $('serverDownRetry').disabled = false;
+      updateOfflineReaderButton();
       clearTimeout(serverDownTimer);
       serverDownTimer = setTimeout(boot, 3000); // auto-continue when the server returns
       return;
@@ -204,6 +205,77 @@
   });
   // A regained network connection is a good moment to re-check the local server.
   window.addEventListener('online', function () { if (!$('serverDown').classList.contains('hidden')) boot(); });
+
+  // ---------------- Offline read cache (opt-in) ----------------
+  // Keep readable copies of opened notes in this browser so they can be read when
+  // the server is unreachable. Stored UNENCRYPTED (hence opt-in, off by default);
+  // a localStorage flag mirrors the setting so the pre-auth server-down screen can
+  // decide whether to offer the reader without reaching the server.
+  var OFFLINE_CACHE_KEY = 'cove.noteCache';
+  var OFFLINE_FLAG_KEY = 'cove.offlineCache';
+  var OFFLINE_CACHE_MAX = 40;
+  function offlineCacheEnabled() { return !!(state.settings && state.settings.offlineCache); }
+  function setOfflineFlag(on) { try { if (on) localStorage.setItem(OFFLINE_FLAG_KEY, '1'); else localStorage.removeItem(OFFLINE_FLAG_KEY); } catch (_e) { /* storage off */ } }
+  function loadNoteCache() { try { return JSON.parse(localStorage.getItem(OFFLINE_CACHE_KEY) || '{}'); } catch (_e) { return {}; } }
+  function writeNoteCache(m) { try { localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify(m)); } catch (_e) { /* full/off */ } }
+  function clearNoteCache() { try { localStorage.removeItem(OFFLINE_CACHE_KEY); } catch (_e) { /* off */ } }
+  function cacheNoteForOffline(n) {
+    if (!offlineCacheEnabled() || !n || !n.id) return;
+    var m = loadNoteCache();
+    m[n.id] = {
+      id: n.id, title: n.title || '', customTitle: n.customTitle || null,
+      displayTitle: n.customTitle ? (n.title + ' — ' + n.customTitle) : (n.title || 'Untitled'),
+      tags: n.tags || [], carryover: n.carryover || '', meetingNotes: n.meetingNotes || '',
+      todos: (n.todos || []).map(function (t) { return { text: t.text, done: !!t.done }; }),
+      updatedAt: n.updatedAt || null, cachedAt: Date.now(),
+    };
+    var ids = Object.keys(m);
+    if (ids.length > OFFLINE_CACHE_MAX) { // evict oldest by cache time
+      ids.sort(function (a, b) { return (m[a].cachedAt || 0) - (m[b].cachedAt || 0); });
+      while (ids.length > OFFLINE_CACHE_MAX) delete m[ids.shift()];
+    }
+    writeNoteCache(m);
+  }
+  function updateOfflineReaderButton() {
+    var btn = $('serverDownCached'); if (!btn) return;
+    var on = false; try { on = localStorage.getItem(OFFLINE_FLAG_KEY) === '1'; } catch (_e) { /* off */ }
+    var count = on ? Object.keys(loadNoteCache()).length : 0;
+    btn.classList.toggle('hidden', count === 0);
+    btn.textContent = '📖 Read cached notes (' + count + ')';
+  }
+  function openOfflineReader() {
+    var m = loadNoteCache();
+    var items = Object.keys(m).map(function (id) { return m[id]; })
+      .sort(function (a, b) { return (b.updatedAt || '') < (a.updatedAt || '') ? -1 : 1; });
+    var ul = $('orList'); ul.innerHTML = '';
+    $('orContent').innerHTML = '<p class="muted">Select a note to read.</p>';
+    items.forEach(function (it) {
+      var li = document.createElement('li');
+      li.className = 'or-item';
+      li.textContent = it.displayTitle || 'Untitled';
+      li.addEventListener('click', function () {
+        Array.prototype.forEach.call(ul.children, function (c) { c.classList.remove('active'); });
+        li.classList.add('active'); renderOfflineNote(it);
+      });
+      ul.appendChild(li);
+    });
+    if (items.length) { ul.children[0].classList.add('active'); renderOfflineNote(items[0]); }
+    else $('orContent').innerHTML = '<p class="muted">No cached notes yet.</p>';
+    $('offlineReader').classList.remove('hidden');
+  }
+  function renderOfflineNote(it) {
+    var parts = ['<h2>' + esc(it.displayTitle || 'Untitled') + '</h2>'];
+    if (it.tags && it.tags.length) parts.push('<div class="or-tags muted tiny">' + it.tags.map(function (t) { return '#' + esc(t); }).join(' ') + '</div>');
+    var open = (it.todos || []).filter(function (t) { return !t.done; });
+    if (open.length) parts.push('<h3>To-do</h3><ul>' + open.map(function (t) { return '<li>' + esc(t.text) + '</li>'; }).join('') + '</ul>');
+    // carryover/meetingNotes are our own server-sanitized HTML.
+    if (it.carryover) parts.push('<h3>Ongoing notes</h3><div class="or-rte">' + it.carryover + '</div>');
+    if (it.meetingNotes) parts.push('<h3>Meeting notes</h3><div class="or-rte">' + it.meetingNotes + '</div>');
+    if (it.updatedAt) parts.push('<p class="muted tiny">Cached copy · last edited ' + esc(String(it.updatedAt).slice(0, 10)) + '</p>');
+    $('orContent').innerHTML = parts.join('');
+  }
+  $('serverDownCached').addEventListener('click', openOfflineReader);
+  $('orBack').addEventListener('click', function () { $('offlineReader').classList.add('hidden'); });
 
   function showAuth(initialized) {
     $('app').classList.add('hidden');
@@ -390,6 +462,7 @@
     state.savedSearches = Array.isArray(state.settings.savedSearches) ? state.settings.savedSearches : [];
     state.allTags = [];
     try { state.allTags = await API.allTags(); } catch (_e) { /* non-fatal */ }
+    setOfflineFlag(offlineCacheEnabled()); // mirror to localStorage for the pre-auth server-down screen
     applyFontSize(state.settings.fontSize || 14);
     applyListCaps();
     applyEditorSizes();
@@ -886,6 +959,7 @@
     state.note = await API.getNote(id);
     state.wsId = state.note.workspaceId; $('workspaceSelect').value = state.wsId;
     showView('note'); renderNote(); renderNoteList(); loadTasks(); closeDrawer();
+    cacheNoteForOffline(state.note);
   }
 
   function showLanding() {
@@ -2057,6 +2131,7 @@
       state.note.todos = saved.todos; state.note.updatedAt = saved.updatedAt; state.note.rev = saved.rev;
       state.lastSaveAt = Date.now(); // suppress the live-sync echo of our own write
       clearPending(state.note.id);
+      cacheNoteForOffline(state.note);
       setSaveStatus('Saved ✓'); renderNoteList();
     } catch (ex) {
       if (ex.status === 409) {
@@ -2715,6 +2790,7 @@
     $('tzInput').value = state.settings.timezone || '';
     $('tzMsg').textContent = '';
     $('completedKeep').value = String(state.settings.completedKeep || 0);
+    $('offlineCache').checked = offlineCacheEnabled();
     renderBioSettings();
     renderInboxSettings();
     renderSlackSettings();
@@ -3012,6 +3088,14 @@
   $('sessionTtl').addEventListener('change', function () {
     state.settings.sessionTtlMinutes = parseInt($('sessionTtl').value, 10) || 240;
     API.saveSettings({ sessionTtlMinutes: state.settings.sessionTtlMinutes });
+  });
+  $('offlineCache').addEventListener('change', function () {
+    var on = $('offlineCache').checked;
+    state.settings.offlineCache = on;
+    API.saveSettings({ offlineCache: on });
+    setOfflineFlag(on);
+    if (on) cacheNoteForOffline(state.note); // seed with the current note right away
+    else clearNoteCache();                   // turning off clears the stored copies
   });
   $('dailyNudgeDelay').addEventListener('change', function () {
     state.settings.dailyNudgeSeconds = parseInt($('dailyNudgeDelay').value, 10) || 0;
