@@ -382,10 +382,19 @@ A `/api/health` endpoint (also used by the image's `HEALTHCHECK`) returns
 ## Running the checks
 
 ```bash
-npm run check   # quality: syntax + lightweight static checks
-npm test        # functional + security test suites (zero dependencies)
-npm run verify  # both of the above
+npm run check    # quality: syntax + lightweight static checks
+npm test         # functional + security test suites (zero dependencies)
+npm run verify   # both of the above
+npm run test:e2e # optional headless-browser smoke test (see below)
 ```
+
+`npm run test:e2e` drives a real headless Chromium through the main flows
+(mobile drawer, offline-save queue, modal accessibility, AI summary → task, and
+the offline read cache). It adds **no dependency** to the project and
+**self-skips** (exit 0) unless you opt in by installing `playwright-core`
+(`npm i -D playwright-core`) and providing a Chromium — it looks at
+`COVE_CHROMIUM` / `PLAYWRIGHT_CHROMIUM` / `CHROME_PATH`, `playwright-core`'s own
+browser, then `$PLAYWRIGHT_BROWSERS_PATH`.
 
 ---
 

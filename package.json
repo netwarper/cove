@@ -1,6 +1,6 @@
 {
   "name": "cove",
-  "version": "1.51.0",
+  "version": "1.52.0",
   "description": "Cove — self-contained, encrypted meeting notes. Zero runtime dependencies, portable, works over cloud-sync folders (Google Drive, Box, Dropbox).",
   "main": "server.js",
   "type": "commonjs",
@@ -12,7 +12,8 @@
     "test:config": "node test/config.test.js",
     "test:backup": "node test/backup.test.js",
     "check": "node scripts/check-quality.js",
-    "verify": "npm run check && npm test"
+    "verify": "npm run check && npm test",
+    "test:e2e": "node test/e2e/smoke.mjs"
   },
   "engines": {
     "node": ">=18"
