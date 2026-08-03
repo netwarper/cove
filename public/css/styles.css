@@ -333,6 +333,7 @@ select.qa-pill { padding: 4px 6px; }
 .slack-daily input[type="checkbox"] { width: auto; margin: 0; }
 .slack-daily input[type="time"] { width: auto; margin: 0; }
 .slack-actions { display: flex; gap: 8px; margin-top: 8px; }
+.tz-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 
 /* ---- Rich text ---- */
 .rte-toolbar { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }

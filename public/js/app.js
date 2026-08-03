@@ -378,6 +378,14 @@
     $('authGate').classList.add('hidden');
     $('app').classList.remove('hidden');
     state.settings = await API.getSettings();
+    // First run: adopt this device's timezone so server-side dates/reminders match
+    // the user's wall clock out of the box (they can change it in Settings).
+    if (!state.settings.timezone) {
+      try {
+        var detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (detected) { state.settings.timezone = detected; API.saveSettings({ timezone: detected }); }
+      } catch (_e) { /* leave unset → server local */ }
+    }
     state.tagBookmarks = Array.isArray(state.settings.tagBookmarks) ? state.settings.tagBookmarks : [];
     state.savedSearches = Array.isArray(state.settings.savedSearches) ? state.settings.savedSearches : [];
     state.allTags = [];
@@ -2704,6 +2712,8 @@
     var sc = state.settings.summary || {};
     $('sumEndpoint').value = sc.endpoint || ''; $('sumKey').value = sc.apiKey || ''; $('sumModel').value = sc.model || '';
     updateSumWarn();
+    $('tzInput').value = state.settings.timezone || '';
+    $('tzMsg').textContent = '';
     renderBioSettings();
     renderInboxSettings();
     renderSlackSettings();
@@ -2785,6 +2795,23 @@
     await API.saveSettings({ summary: state.settings.summary });
     updateSummaryAvailability();
     acctMsg('Summary settings saved ✓', false);
+  });
+
+  // ---------------- Time zone ----------------
+  function tzMsg(s, isErr) { var el = $('tzMsg'); el.textContent = s; el.style.color = isErr ? 'var(--danger)' : 'var(--muted)'; }
+  $('tzDeviceBtn').addEventListener('click', function () {
+    try { $('tzInput').value = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_e) {}
+    tzMsg('', false);
+  });
+  $('tzSaveBtn').addEventListener('click', async function () {
+    var tz = $('tzInput').value.trim();
+    // Validate locally first so the user gets instant feedback (the server also checks).
+    if (tz) { try { new Intl.DateTimeFormat('en-CA', { timeZone: tz }); } catch (_e) { tzMsg('That isn’t a valid time zone name.', true); return; } }
+    try {
+      await API.saveSettings({ timezone: tz });
+      state.settings.timezone = tz;
+      tzMsg(tz ? ('Saved — dates now follow ' + tz + ' ✓') : 'Cleared — using the server’s local time ✓', false);
+    } catch (ex) { tzMsg(ex.message || 'Could not save time zone', true); }
   });
 
   // ---------------- AI meeting summary ----------------

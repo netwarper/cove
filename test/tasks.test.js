@@ -21,6 +21,17 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     t.eq(tasksLib.nextDue('2026-07-22', { type: 'daily', endDate: '2026-07-22' }), null, 'bounded recurrence ends');
     t.eq(tasksLib.normalizeRecurrence({ type: 'none' }), null, 'none recurrence normalizes to null');
 
+    // --- timezone-aware "today"/time helpers (fixed instant) ---
+    const inst = new Date('2026-03-10T05:30:00Z'); // NY 01:30 EDT, Tokyo 14:30, Honolulu 19:30 (prev day)
+    t.eq(tasksLib.todayISOInTz('America/New_York', inst), '2026-03-10', 'todayISOInTz: NY date at 01:30 local');
+    t.eq(tasksLib.todayISOInTz('Asia/Tokyo', inst), '2026-03-10', 'todayISOInTz: Tokyo date (14:30 local)');
+    t.eq(tasksLib.todayISOInTz('Pacific/Honolulu', new Date('2026-03-10T05:30:00Z')), '2026-03-09', 'todayISOInTz: Honolulu still previous day (19:30)');
+    t.eq(tasksLib.hhmmInTz('America/New_York', inst), '01:30', 'hhmmInTz: NY wall clock (EDT)');
+    t.eq(tasksLib.hhmmInTz('Asia/Tokyo', inst), '14:30', 'hhmmInTz: Tokyo wall clock');
+    t.eq(tasksLib.todayISOInTz('Not/AZone', inst), tasksLib.todayISO(), 'invalid tz falls back to server-local today');
+    t.eq(tasksLib.isValidTimezone('America/New_York'), true, 'isValidTimezone accepts a real zone');
+    t.eq(tasksLib.isValidTimezone('Nope/Nope'), false, 'isValidTimezone rejects a bad zone');
+
     // --- interval recurrence: every N weeks / N months ---
     t.eq(tasksLib.nextDue('2026-07-22', { type: 'weekly', n: 2 }), '2026-08-05', 'nextDue every 2 weeks = +14d');
     t.eq(tasksLib.nextDue('2026-07-15', { type: 'monthly', n: 2 }), '2026-09-15', 'nextDue every 2 months = +2 months');

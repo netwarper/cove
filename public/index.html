@@ -560,6 +560,19 @@
         </div>
       </div>
       <div class="acct-block">
+        <h4>Time zone</h4>
+        <p class="muted tiny">Used for daily-note dates, “today”/overdue, and when timed reminders fire. Defaults to this device's time zone — change it only if the Cove <b>server</b> runs somewhere else (e.g. a cloud host) and you want dates to follow a specific zone.</p>
+        <div class="setting-row">
+          <label for="tzInput">IANA time zone</label>
+          <input id="tzInput" type="text" class="ws-tpl" placeholder="e.g. America/New_York" autocomplete="off">
+        </div>
+        <div class="tz-actions">
+          <button id="tzDeviceBtn" class="sm" type="button" title="Use this device's time zone">📍 Use this device</button>
+          <button id="tzSaveBtn" class="sm primary" type="button">Save time zone</button>
+          <span id="tzMsg" class="tiny muted"></span>
+        </div>
+      </div>
+      <div class="acct-block">
         <h4>Image text (OCR)</h4>
         <p class="muted tiny">When you paste or attach a screenshot, Cove reads any text in it <b>on your device</b> (nothing is uploaded) so the image turns up in search. Runs in the background the first time it loads a small local engine.</p>
         <label class="tiny"><input id="ocrEnabled" type="checkbox" checked> Extract text from pasted images</label>
