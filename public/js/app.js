@@ -3080,14 +3080,36 @@
 
   // Modal helpers
   var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal', 'conflictLogModal', 'tourModal', 'summaryModal'];
+  var modalReturnFocus = null;
+  // Visible, tabbable elements inside a container — for the focus trap / initial focus.
+  function focusablesIn(el) {
+    var sel = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.prototype.slice.call(el.querySelectorAll(sel)).filter(function (n) { return n.offsetParent !== null; });
+  }
+  function currentModalEl() {
+    for (var i = 0; i < MODALS.length; i++) { var el = $(MODALS[i]); if (el && !el.classList.contains('hidden')) return el; }
+    return null;
+  }
   function openModal(id) {
+    modalReturnFocus = document.activeElement;
     $('modalBackdrop').classList.remove('hidden');
     MODALS.forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });
+    // Mark it up as a dialog and label it by its heading for screen readers.
+    var el = $(id);
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    var h = el.querySelector('h3, h2');
+    if (h) { if (!h.id) h.id = id + 'Title'; el.setAttribute('aria-labelledby', h.id); }
+    // Move focus into the dialog so keyboard + screen-reader users land inside it.
+    setTimeout(function () { var f = focusablesIn(el); if (f.length) f[0].focus(); }, 0);
   }
   function closeModals() {
     var recoveryWasOpen = !$('recoveryModal').classList.contains('hidden');
     $('modalBackdrop').classList.add('hidden');
     MODALS.forEach(function (m) { $(m).classList.add('hidden'); });
+    // Return focus to whatever opened the modal (keyboard users don't lose their place).
+    if (modalReturnFocus && typeof modalReturnFocus.focus === 'function') { try { modalReturnFocus.focus(); } catch (_e) { /* element gone */ } }
+    modalReturnFocus = null;
     // Once the recovery key is saved/dismissed, run the deferred first-run tour.
     if (recoveryWasOpen && state.pendingTour) { state.pendingTour = false; setTimeout(openTour, 350); }
   }
@@ -3106,6 +3128,19 @@
       e.preventDefault();
       if (palette.open) closePalette(); else openPalette();
       return;
+    }
+    // Trap Tab within an open modal so focus can't escape to the page behind it.
+    if (e.key === 'Tab') {
+      var mel = currentModalEl();
+      if (mel) {
+        var f = focusablesIn(mel);
+        if (f.length) {
+          var first = f[0], last = f[f.length - 1];
+          if (!mel.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+          else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
     }
     if (e.key === 'Escape') {
       if (palette.open) { closePalette(); return; }
