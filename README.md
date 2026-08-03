@@ -78,6 +78,7 @@ behaves through sleep / lid-close.
 | **Export / print** | Export a note to **PDF (print), HTML, Markdown, or JSON**. |
 | **Export for AI** | Export a whole **workspace** or a **tag** as clean Markdown to upload to ChatGPT / Claude as knowledge — as one combined file (with a table of contents and open tasks) or a ZIP with one file per note. |
 | **Image text (OCR)** | Paste or attach a screenshot and Cove reads its text **on-device** (via a bundled, offline Tesseract engine — nothing is uploaded) so the image turns up in search. Toggle it off in Settings. |
+| **AI meeting summary** | **Opt-in.** Configure a summary endpoint (a **local** LLM to stay private, or a cloud provider) and a **✨ Summarize** button turns a note's notes + transcript into a short summary and a list of **action items** you can add as tasks in one click. The API key is stored encrypted server-side; hidden until configured. |
 | **Import** | Upload a previously exported JSON / HTML / Markdown note into a workspace. |
 | **Encrypted backup** | Download a single encrypted backup file of everything; restore on a fresh install. Bulk-export a whole workspace as a ZIP (HTML/MD/JSON). |
 | **Version history** | Every note keeps automatic snapshots (up to 20); view and restore any earlier version. |
@@ -85,7 +86,8 @@ behaves through sleep / lid-close.
 | **Note links & backlinks** | Link between notes (`⧉` in the editor); each note shows what links to it. Rich text also supports **tables** and **/slash commands**. |
 | **Deep links** | Each note has a shareable `#note/<id>` link (**⋯ → Copy link to note**); a page refresh reopens the same note instead of jumping to the newest. |
 | **User manual** | A full in-app manual at `/manual.html` (also linked from **?** Help and **⋮ → User manual**), theme-matched and available offline. |
-| **Offline / installable** | Ships as a PWA — installable, with an offline app shell. |
+| **Offline / installable** | Ships as a PWA — installable, with an offline app shell. **Offline-safe edits:** a save that can't reach the server is parked on-device and retried on reconnect (with a *save pending* indicator and a close-tab warning) so edits are never silently lost; a *new version — reload* prompt appears when a fresh app shell takes over. |
+| **Mobile layout** | Responsive shell: below ~760px the note list becomes a **☰ drawer**, the search bar drops to its own row, row actions stay tappable (not hover-only), and inputs don't trigger iOS zoom. |
 | **Security** | AES-256-GCM **envelope encryption at rest**, scrypt key derivation, **passphrase change + recovery key**, CSRF tokens, session auth with idle auto-lock, CSP + anti-clickjacking headers, login rate-limiting. |
 
 ---
@@ -229,6 +231,17 @@ lines from both sides are ordered by when they were actually spoken (captured at
 chunk time, so variable transcription latency can't scramble the order).
 
 Config (all optional; stored encrypted in settings): endpoint, API key, model.
+
+### AI summary & action items (opt-in)
+
+Under **⋮ → Settings → AI meeting summary**, set an **OpenAI-compatible
+`/chat/completions` endpoint** (a **local** LLM such as LM Studio / Ollama to
+keep everything on your machine, or a cloud provider). A **✨ Summarize** button
+then appears in the Meeting Notes header: it sends the note's notes + transcript
+through the **local server proxy** (key stays server-side, CSP respected) and
+returns a short **summary** plus **action items**, each addable as a task in one
+click (any date it mentions is parsed into the due date). The button stays hidden
+until an endpoint is configured, and nothing is sent anywhere until you press it.
 
 ## View on your phone (offline viewer)
 

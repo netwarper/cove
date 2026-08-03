@@ -131,6 +131,7 @@
     getDataDir: () => req('GET', '/api/datadir'),
     saveDataDir: (path) => req('PUT', '/api/datadir', { path }),
     transcribe: (audioB64, mime, filename, source) => req('POST', '/api/transcribe', { audioB64, mime, filename, source }),
+    summarize: (text, title) => req('POST', '/api/summarize', { text, title }),
     listTrash: () => req('GET', '/api/trash'),
     restoreTrash: (id) => req('POST', '/api/trash/' + id + '/restore', {}),
     purgeTrash: (id) => req('DELETE', '/api/trash/' + id),

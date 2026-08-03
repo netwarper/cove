@@ -180,6 +180,14 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .daily-nudge .dn-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 6px; }
 .daily-nudge .dn-x:hover { background: var(--panel-2); color: var(--ink); }
 
+/* ---- AI meeting summary ---- */
+.summary-body { white-space: pre-wrap; line-height: 1.55; margin: 6px 0 4px; max-height: 40vh; overflow: auto; }
+.summary-sec-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 6px; }
+.summary-actions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 34vh; overflow: auto; }
+.summary-action { display: flex; align-items: center; gap: 10px; }
+.summary-action .sa-text { flex: 1; min-width: 0; font-size: 13px; }
+.summary-action button[disabled] { opacity: .55; }
+
 /* ---- New-version toast ---- */
 .update-toast {
   position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 210;

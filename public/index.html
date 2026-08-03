@@ -274,6 +274,7 @@
                 <div class="rec-controls">
                   <button id="recordBtn" class="mini" title="Record meeting audio (mic + shared audio → one .wav)">🔴 Record</button>
                   <button id="screenBtn" class="mini" title="Record screen + audio → one .webm video">🖥 Screen</button>
+                  <button id="summarizeBtn" class="mini ghost hidden" title="Summarize this meeting with AI">✨ Summarize</button>
                   <button id="sttSettingsBtn" class="mini ghost" title="Transcription settings">⚙ Transcription</button>
                   <span id="recStatus" class="rec-status muted tiny"></span>
                 </div>
@@ -578,6 +579,19 @@
         <button id="saveSttBtn" class="sm">Save transcription settings</button>
       </div>
       <div class="acct-block">
+        <h4>AI meeting summary (opt-in)</h4>
+        <p class="muted tiny">Turn a meeting's notes + transcript into a short summary and a list of action items you can add as tasks with one click. Point it at a <b>local</b> LLM server (e.g. LM Studio / Ollama's OpenAI-compatible endpoint) to stay fully private, or a cloud provider (your meeting text is then sent there). Leave the endpoint blank to keep the feature hidden.</p>
+        <button id="sumLocalBtn" class="sm" type="button" title="Fill in a common local LLM endpoint">🖥 Use local LLM</button>
+        <label class="tiny muted">Chat endpoint (OpenAI-compatible <code>/chat/completions</code>)</label>
+        <input id="sumEndpoint" type="text" placeholder="http://127.0.0.1:1234/v1/chat/completions">
+        <label class="tiny muted">API key (only for cloud providers)</label>
+        <input id="sumKey" type="password" placeholder="(blank for a local server)" autocomplete="off">
+        <label class="tiny muted">Model</label>
+        <input id="sumModel" type="text" placeholder="gpt-4o-mini">
+        <div id="sumWarn" class="tiny" style="color:var(--danger)"></div>
+        <button id="saveSumBtn" class="sm">Save summary settings</button>
+      </div>
+      <div class="acct-block">
         <h4>Inbox — send yourself tasks (Slack, etc.)</h4>
         <p class="muted tiny">Drop a <code>.txt</code>/<code>.md</code>/<code>.json</code> file into the inbox folder — via Zapier, Make, or a Cloudflare Worker — and each line becomes a task in the chosen workspace, even if this Mac was asleep (it lands next time you unlock). Full setup in <code>docs/slack-inbox.md</code>.</p>
         <label class="tiny muted">Add inbox tasks to workspace</label>
@@ -691,6 +705,21 @@
       <div class="modal-actions">
         <button id="doMoveBtn" class="primary">Move</button>
         <button class="modal-close">Cancel</button>
+      </div>
+    </div>
+
+    <div class="modal hidden wide" id="summaryModal">
+      <h3>✨ Meeting summary</h3>
+      <div id="summaryStatus" class="muted tiny" aria-live="polite"></div>
+      <div id="summaryBody" class="summary-body"></div>
+      <div id="summaryActionsWrap" class="hidden">
+        <div class="summary-sec-label">Action items</div>
+        <ul id="summaryActions" class="summary-actions"></ul>
+      </div>
+      <div class="modal-actions">
+        <button id="insertSummaryBtn" class="sm hidden">⭳ Insert summary into notes</button>
+        <button id="addAllActionsBtn" class="sm hidden">✓ Add all as tasks</button>
+        <button class="modal-close">Close</button>
       </div>
     </div>
 

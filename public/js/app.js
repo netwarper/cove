@@ -912,6 +912,7 @@
     updateWordCount();
     renderBacklinks();
     renderTranscript();
+    updateSummaryAvailability();
     setNoteHash(n.id);
     armDailyNudge();
   }
@@ -2700,6 +2701,9 @@
     var tc = state.settings.transcription || {};
     $('sttEndpoint').value = tc.endpoint || ''; $('sttKey').value = tc.apiKey || ''; $('sttModel').value = tc.model || '';
     updateSttWarn();
+    var sc = state.settings.summary || {};
+    $('sumEndpoint').value = sc.endpoint || ''; $('sumKey').value = sc.apiKey || ''; $('sumModel').value = sc.model || '';
+    updateSumWarn();
     renderBioSettings();
     renderInboxSettings();
     renderSlackSettings();
@@ -2760,6 +2764,120 @@
     state.settings.transcription = { endpoint: $('sttEndpoint').value.trim(), apiKey: $('sttKey').value, model: $('sttModel').value.trim() || 'whisper-1' };
     await API.saveSettings({ transcription: state.settings.transcription });
     acctMsg('Transcription settings saved ✓', false);
+  });
+
+  // AI meeting summary (opt-in) — same pattern as transcription: key stays server-side.
+  function updateSumWarn() {
+    var ep = $('sumEndpoint').value.trim();
+    $('sumWarn').textContent = (ep && !isLocalEndpoint(ep))
+      ? '⚠ This is an external endpoint — your meeting notes & transcript will be sent there to summarize.'
+      : '';
+  }
+  $('sumEndpoint').addEventListener('input', updateSumWarn);
+  $('sumLocalBtn').addEventListener('click', function () {
+    $('sumEndpoint').value = 'http://127.0.0.1:1234/v1/chat/completions';
+    $('sumKey').value = '';
+    if (!$('sumModel').value.trim()) $('sumModel').value = 'gpt-4o-mini';
+    updateSumWarn();
+  });
+  $('saveSumBtn').addEventListener('click', async function () {
+    state.settings.summary = { endpoint: $('sumEndpoint').value.trim(), apiKey: $('sumKey').value, model: $('sumModel').value.trim() || 'gpt-4o-mini' };
+    await API.saveSettings({ summary: state.settings.summary });
+    updateSummaryAvailability();
+    acctMsg('Summary settings saved ✓', false);
+  });
+
+  // ---------------- AI meeting summary ----------------
+  function hasSummaryEndpoint() { return !!((state.settings.summary || {}).endpoint); }
+  function updateSummaryAvailability() {
+    var btn = $('summarizeBtn');
+    if (btn) btn.classList.toggle('hidden', !hasSummaryEndpoint());
+  }
+  // Build the plain-text context to summarize: the meeting notes plus any transcript.
+  function gatherMeetingText() {
+    var parts = [];
+    var notes = ($('meetingEditor').innerText || '').trim();
+    if (notes) parts.push('=== Notes ===\n' + notes);
+    var lines = (state.note && state.note.transcript || []).slice().sort(function (a, b) { return (a.t || 0) - (b.t || 0); });
+    if (lines.length) {
+      parts.push('=== Transcript ===\n' + lines.map(function (l) {
+        return (l.source === 'them' ? 'Them: ' : 'You: ') + (l.text || '');
+      }).join('\n'));
+    }
+    return parts.join('\n\n');
+  }
+  $('summarizeBtn').addEventListener('click', async function () {
+    if (!state.note) return;
+    var text = gatherMeetingText();
+    if (!text) { await dialog.alert('There are no meeting notes or transcript to summarize yet.'); return; }
+    $('summaryBody').innerHTML = ''; $('summaryActions').innerHTML = '';
+    $('summaryActionsWrap').classList.add('hidden');
+    $('insertSummaryBtn').classList.add('hidden'); $('addAllActionsBtn').classList.add('hidden');
+    $('summaryStatus').textContent = 'Summarizing…';
+    openModal('summaryModal');
+    try {
+      var res = await API.summarize(text, ($('noteCustomTitle').value || (state.note && state.note.title) || '').trim());
+      renderSummary(res);
+    } catch (ex) {
+      $('summaryStatus').textContent = 'Summary failed: ' + ex.message;
+    }
+  });
+  function renderSummary(res) {
+    res = res || {};
+    $('summaryStatus').textContent = '';
+    var body = $('summaryBody');
+    body.textContent = res.summary || '(no summary returned)';
+    var items = res.actionItems || [];
+    var ul = $('summaryActions'); ul.innerHTML = '';
+    if (items.length) {
+      $('summaryActionsWrap').classList.remove('hidden');
+      items.forEach(function (it) { ul.appendChild(actionItemRow(it)); });
+      $('addAllActionsBtn').classList.remove('hidden');
+    } else {
+      $('summaryActionsWrap').classList.add('hidden');
+      $('addAllActionsBtn').classList.add('hidden');
+    }
+    $('insertSummaryBtn').classList.toggle('hidden', !res.summary);
+  }
+  function actionItemRow(it) {
+    var li = document.createElement('li');
+    li.className = 'summary-action';
+    var label = document.createElement('span');
+    label.className = 'sa-text';
+    label.textContent = it.text + (it.due ? ('  (' + it.due + ')') : '');
+    var add = document.createElement('button');
+    add.className = 'sm'; add.textContent = '＋ Add task';
+    add.addEventListener('click', async function () {
+      add.disabled = true;
+      try { await addActionItemTask(it); add.textContent = '✓ Added'; }
+      catch (ex) { add.disabled = false; await dialog.alert('Could not add task: ' + ex.message); }
+    });
+    li.appendChild(label); li.appendChild(add);
+    return li;
+  }
+  // Turn an action item into a task, letting the NL parser pick up any inline date
+  // (and honoring an explicit "due" field the model returned).
+  async function addActionItemTask(it) {
+    var raw = it.text + (it.due ? (' ' + it.due) : '');
+    var p = window.TaskParse ? window.TaskParse.parse(raw) : { text: raw, priority: 4 };
+    applyTaskResult(await API.addTask(state.wsId, {
+      text: p.text || it.text, due: p.due, time: p.time, priority: p.priority, recurrence: p.recurrence,
+    }));
+  }
+  $('addAllActionsBtn').addEventListener('click', async function () {
+    var btn = this; btn.disabled = true;
+    var rows = $('summaryActions').querySelectorAll('.summary-action button');
+    for (var i = 0; i < rows.length; i++) { if (!rows[i].disabled) rows[i].click(); }
+    setTimeout(function () { btn.textContent = '✓ Added all'; }, 300);
+  });
+  $('insertSummaryBtn').addEventListener('click', function () {
+    var summary = $('summaryBody').textContent || '';
+    if (!summary) return;
+    var html = '<p><b>Summary</b></p><p>' + esc(summary).replace(/\n/g, '<br>') + '</p>';
+    $('meetingEditor').innerHTML = html + $('meetingEditor').innerHTML;
+    state.note.meetingNotes = $('meetingEditor').innerHTML;
+    scheduleSave();
+    closeModals();
   });
 
   // Workspaces modal
@@ -2961,7 +3079,7 @@
   }
 
   // Modal helpers
-  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal', 'conflictLogModal', 'tourModal'];
+  var MODALS = ['wsModal', 'importModal', 'templateModal', 'accountModal', 'backupModal', 'moveModal', 'recoveryModal', 'historyModal', 'notePickerModal', 'conflictModal', 'conflictLogModal', 'tourModal', 'summaryModal'];
   function openModal(id) {
     $('modalBackdrop').classList.remove('hidden');
     MODALS.forEach(function (m) { $(m).classList.toggle('hidden', m !== id); });

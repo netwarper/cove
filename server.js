@@ -27,6 +27,7 @@ const config = require('./lib/config');
 const backup = require('./lib/backup');
 const viewer = require('./lib/viewer');
 const transcribe = require('./lib/transcribe');
+const summarize = require('./lib/summarize');
 const slack = require('./lib/slack');
 const { Store } = store;
 
@@ -671,6 +672,11 @@ async function route(s, req, res, pathname, query, session) {
     const cfg = (s.getSettings().transcription) || {};
     const out = await transcribe.transcribe(cfg, { audio: Buffer.from(body.audioB64 || '', 'base64'), mime: body.mime, filename: body.filename });
     return { text: out.text };
+  }
+  if (pathname === '/api/summarize' && m === 'POST') {
+    const body = await readBody(req);
+    const cfg = (s.getSettings().summary) || {};
+    return summarize.summarize(cfg, { text: String(body.text || ''), title: String(body.title || '') });
   }
 
   throw Object.assign(new Error('not found'), { status: 404 });
