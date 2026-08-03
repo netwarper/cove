@@ -508,11 +508,13 @@ sync with Alex next tue 3pm</code></pre>
         <p>Passkeys require <code>localhost</code>, a domain, or HTTPS — not a raw <code>127.0.0.1</code> address. Open the app at <code>http://localhost:&lt;port&gt;</code> or a <code>cove.localhost</code> address (the Enable button is hidden on an IP address for this reason).</p>
         <h3>It adds the passkey, then errors.</h3>
         <p>Biometric unlock uses the passkey's <b>PRF</b> extension (a.k.a. <code>hmac-secret</code>) to wrap your key. If your device creates the passkey but can't produce a PRF secret, enrollment can't finish. A few things to check:</p>
+        <p>The failure is usually about <b>which passkey provider</b> handled the passkey — some don't implement PRF:</p>
         <ul>
-          <li><b>A password manager is handling your passkeys.</b> This is the most common cause: <b>1Password, Bitwarden, Dashlane</b> and similar intercept passkey creation, and their passkeys <b>don't support the PRF / hmac-secret extension</b> Cove needs. Turn off your password manager's passkey / “offer to save” handling for this site (or choose “this device” / the built-in option in the passkey prompt) so the passkey is created with your <b>device's own</b> Touch&nbsp;ID / Windows&nbsp;Hello / iCloud&nbsp;Keychain — then delete the leftover “Cove” passkey from the password manager and try again.</li>
-          <li>Use a <b>platform authenticator</b> (built-in Touch&nbsp;ID / Windows&nbsp;Hello / a synced passkey) — a plug-in <b>security key</b> won't provide PRF here.</li>
-          <li>PRF needs a recent OS + browser: macOS&nbsp;15 / Chrome or Safari current for Touch&nbsp;ID&nbsp;/&nbsp;iCloud&nbsp;Keychain; current Chrome/Edge for Windows&nbsp;Hello. Some older Windows&nbsp;Hello / TPM combinations simply don't expose it.</li>
-          <li>Open over <code>localhost</code> or HTTPS (not a raw IP).</li>
+          <li><b>On a Mac with Chrome:</b> Chrome's built-in “<b>this device</b>” passkey provider <b>doesn't support PRF</b>. When the “Create a passkey” prompt appears, click <b>“Save another way”</b> and choose <b>iCloud&nbsp;Keychain</b> (or your iPhone) — those do support PRF. Safari uses iCloud&nbsp;Keychain by default and works too. (Needs macOS&nbsp;15 / iOS&nbsp;18 or later for iCloud&nbsp;Keychain PRF.)</li>
+          <li><b>A password manager</b> — <b>1Password, Bitwarden, Dashlane</b> — handling passkeys will also fail, since their passkeys don't support PRF. Turn off its passkey / “offer to save” handling for this site, or pick a different option in the prompt.</li>
+          <li><b>On Windows:</b> pick <b>Windows&nbsp;Hello</b> (recent Windows&nbsp;11 + current Chrome/Edge). Some older Windows&nbsp;Hello / TPM combinations don't expose PRF.</li>
+          <li>A plug-in <b>security key</b> won't provide PRF. Open over <code>localhost</code> or HTTPS (not a raw IP).</li>
+          <li>After a failed attempt, <b>delete the leftover “Cove” passkey</b> from wherever it was saved (browser/OS/manager passkey settings) before retrying, so the non-PRF one isn't reused.</li>
         </ul>
         <p>When it fails, Cove now logs the authenticator's exact response to the browser console (<b>F12 → Console</b>) — that line tells you whether PRF was <i>enabled</i> at all. Either way your <b>passphrase still works</b>, and you can delete the leftover “Cove” passkey in your browser or OS passkey settings.</p>
         <h3>My Slack message didn't become a task.</h3>
