@@ -2714,6 +2714,7 @@
     updateSumWarn();
     $('tzInput').value = state.settings.timezone || '';
     $('tzMsg').textContent = '';
+    $('completedKeep').value = String(state.settings.completedKeep || 0);
     renderBioSettings();
     renderInboxSettings();
     renderSlackSettings();
@@ -3016,6 +3017,10 @@
     state.settings.dailyNudgeSeconds = parseInt($('dailyNudgeDelay').value, 10) || 0;
     API.saveSettings({ dailyNudgeSeconds: state.settings.dailyNudgeSeconds });
     dailyNudge.forNoteId = null; armDailyNudge(); // re-arm the current note with the new delay
+  });
+  $('completedKeep').addEventListener('change', function () {
+    state.settings.completedKeep = parseInt($('completedKeep').value, 10) || 0;
+    API.saveSettings({ completedKeep: state.settings.completedKeep });
   });
 
   // Backup / restore + bulk export

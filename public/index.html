@@ -573,6 +573,20 @@
         </div>
       </div>
       <div class="acct-block">
+        <h4>Completed-task history</h4>
+        <p class="muted tiny">How many completed tasks to keep <b>per workspace</b>. When you complete a task and the count is over this limit, the oldest completed tasks are permanently removed — keeping the Completed view and searches fast over years of use. Open tasks are never affected.</p>
+        <div class="setting-row">
+          <label for="completedKeep">Keep per workspace</label>
+          <select id="completedKeep" class="ws-tpl">
+            <option value="0">Unlimited (default)</option>
+            <option value="200">200 most recent</option>
+            <option value="500">500 most recent</option>
+            <option value="1000">1000 most recent</option>
+            <option value="2000">2000 most recent</option>
+          </select>
+        </div>
+      </div>
+      <div class="acct-block">
         <h4>Image text (OCR)</h4>
         <p class="muted tiny">When you paste or attach a screenshot, Cove reads any text in it <b>on your device</b> (nothing is uploaded) so the image turns up in search. Runs in the background the first time it loads a small local engine.</p>
         <label class="tiny"><input id="ocrEnabled" type="checkbox" checked> Extract text from pasted images</label>

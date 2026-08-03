@@ -110,6 +110,37 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     // reopening removes it from history
     store.updateTask(cA, { done: false });
     t.eq(store.completedTasks().some((x) => x.id === cA), false, 'reopened task leaves the completed history');
+
+    // --- completed-history cap (configurable) ---
+    const capWs = store.createWorkspace('CapWs');
+    const capIds = [];
+    for (let i = 0; i < 6; i++) {
+      const id = store.addTask(capWs.id, { text: 'done ' + i, due: '2026-07-01' }).task.id;
+      capIds.push(id);
+    }
+    // Complete them with increasing completedAt so ordering is deterministic.
+    for (let i = 0; i < capIds.length; i++) {
+      const loc = store._locateTask(capIds[i], capWs.id);
+      loc.task.done = true; loc.task.completedAt = '2026-07-0' + (i + 1) + 'T10:00:00.000Z';
+      store._writeTasks(capWs.id, loc.store);
+    }
+    t.eq(store.completedTasks().filter((x) => x.workspaceName === 'CapWs').length, 6, 'all 6 completed before a cap is set');
+    // Default (unlimited) keeps everything even on a new completion.
+    store.saveSettings({ completedKeep: 0 });
+    const openId = store.addTask(capWs.id, { text: 'open then done', due: '2026-07-10' }).task.id;
+    store.completeTask(openId, {});
+    t.eq(store.completedTasks().filter((x) => x.workspaceName === 'CapWs').length, 7, 'unlimited cap keeps all completed');
+    // Set a cap of 3: completing one more prunes CapWs down to the 3 newest completed.
+    store.saveSettings({ completedKeep: 3 });
+    const openId2 = store.addTask(capWs.id, { text: 'trigger prune', due: '2026-07-11' }).task.id;
+    store.completeTask(openId2, {});
+    const capLeft = store.completedTasks().filter((x) => x.workspaceName === 'CapWs');
+    t.eq(capLeft.length, 3, 'cap prunes CapWs completed history to 3 newest');
+    t.ok(capLeft.every((x) => x.completedAt >= '2026-07-05'), 'the newest completions are the ones kept');
+    // Open tasks in the workspace are untouched by pruning.
+    t.eq(store.listTasks(capWs.id).some((x) => !x.done), false, 'no stray open tasks left (all were completed)');
+    // Other workspaces are unaffected by CapWs's cap application.
+    t.ok(store.completedTasks().some((x) => x.id === cB), 'other workspaces keep their completed history');
   } catch (ex) {
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {
