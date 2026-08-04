@@ -77,15 +77,21 @@
     fireInput(editor);
   }
 
+  // After execCommand('insertImage') some browsers leave the new <img> SELECTED,
+  // so the next keystroke would replace it. Collapse the caret to just after the
+  // image so typing appends text instead.
+  function caretAfterInsertedImage() {
+    try { var s = window.getSelection(); if (s && s.rangeCount) s.collapseToEnd(); } catch (_e) { /* ignore */ }
+  }
   function insertImageFile(editor, f, uploader, range) {
     if (f.size > 8 * 1024 * 1024) { dlg().alert('Image too large (max 8 MB).'); return; }
     if (uploader) {
-      uploader(f).then(function (src) { restoreRange(editor, range); document.execCommand('insertImage', false, src); fireInput(editor); })
+      uploader(f).then(function (src) { restoreRange(editor, range); document.execCommand('insertImage', false, src); caretAfterInsertedImage(); fireInput(editor); })
         .catch(function (e) { dlg().alert('Image upload failed: ' + e.message); });
       return;
     }
     var reader = new FileReader();
-    reader.onload = function () { restoreRange(editor, range); document.execCommand('insertImage', false, reader.result); fireInput(editor); };
+    reader.onload = function () { restoreRange(editor, range); document.execCommand('insertImage', false, reader.result); caretAfterInsertedImage(); fireInput(editor); };
     reader.readAsDataURL(f);
   }
 
@@ -255,9 +261,13 @@
     editor.addEventListener('click', function (e) { select(e.target.tagName === 'IMG' ? e.target : null); });
     editor.addEventListener('keydown', function (e) {
       if (!selImg) return;
-      if (e.key === '+' || e.key === '=') { resizeImg(selImg, 1.1); place(); e.preventDefault(); }
-      else if (e.key === '-') { resizeImg(selImg, 0.9); place(); e.preventDefault(); }
-      else if (e.key === 'Delete' || e.key === 'Backspace') { var i = selImg; select(null); i.remove(); e.preventDefault(); fireInput(editor); }
+      if (e.key === '+' || e.key === '=') { resizeImg(selImg, 1.1); place(); e.preventDefault(); return; }
+      if (e.key === '-') { resizeImg(selImg, 0.9); place(); e.preventDefault(); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') { var i = selImg; select(null); i.remove(); e.preventDefault(); fireInput(editor); return; }
+      // Ignore lone modifier keys, but any other key (typing, arrows, Enter…) means
+      // the user has moved on to editing text — release the stale image selection so
+      // Backspace/Delete and typing act on the TEXT, not the previously-clicked image.
+      if (e.key !== 'Shift' && e.key !== 'Control' && e.key !== 'Alt' && e.key !== 'Meta') select(null);
     });
     // Drag the handle to resize (keeps aspect ratio via width only).
     handle.addEventListener('mousedown', function (e) {

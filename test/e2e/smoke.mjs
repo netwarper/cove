@@ -138,6 +138,22 @@ try {
   await sp.keyboard.press('Escape');
   ok(await sp.locator('#accountModal').isVisible() === false, 'Escape closes modal');
 
+  // --- inline image survives editing after being click-selected (regression) ---
+  await sp.evaluate((src) => {
+    const ed = document.getElementById('meetingEditor'); ed.focus();
+    ed.innerHTML = '<p>start&nbsp;<img src="' + src + '" style="width:80px;height:80px">&nbsp;tail</p>';
+    const img = ed.querySelector('img');
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true })); // select it (resize handle)
+    const t = img.nextSibling; const r = document.createRange(); r.setStart(t, Math.min(2, t.length || 0)); r.collapse(true);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }, 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==');
+  await sp.keyboard.type('Z');
+  await sp.keyboard.press('Backspace');
+  await sp.waitForTimeout(100);
+  ok(await sp.evaluate(() => document.getElementById('meetingEditor').querySelectorAll('img').length) === 1, 'inline image survives Backspace while editing text');
+  // Restore the meeting-notes body the later summary step relies on.
+  await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); e.innerHTML = '<p>E2EBODY beta on friday</p>'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+
   // --- new-task feedback (toast + scroll-into-view) ---
   await sp.fill('#taskInput', 'harness upcoming task next friday');
   await sp.press('#taskInput', 'Enter');
