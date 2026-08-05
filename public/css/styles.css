@@ -385,10 +385,23 @@ select.qa-pill { padding: 4px 6px; }
   background: var(--panel-2); color: var(--ink); overflow: auto;
 }
 .rte:focus { outline: none; border-color: var(--brand); }
+/* Text-color palette popover */
+.color-pop {
+  position: absolute; z-index: 210; display: grid; grid-template-columns: repeat(5, 22px); gap: 6px;
+  padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+}
+.color-sw { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); cursor: pointer; padding: 0; }
+.color-sw:hover { transform: scale(1.12); border-color: var(--brand); }
 /* The two main note editors are fixed-height, internally-scrolling boxes you can
    drag to resize (native handle); their height is applied from settings and
    persisted, so it survives refreshes. */
-#carryoverEditor, #meetingEditor { flex: none; resize: vertical; max-height: none; }
+#carryoverEditor, #meetingEditor { flex: none; max-height: none; }
+/* Visible, touch-friendly drag grip below each note editor (native resize handles
+   are faint and don't work on touch). Mirrors the task-list resize grip. */
+.rte-resize { height: 14px; margin-top: 2px; cursor: ns-resize; display: flex; align-items: center; justify-content: center; touch-action: none; }
+.rte-resize::before { content: ''; width: 40px; height: 3px; border-radius: 3px; background: var(--line); transition: background .15s; }
+.rte-resize:hover::before, .rte-resize:focus-visible::before { background: var(--brand); }
+.rte-resize:focus-visible { outline: none; }
 .rte img { max-width: 100%; cursor: pointer; }
 .rte img.selected { outline: 2px solid var(--brand); }
 .rte ul, .rte ol { padding-left: 22px; }
@@ -790,7 +803,7 @@ button.mini.ghost:hover { color: var(--ink); }
 
 /* ---- Print ---- */
 @media print {
-  .topbar, .sidebar, .note-tools, .rte-toolbar, .quick-add, .task-actions, .rec-controls, .transcript-region, .attach-head label { display: none !important; }
+  .topbar, .sidebar, .note-tools, .rte-toolbar, .rte-resize, .quick-add, .task-actions, .rec-controls, .transcript-region, .attach-head label { display: none !important; }
   .app, .body, .main { display: block; height: auto; overflow: visible; }
   .sections { grid-template-columns: 1fr 1fr; }
   .section { break-inside: avoid; box-shadow: none; }

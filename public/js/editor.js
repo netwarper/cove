@@ -9,6 +9,7 @@
     { cmd: 'strikeThrough', label: 'S', title: 'Strikethrough', style: 'text-decoration:line-through' },
     { cmd: 'insertUnorderedList', label: '•', title: 'Bullet list' },
     { cmd: 'insertOrderedList', label: '1.', title: 'Numbered list' },
+    { cmd: 'foreColor', label: 'A', title: 'Text color', color: true, style: 'text-decoration:underline; text-decoration-color:#e5484d; text-underline-offset:2px' },
     { cmd: 'formatBlock:H3', label: 'H', title: 'Heading' },
     { cmd: 'insertTable', label: '▦', title: 'Insert table' },
     { cmd: 'insertImage', label: '🖼', title: 'Insert image' },
@@ -125,9 +126,46 @@
       // Update the button's active state right after the command runs, so a
       // second toggle (off→on) reflects immediately instead of waiting for the
       // next keystroke/selection change.
-      b.addEventListener('click', function () { Promise.resolve(exec(t.cmd, editor, opts)).then(function () { updateActiveStates(toolbarEl); }); });
+      b.addEventListener('click', function () {
+        if (t.color) { openColorPalette(editor, b); return; }
+        Promise.resolve(exec(t.cmd, editor, opts)).then(function () { updateActiveStates(toolbarEl); });
+      });
       toolbarEl.appendChild(b);
     });
+  }
+
+  // Text-color palette. foreColor with styleWithCSS produces <span style="color:…">,
+  // which the note editors render and the server keeps (only script/style/handlers
+  // are stripped). "Clear formatting" (⌫) removes the color again.
+  var COLOR_SWATCHES = ['#e5484d', '#e0821e', '#c99a06', '#2ea043', '#12b5b5', '#3b6cf6', '#7c5cff', '#d6409f', '#6b7280', '#e7eaf0'];
+  function openColorPalette(editor, anchorBtn) {
+    var range = saveRange(editor); // the selection to colorize (before the popover steals focus)
+    var existing = document.querySelector('.color-pop');
+    if (existing) existing.remove();
+    var pop = document.createElement('div');
+    pop.className = 'color-pop';
+    COLOR_SWATCHES.forEach(function (col) {
+      var sw = document.createElement('button');
+      sw.type = 'button'; sw.className = 'color-sw'; sw.title = col;
+      sw.style.background = col;
+      sw.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      sw.addEventListener('click', function () {
+        restoreRange(editor, range);
+        try { document.execCommand('styleWithCSS', false, true); } catch (_e) { /* older browsers */ }
+        document.execCommand('foreColor', false, col);
+        fireInput(editor);
+        close();
+      });
+      pop.appendChild(sw);
+    });
+    document.body.appendChild(pop);
+    var r = anchorBtn.getBoundingClientRect();
+    pop.style.left = Math.max(6, Math.min(r.left + window.scrollX, window.innerWidth - pop.offsetWidth - 6)) + 'px';
+    pop.style.top = (r.bottom + window.scrollY + 4) + 'px';
+    function close() { pop.remove(); document.removeEventListener('mousedown', onDoc, true); document.removeEventListener('keydown', onKey, true); }
+    function onDoc(e) { if (!pop.contains(e.target) && e.target !== anchorBtn) close(); }
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
+    setTimeout(function () { document.addEventListener('mousedown', onDoc, true); document.addEventListener('keydown', onKey, true); }, 0);
   }
 
   var SLASH = [

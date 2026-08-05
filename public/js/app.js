@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.53.7'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.54.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -699,6 +699,31 @@
           var patch = {}; patch[e[1]] = clamped; API.saveSettings(patch);
         }, 400);
       }).observe(el);
+    });
+  })();
+  // Drag grips below each editor set its height directly; the ResizeObserver above
+  // then persists it. Works with mouse and touch (native corner handles don't).
+  (function initEditorGrips() {
+    var GRIPS = [['carryoverEditor', 'carryoverResize', 'ongoingEditorHeight', 200], ['meetingEditor', 'meetingResize', 'meetingEditorHeight', 260]];
+    GRIPS.forEach(function (g) {
+      var el = $(g[0]), grip = $(g[1]); if (!el || !grip) return;
+      function setH(px) { el.style.height = Math.max(EDITOR_MIN, Math.min(EDITOR_MAX, Math.round(px))) + 'px'; }
+      var dragging = false, startY = 0, startH = 0;
+      grip.addEventListener('pointerdown', function (e) {
+        dragging = true; startY = e.clientY; startH = el.getBoundingClientRect().height;
+        try { grip.setPointerCapture(e.pointerId); } catch (_e) { /* synthetic */ }
+        e.preventDefault();
+      });
+      grip.addEventListener('pointermove', function (e) { if (dragging) setH(startH + (e.clientY - startY)); });
+      var end = function () { dragging = false; };
+      grip.addEventListener('pointerup', end);
+      grip.addEventListener('pointercancel', end);
+      grip.addEventListener('dblclick', function () { setH(g[3]); });
+      grip.addEventListener('keydown', function (e) {
+        var h = el.getBoundingClientRect().height;
+        if (e.key === 'ArrowUp') { setH(h - 24); e.preventDefault(); }
+        else if (e.key === 'ArrowDown') { setH(h + 24); e.preventDefault(); }
+      });
     });
   })();
   // Recompute the quick-add offset when the layout reflows (e.g. width changes
