@@ -631,6 +631,10 @@ async function route(s, req, res, pathname, query, session) {
     if (seg[3] === 'skip' && m === 'POST') return s.skipTask(taskId);
     if (seg[3] === 'reschedule' && m === 'POST') return s.rescheduleTask(taskId, (await readBody(req)).due);
     if (seg[3] === 'move' && m === 'POST') return s.moveTask(taskId, safeId((await readBody(req)).workspaceId));
+    if (seg[3] === 'share' && m === 'POST') {
+      const ids = (await readBody(req)).workspaceIds;
+      return s.shareTask(taskId, Array.isArray(ids) ? ids.map(safeId) : []);
+    }
   }
 
   // trash

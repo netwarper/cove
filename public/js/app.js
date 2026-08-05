@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.54.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.55.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -1428,6 +1428,42 @@
     else loadTasks();
   }
   function wsName(id) { var w = (state.workspaces || []).find(function (x) { return x.id === id; }); return (w && w.name) || 'workspace'; }
+  // Share a task into additional workspaces. The task keeps a single home record,
+  // so completing it (and its completed date) reflects in every shared space.
+  function openShareDialog(t) {
+    var home = t.workspaceId;
+    var others = (state.workspaces || []).filter(function (w) { return w.id !== home; });
+    if (!others.length) { dialog.alert('You only have one workspace — create another to share tasks with it.'); return; }
+    var shared = {}; (t.sharedWith || []).forEach(function (id) { shared[id] = true; });
+    var back = document.createElement('div'); back.className = 'modal-backdrop';
+    var modal = document.createElement('div'); modal.className = 'modal'; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+    var h = document.createElement('h3'); h.textContent = 'Share task with workspaces'; modal.appendChild(h);
+    var p = document.createElement('p'); p.className = 'muted tiny';
+    p.textContent = '“' + t.text + '” lives in ' + wsName(home) + '. Tick other workspaces to show it there too — it stays one task, so completing it (and its date) is reflected in all of them.';
+    modal.appendChild(p);
+    var list = document.createElement('div'); list.className = 'share-ws-list';
+    others.forEach(function (w) {
+      var lab = document.createElement('label'); lab.className = 'share-ws-item';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = w.id; cb.checked = !!shared[w.id];
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + w.name));
+      list.appendChild(lab);
+    });
+    modal.appendChild(list);
+    var acts = document.createElement('div'); acts.className = 'modal-actions';
+    var save = document.createElement('button'); save.className = 'primary'; save.textContent = 'Save';
+    var cancel = document.createElement('button'); cancel.textContent = 'Cancel';
+    acts.appendChild(save); acts.appendChild(cancel); modal.appendChild(acts);
+    back.appendChild(modal); document.body.appendChild(back);
+    function close() { back.remove(); }
+    cancel.addEventListener('click', close);
+    back.addEventListener('click', function (e) { if (e.target === back) close(); });
+    save.addEventListener('click', async function () {
+      var ids = Array.prototype.slice.call(list.querySelectorAll('input:checked')).map(function (c) { return c.value; });
+      try { applyTaskResult(await API.shareTask(t.id, ids)); setSaveStatus(ids.length ? 'Shared ✓' : 'Sharing removed ✓'); }
+      catch (ex) { await dialog.alert('Could not update sharing: ' + ex.message); }
+      close();
+    });
+  }
   // Guard against a stale cached app tab where API.moveTask isn't defined yet —
   // surface a clear "reload" message instead of a silent failure.
   function moveTaskTo(taskId, dest) {
@@ -1506,6 +1542,15 @@
     }
     if (t.recurrence) { var rc = document.createElement('span'); rc.className = 'task-recur'; rc.textContent = '🔁 ' + recurLabel(t.recurrence); meta.appendChild(rc); }
     if (t.sourceInbox) { var ib = document.createElement('span'); ib.className = 'inbox-badge'; ib.textContent = '📥'; ib.title = 'From your inbox (e.g. Slack)'; meta.appendChild(ib); }
+    // Shared-across-workspaces indicator: shows either which spaces this task is
+    // shared INTO (when viewed in its home) or that it's borrowed FROM another space.
+    var sw = t.sharedWith || [];
+    if (sw.length || (t.workspaceId && t.workspaceId !== state.wsId)) {
+      var shb = document.createElement('span'); shb.className = 'task-shared'; shb.textContent = '🔗';
+      if (t.workspaceId !== state.wsId) shb.title = 'Shared here from ' + wsName(t.workspaceId);
+      else shb.title = 'Shared with ' + sw.map(wsName).join(', ');
+      meta.appendChild(shb);
+    }
     if (meta.childNodes.length) main.appendChild(meta);
     li.appendChild(cb); li.appendChild(main);
 
@@ -1523,6 +1568,10 @@
         } catch (ex) { await handleMoveError(ex); }
       });
       actions.appendChild(mv);
+      // Share (link) to additional workspaces — keeps the Move button for relocating.
+      var shl = document.createElement('button'); shl.className = 'task-act'; shl.title = 'Share with other workspaces'; shl.textContent = '🔗';
+      shl.addEventListener('click', function () { openShareDialog(t); });
+      actions.appendChild(shl);
     }
     var del = document.createElement('button'); del.className = 'task-act task-del'; del.title = 'Delete'; del.textContent = '✕';
     del.addEventListener('click', async function () { applyTaskResult(await API.deleteTask(t.id)); });

@@ -110,6 +110,7 @@
     skipTask: (id) => req('POST', '/api/tasks/' + id + '/skip', {}),
     rescheduleTask: (id, due) => req('POST', '/api/tasks/' + id + '/reschedule', { due: due }),
     moveTask: (id, workspaceId) => req('POST', '/api/tasks/' + id + '/move', { workspaceId: workspaceId }),
+    shareTask: (id, workspaceIds) => req('POST', '/api/tasks/' + id + '/share', { workspaceIds: workspaceIds }),
     globalTasks: () => req('GET', '/api/tasks'),
     completedTasks: (params) => {
       var qs = Object.keys(params || {})

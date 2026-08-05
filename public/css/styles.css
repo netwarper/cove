@@ -346,6 +346,10 @@ select.qa-pill { padding: 4px 6px; }
 .upcoming-day .upcoming-date { margin-bottom: 6px; }
 
 .inbox-badge { font-size: 11px; align-self: center; }
+.task-shared { font-size: 11px; align-self: center; cursor: default; }
+.share-ws-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; max-height: 46vh; overflow: auto; }
+.share-ws-item { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.share-ws-item input[type="checkbox"] { width: auto; margin: 0; }
 .slack-daily { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 
 /* Completed-task rows: filled check that offers "reopen" on hover. */

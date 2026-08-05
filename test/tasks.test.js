@@ -141,6 +141,30 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     t.eq(store.listTasks(capWs.id).some((x) => !x.done), false, 'no stray open tasks left (all were completed)');
     // Other workspaces are unaffected by CapWs's cap application.
     t.ok(store.completedTasks().some((x) => x.id === cB), 'other workspaces keep their completed history');
+
+    // --- shared tasks across workspaces (one record, home + shared spaces) ---
+    const wsX = store.createWorkspace('SpaceX');
+    const wsY = store.createWorkspace('SpaceY');
+    const shId = store.addTask(wsX.id, { text: 'shared review', due: '2026-08-01', priority: 2 }).task.id;
+    store.shareTask(shId, [wsY.id]);
+    t.ok(store.listTasks(wsX.id).some((x) => x.id === shId), 'shared task still shows in its home workspace');
+    t.ok(store.listTasks(wsY.id).some((x) => x.id === shId), 'shared task appears in the shared workspace');
+    t.eq((store.listTasks(wsY.id).find((x) => x.id === shId) || {}).sharedWith, [wsY.id], 'sharedWith records the extra space');
+    // A workspace can't share into itself; invalid ids are dropped.
+    store.shareTask(shId, [wsY.id, wsX.id, 'bogus-ws']);
+    t.eq((store.listTasks(wsX.id).find((x) => x.id === shId) || {}).sharedWith, [wsY.id], 'home + invalid ids excluded from sharedWith');
+    // Complete it from the shared space — one record, so done + completedAt reflect in both.
+    store.completeTask(shId, { noteId: null, workspaceId: wsY.id });
+    const inX = store.listTasks(wsX.id).find((x) => x.id === shId);
+    const inY = store.listTasks(wsY.id).find((x) => x.id === shId);
+    t.ok(inX && inX.done && inX.completedAt, 'completing a shared task marks it done in the home space');
+    t.ok(inY && inY.done && inY.completedAt === inX.completedAt, 'same completed date reflects in the shared space');
+    t.eq(store.completedTasks().filter((x) => x.id === shId).length, 1, 'a shared task appears once in global completed history');
+    // Moving home strips the destination from sharedWith.
+    store.updateTask(shId, { done: false });
+    store.moveTask(shId, wsY.id);
+    const movedShared = store.listTasks(wsY.id).find((x) => x.id === shId);
+    t.ok(movedShared && !(movedShared.sharedWith || []).includes(wsY.id), 'moving home drops that space from sharedWith');
   } catch (ex) {
     t.ok(false, 'unexpected exception: ' + ex.stack);
   } finally {
