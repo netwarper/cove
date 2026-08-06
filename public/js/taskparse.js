@@ -41,7 +41,7 @@
     else if (/\s(every\s+day|daily)\b/i.test(text)) { res.recurrence = { type: 'daily' }; res.matched.recurrence = true; strip(/\s(every\s+day|daily)\b/i); }
     else if (/\s(every\s+week|weekly)\b/i.test(text)) { res.recurrence = { type: 'weekly' }; res.matched.recurrence = true; strip(/\s(every\s+week|weekly)\b/i); }
     else if (/\s(every\s+month|monthly)\b/i.test(text)) { res.recurrence = { type: 'monthly' }; res.matched.recurrence = true; strip(/\s(every\s+month|monthly)\b/i); }
-    else if ((m = /\severy\s+(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/i.exec(text))) {
+    else if ((m = /\severy\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tues|tue|weds|wed|thurs|thur|thu|fri|sat)\b/i.exec(text))) {
       var wd = DOW[m[1].toLowerCase().slice(0, 3)];
       res.recurrence = { type: 'weekly', days: [wd] }; res.matched.recurrence = true; strip(m[0]);
       if (!res.due) res.due = iso(nextDow(today(), wd));
@@ -61,11 +61,11 @@
       else if (/\stoday\b/i.test(text)) { res.due = iso(today()); res.matched.due = true; strip(/\stoday\b/i); }
       else if (/\s(tomorrow|tmr|tom)\b/i.test(text)) { res.due = iso(addDays(today(), 1)); res.matched.due = true; strip(/\s(tomorrow|tmr|tom)\b/i); }
       else if (/\snext\s+week\b/i.test(text)) { res.due = iso(addDays(today(), 7)); res.matched.due = true; strip(/\snext\s+week\b/i); }
-      else if ((m = /\s(next\s+)?(sun|mon|tue|wed|thu|fri|sat)[a-z]*\b/i.exec(text))) {
+      else if ((m = /\s(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tues|tue|weds|wed|thurs|thur|thu|fri|sat)\b/i.exec(text))) {
         res.due = iso(nextDow(today(), DOW[m[2].toLowerCase().slice(0, 3)])); res.matched.due = true; strip(m[0]);
-      } else if ((m = /\s(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})\b/i.exec(text))) {
+      } else if ((m = /\s(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\.?\s+(\d{1,2})\b/i.exec(text))) {
         res.due = dateFromMonth(MON[m[1].toLowerCase().slice(0, 3)], parseInt(m[2], 10)); res.matched.due = true; strip(m[0]);
-      } else if ((m = /\s(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i.exec(text))) {
+      } else if ((m = /\s(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec)\b/i.exec(text))) {
         res.due = dateFromMonth(MON[m[2].toLowerCase().slice(0, 3)], parseInt(m[1], 10)); res.matched.due = true; strip(m[0]);
       } else if ((m = /\s(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/.exec(text))) {
         var y = m[3] ? (m[3].length === 2 ? 2000 + parseInt(m[3], 10) : parseInt(m[3], 10)) : today().getFullYear();
