@@ -151,6 +151,21 @@ try {
   await sp.keyboard.press('Backspace');
   await sp.waitForTimeout(100);
   ok(await sp.evaluate(() => document.getElementById('meetingEditor').querySelectorAll('img').length) === 1, 'inline image survives Backspace while editing text');
+
+  // --- Markdown-style auto lists (type "- " / "1. " at line start) ---
+  await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); e.innerHTML = ''; e.focus(); });
+  await sp.keyboard.type('- ');
+  await sp.waitForTimeout(80);
+  ok(await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); return !!e.querySelector('ul li') && !e.querySelector('ol'); }), 'auto-list: "- " becomes a bullet list');
+  await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); e.innerHTML = ''; e.focus(); });
+  await sp.keyboard.type('1. ');
+  await sp.waitForTimeout(80);
+  ok(await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); return !!e.querySelector('ol li') && !e.querySelector('ul'); }), 'auto-list: "1. " becomes a numbered list');
+  await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); e.innerHTML = ''; e.focus(); });
+  await sp.keyboard.type('a - b');
+  await sp.waitForTimeout(80);
+  ok(await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); return !e.querySelector('ul') && !e.querySelector('ol') && /a - b/.test(e.textContent); }), 'auto-list: mid-line "a - b" stays plain (not annoying)');
+
   // Restore the meeting-notes body the later summary step relies on.
   await sp.evaluate(() => { const e = document.getElementById('meetingEditor'); e.innerHTML = '<p>E2EBODY beta on friday</p>'; e.dispatchEvent(new Event('input', { bubbles: true })); });
 

@@ -376,6 +376,50 @@
     });
   }
 
+  /* Markdown-style auto lists: typing "- " / "* " / "+ " (or "1. " / "1) ") at the
+     very start of a line turns it into a bullet / numbered list. Deliberately
+     conservative so it isn't annoying: it only fires when the marker is the ONLY
+     thing on the line, never inside an existing list item or a code block, and a
+     couple of Ctrl/Cmd+Z presses undo it right back to the text you typed. */
+  function ancestorTag(editor, node, tag) {
+    for (var c = node; c && c !== editor; c = c.parentNode) if (c.nodeType === 1 && c.tagName === tag) return true;
+    return false;
+  }
+  function blockOf(editor, node) {
+    var b = node.nodeType === 3 ? node.parentNode : node;
+    while (b && b !== editor && b.parentNode !== editor) b = b.parentNode;
+    if (b && b !== editor) return b;                 // a block-level child of the editor
+    return node.parentNode === editor ? node : editor; // text typed directly in the editor
+  }
+  function enableAutoList(editor) {
+    editor.addEventListener('input', function (e) {
+      // React only to plain typing (ignore paste, formatting, deletes, our own
+      // synthetic input events don't set inputType so they fall through harmlessly).
+      if (e.inputType && e.inputType !== 'insertText') return;
+      var sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+      var range = sel.getRangeAt(0);
+      var node = range.startContainer;
+      if (ancestorTag(editor, node, 'LI') || ancestorTag(editor, node, 'PRE')) return;
+      var block = blockOf(editor, node);
+      if (!block) return;
+      // Text from the start of this line up to the caret.
+      var probe = document.createRange();
+      try { probe.setStart(block, 0); probe.setEnd(range.startContainer, range.startOffset); } catch (_e) { return; }
+      var before = probe.toString();
+      var bullet = /^[-*+]\s$/.test(before);
+      var numbered = /^1[.)]\s$/.test(before);
+      if (!bullet && !numbered) return;
+      // Delete the marker, then turn the (now empty) line into a list.
+      var del = document.createRange();
+      try { del.setStart(block, 0); del.setEnd(range.startContainer, range.startOffset); } catch (_e) { return; }
+      sel.removeAllRanges(); sel.addRange(del);
+      document.execCommand('delete');
+      document.execCommand(bullet ? 'insertUnorderedList' : 'insertOrderedList');
+      fireInput(editor);
+    });
+  }
+
   window.Editor = {
     // opts.uploader(file) -> Promise<url>: inserted images become attachments.
     // opts.noteLinkPicker(insertFn): lets the app supply a note to link to.
@@ -389,6 +433,7 @@
       enableNoteLinks(editor);
       enableWikiLinks(editor, opts);
       enableTabIndent(editor);
+      enableAutoList(editor);
       // Reflect the active formatter on the toolbar buttons.
       var refresh = function () { if (editor.contains(document.getSelection().anchorNode)) updateActiveStates(toolbarEl); };
       editor.addEventListener('keyup', refresh);
