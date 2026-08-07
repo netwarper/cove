@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.55.2'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.55.3'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -1074,6 +1074,7 @@
     var n = state.note;
     if (!n || dailyNudge.forNoteId === n.id) return; // only (re)arm when the note changes
     dailyNudge.forNoteId = n.id;
+    dailyNudge.armedDay = todayStr();
     clearTimeout(dailyNudge.timer); dailyNudge.timer = null;
     $('dailyNudge').classList.add('hidden');
     var delay = dailyNudgeDelayMs();
@@ -1099,6 +1100,14 @@
   }
   $('dailyNudgeNew').addEventListener('click', function () { $('dailyNudge').classList.add('hidden'); createNewNote({}); });
   $('dailyNudgeDismiss').addEventListener('click', function () { $('dailyNudge').classList.add('hidden'); });
+  // If the app was left open past midnight (common for an installed PWA), re-evaluate
+  // the nudge when the tab becomes visible again on a NEW day — otherwise it would
+  // never re-arm until you switched notes.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && dailyNudge.armedDay && dailyNudge.armedDay !== todayStr()) {
+      dailyNudge.forNoteId = null; armDailyNudge();
+    }
+  });
 
   function updateWordCount() {
     var txt = ($('carryoverEditor').textContent + ' ' + $('meetingEditor').textContent).trim();
