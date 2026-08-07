@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.57.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.58.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -533,8 +533,13 @@
     });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js').then(function (reg) {
-        // Check for a new deploy hourly while the app stays open.
-        setInterval(function () { reg.update().catch(function () {}); }, 60 * 60 * 1000);
+        var check = function () { reg.update().catch(function () {}); };
+        // Check right away, hourly, and whenever the app regains focus — an
+        // installed PWA that's left open otherwise keeps its stale JS in memory
+        // for up to an hour before the "New version — reload" prompt appears.
+        check();
+        setInterval(check, 60 * 60 * 1000);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
       }).catch(function () {});
     });
   }

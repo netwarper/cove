@@ -391,6 +391,29 @@
     if (b && b !== editor) return b;                 // a block-level child of the editor
     return node.parentNode === editor ? node : editor; // text typed directly in the editor
   }
+  // The <br> on the caret's current line that immediately precedes it, or null.
+  // Lets us treat the current LINE — not the whole block — as the start point, so
+  // "line one<br>- " (Shift+Enter, or note HTML that uses <br> line breaks) still
+  // matches the marker instead of measuring back past the previous line.
+  function lastBrBeforeCaret(block, container, offset) {
+    var caret = document.createRange();
+    try { caret.setStart(container, offset); caret.collapse(true); } catch (_e) { return null; }
+    var brs = block.querySelectorAll ? block.querySelectorAll('br') : [];
+    var found = null;
+    for (var i = 0; i < brs.length; i++) {
+      var after = document.createRange();
+      after.setStartAfter(brs[i]); after.collapse(true);
+      if (after.compareBoundaryPoints(Range.START_TO_START, caret) <= 0) found = brs[i];
+      else break; // brs are in document order; once past the caret we're done
+    }
+    return found;
+  }
+  function lineRange(block, br, container, offset) {
+    var r = document.createRange();
+    if (br) r.setStartAfter(br); else r.setStart(block, 0);
+    r.setEnd(container, offset);
+    return r;
+  }
   function enableAutoList(editor) {
     editor.addEventListener('input', function (e) {
       // React only to plain typing (ignore paste, formatting, deletes, our own
@@ -403,16 +426,16 @@
       if (ancestorTag(editor, node, 'LI') || ancestorTag(editor, node, 'PRE')) return;
       var block = blockOf(editor, node);
       if (!block) return;
-      // Text from the start of this line up to the caret.
-      var probe = document.createRange();
-      try { probe.setStart(block, 0); probe.setEnd(range.startContainer, range.startOffset); } catch (_e) { return; }
-      var before = probe.toString();
+      // Text from the start of the CURRENT line up to the caret.
+      var br = lastBrBeforeCaret(block, node, range.startOffset);
+      var before;
+      try { before = lineRange(block, br, node, range.startOffset).toString(); } catch (_e) { return; }
       var bullet = /^[-*+]\s$/.test(before);
       var numbered = /^1[.)]\s$/.test(before);
       if (!bullet && !numbered) return;
-      // Delete the marker, then turn the (now empty) line into a list.
-      var del = document.createRange();
-      try { del.setStart(block, 0); del.setEnd(range.startContainer, range.startOffset); } catch (_e) { return; }
+      // Delete just the marker (only the current line), then make it a list.
+      var del;
+      try { del = lineRange(block, br, node, range.startOffset); } catch (_e) { return; }
       sel.removeAllRanges(); sel.addRange(del);
       document.execCommand('delete');
       document.execCommand(bullet ? 'insertUnorderedList' : 'insertOrderedList');
