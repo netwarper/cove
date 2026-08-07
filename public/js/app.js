@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.55.3'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.56.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -1067,7 +1067,9 @@
   function dailyNudgeDelayMs() {
     if (typeof window !== 'undefined' && window.__coveNudgeMs) return window.__coveNudgeMs;
     var s = dailyNudgeSeconds();
-    return s > 0 ? s * 1000 : 0;
+    if (s <= 0) return 0;              // Never
+    if (s <= 1) return 250;            // "Immediately" — just enough for the note to render
+    return s * 1000;
   }
   function dailyNudgeShownToday() { try { return localStorage.getItem('cove.dailyNudge') === todayStr(); } catch (_e) { return false; } }
   function armDailyNudge() {
