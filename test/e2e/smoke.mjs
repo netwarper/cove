@@ -159,6 +159,10 @@ try {
   await sp.press('#taskInput', 'Enter');
   await sp.waitForSelector('#miniToast.show', { timeout: 4000 });
   ok(/Task added/.test(await sp.textContent('#miniToast') || ''), 'new-task toast shown');
+  // Text is kept exactly as typed (date words are NOT stripped), yet still scheduled.
+  const added = (await sp.evaluate(async () => await window.API.globalTasks())).find((t) => /harness upcoming task/.test(t.text));
+  ok(added && added.text === 'harness upcoming task next friday', 'typed date words kept in the task text');
+  ok(added && added.due, 'task still parsed a due date from the text');
 
   // --- AI summary + action item -> task ---
   const tasksBefore = await sp.evaluate(async () => (await window.API.globalTasks()).length);

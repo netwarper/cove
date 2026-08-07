@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.55.1'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.55.2'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -832,11 +832,11 @@
       if (pp.priority < 4) bits.push('P' + pp.priority);
       if (pp.recurrence) bits.push('🔁');
       items.push({
-        label: '➕ Add task: ' + (pp.text || rawInput),
+        label: '➕ Add task: ' + rawInput,
         sub: 'to ' + (w0 ? w0.name : 'workspace') + (bits.length ? ' · ' + bits.join(' · ') : ''),
         run: async function () {
           var p = window.TaskParse.parse(rawInput);
-          applyTaskResult(await API.addTask(state.wsId, { text: p.text || rawInput, due: p.due, time: p.time, priority: p.priority, recurrence: p.recurrence }));
+          applyTaskResult(await API.addTask(state.wsId, { text: rawInput, due: p.due, time: p.time, priority: p.priority, recurrence: p.recurrence }));
         },
       });
     }
@@ -1769,8 +1769,10 @@
   });
   async function addTaskFromInput() {
     var raw = $('taskInput').value.trim(); if (!raw) return;
-    var p = window.TaskParse.parse(raw);
-    var payload = { text: p.text || raw, due: state.qa.due || recurrenceImpliedDue(), time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
+    // Keep the task text exactly as typed (e.g. "on Monday do x") — the parsed
+    // date/priority/recurrence still drive scheduling via the chips, but we no
+    // longer strip those words out of the title.
+    var payload = { text: raw, due: state.qa.due || recurrenceImpliedDue(), time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
     $('taskInput').value = ''; resetQa(); syncQa();
     var res = await API.addTask(state.wsId, payload);
     applyTaskResult(res);
