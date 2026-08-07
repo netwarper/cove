@@ -29,6 +29,9 @@ body {
 }
 .hidden { display: none !important; }
 .muted { color: var(--muted); }
+.warn { color: var(--danger); }
+.btn-sm { font: inherit; font-size: 12px; padding: 2px 8px; margin-left: 4px; border: 1px solid var(--danger); color: var(--danger); background: transparent; border-radius: 6px; cursor: pointer; }
+.btn-sm:hover { background: var(--danger); color: #fff; }
 .tiny { font-size: 12px; }
 button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; font-size: 14px; }

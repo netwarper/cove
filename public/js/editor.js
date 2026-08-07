@@ -2,6 +2,13 @@
 (function () {
   'use strict';
 
+  // Build stamp — app.js compares this against its own APP_BUILD so a stale,
+  // separately-cached editor.js (a known installed-PWA failure mode) is detected
+  // and the user is offered a cache-clearing reload instead of silently missing
+  // newer editor features (auto-list, Tab/Shift+Tab indent, …).
+  var EDITOR_BUILD = '1.59.0';
+  window.__coveEditorBuild = EDITOR_BUILD;
+
   var TOOLS = [
     { cmd: 'bold', label: 'B', title: 'Bold', style: 'font-weight:700' },
     { cmd: 'italic', label: 'I', title: 'Italic', style: 'font-style:italic' },

@@ -114,6 +114,9 @@ try {
   await sp.click('#authSubmit');
   await sp.waitForSelector('#app:not(.hidden)', { timeout: 8000 });
   ok(true, 'setup + unlock reaches the app');
+  // editor.js stamps its build so a separately-cached stale copy is detectable.
+  ok(await sp.evaluate(() => typeof window.__coveEditorBuild === 'string' && window.__coveEditorBuild.length > 0), 'editor.js exposes a build stamp');
+  ok(await sp.evaluate(() => document.getElementById('updateToast').classList.contains('hidden')), 'no update toast when app.js and editor.js builds match');
   await dismissFirstRunModals(sp);
   // enable offline cache + configure summary endpoint for later checks
   await sp.click('#moreBtn'); await sp.click('[data-more="account"]');

@@ -258,7 +258,14 @@ function serveStatic(req, res, pathname) {
   fs.readFile(filePath, (err, data) => {
     if (err) return send(res, 404, 'Not found');
     const ext = path.extname(filePath).toLowerCase();
-    send(res, 200, data, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    // `no-cache` = the browser may keep a copy but MUST revalidate before using
+    // it; with the ETag below that revalidation is a cheap 304 when unchanged.
+    // This stops a shell file (e.g. editor.js) from being pinned to a stale copy
+    // in the HTTP cache independently of the others after a pull.
+    const etag = '"' + crypto.createHash('sha1').update(data).digest('hex').slice(0, 16) + '"';
+    const headers = { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'ETag': etag };
+    if (req.headers['if-none-match'] === etag) return res.writeHead(304, headers).end();
+    send(res, 200, data, headers);
   });
 }
 

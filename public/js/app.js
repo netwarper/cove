@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.58.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.59.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -548,8 +548,35 @@
     if (!t || !t.classList.contains('hidden')) return;
     t.classList.remove('hidden');
   }
+  // A plain reload can keep serving a stale, separately-cached script (this is
+  // exactly how an installed PWA ends up on a new app.js but an old editor.js).
+  // Unregister the service worker and drop its caches first, so the reload
+  // refetches every shell file from the server.
+  async function hardReload() {
+    try {
+      if ('serviceWorker' in navigator) {
+        var regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(function (r) { return r.unregister(); }));
+      }
+      if (window.caches && caches.keys) {
+        var keys = await caches.keys();
+        await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }
+    } catch (_e) { /* best effort */ }
+    location.reload();
+  }
+  // Detect a script-version split: editor.js is cached separately from app.js,
+  // so if the loaded editor.js build doesn't match this app.js, newer editor
+  // features silently go missing. Surface it and offer the cache-clearing fix.
+  function editorBuild() { return window.__coveEditorBuild || null; }
+  function scriptsOutOfSync() { var eb = editorBuild(); return !!eb && eb !== APP_BUILD; }
+  if (scriptsOutOfSync()) {
+    try { console.warn('Cove: editor.js build ' + editorBuild() + ' != app build ' + APP_BUILD + ' — cached script mismatch'); } catch (_e) {}
+    showUpdateToast();
+  }
   if ($('updateReloadBtn')) {
-    $('updateReloadBtn').addEventListener('click', function () { location.reload(); });
+    // If scripts are out of sync a normal reload won't help — clear caches.
+    $('updateReloadBtn').addEventListener('click', function () { if (scriptsOutOfSync()) hardReload(); else location.reload(); });
     $('updateDismissBtn').addEventListener('click', function () { $('updateToast').classList.add('hidden'); });
   }
 
@@ -774,7 +801,8 @@
   // and the client build so a stale cached UI is easy to spot when they differ.
   function versionLabel() {
     var sv = (state.instance && state.instance.version) || '';
-    return 'Cove' + (sv ? ' v' + sv : '') + ' · app build ' + APP_BUILD;
+    var mism = scriptsOutOfSync() ? ' · ⚠ editor.js cached at ' + editorBuild() + ' — reload to update' : '';
+    return 'Cove' + (sv ? ' v' + sv : '') + ' · app build ' + APP_BUILD + mism;
   }
   function closeHelp() { $('helpLayer').classList.add('hidden'); }
   // Open the full user manual, matching the app's current theme.
@@ -2922,8 +2950,12 @@
     $('acctMsg').textContent = '';
     var inst = state.instance || {};
     $('instanceInfo').innerHTML = '<b>' + esc(inst.name || 'Cove') + '</b> · server v' + esc(inst.version || '') + ' · app build ' + esc(APP_BUILD) +
+      (scriptsOutOfSync()
+        ? '<br><span class="warn">⚠ editor.js is cached at build ' + esc(editorBuild()) + ' — click <b>Force refresh</b> to clear cached scripts.</span> <button type="button" id="forceRefreshBtn" class="btn-sm">Force refresh</button>'
+        : '') +
       '<br>URL: <code>' + esc(inst.url || location.origin) + '</code>' +
       (inst.domain ? '' : '<br><span class="muted">Tip: run <code>node server.js --set-domain notes</code> for a durable &lt;name&gt;.localhost address.</span>');
+    if ($('forceRefreshBtn')) $('forceRefreshBtn').addEventListener('click', function () { hardReload(); });
     $('fontSize').value = state.settings.fontSize || 14;
     $('ocrEnabled').checked = state.settings.ocrEnabled !== false;
     $('dailyNudgeDelay').value = String(dailyNudgeSeconds());
