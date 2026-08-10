@@ -60,8 +60,12 @@
   <div id="sticky" class="sticky hidden" aria-label="Sticky note">
     <div class="sticky-head" id="stickyHead">
       <span class="sticky-title">📌 Sticky</span>
-      <button id="stickyCollapse" class="sticky-x" type="button" aria-label="Collapse sticky" title="Collapse">–</button>
+      <span class="sticky-tools">
+        <button id="stickyColorBtn" class="sticky-x" type="button" aria-label="Change color" title="Change color">🎨</button>
+        <button id="stickyCollapse" class="sticky-x" type="button" aria-label="Collapse sticky" title="Collapse">–</button>
+      </span>
     </div>
+    <div id="stickyColors" class="sticky-colors hidden" role="group" aria-label="Sticky color"></div>
     <textarea id="stickyText" class="sticky-text" placeholder="Things I'm keeping an eye on…&#10;one per line" spellcheck="true"></textarea>
   </div>
   <button id="stickyFab" class="sticky-fab hidden" type="button" aria-label="Open sticky note" title="Sticky note">📌</button>

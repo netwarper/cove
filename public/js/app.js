@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.61.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.62.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -587,11 +587,15 @@
   // UI in localStorage. Collapses to a corner pin (FAB) so it's never in the way,
   // and defaults to collapsed on phones.
   var stickySaveTimer = null;
+  var STICKY_COLORS = ['yellow', 'pink', 'orange', 'green', 'blue', 'purple'];
+  var STICKY_SWATCH = { yellow: '#f7e27a', pink: '#f2a7c2', orange: '#f3bd83', green: '#a6db97', blue: '#9dc3f4', purple: '#bfa9f1' };
   function stickyEnabled() { return state.settings.stickyEnabled !== false; } // default on
+  function stickyColor() { var c = state.settings.stickyColor; return STICKY_COLORS.indexOf(c) >= 0 ? c : 'yellow'; }
   function stickyPos() { try { return JSON.parse(localStorage.getItem('cove.stickyPos') || 'null'); } catch (_e) { return null; } }
   function setStickyPos(x, y) { try { localStorage.setItem('cove.stickyPos', JSON.stringify({ x: x, y: y })); } catch (_e) {} }
   function stickyCollapsed() { try { return localStorage.getItem('cove.stickyCollapsed') === '1'; } catch (_e) { return false; } }
   function setStickyCollapsed(v) { try { localStorage.setItem('cove.stickyCollapsed', v ? '1' : '0'); } catch (_e) {} }
+  function stickyReduceMotion() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_e) { return false; } }
   function clampSticky(x, y, w, h) {
     var m = 8, maxX = Math.max(m, window.innerWidth - w - m), maxY = Math.max(m, window.innerHeight - h - m);
     return { x: Math.min(Math.max(m, x), maxX), y: Math.min(Math.max(m, y), maxY) };
@@ -603,28 +607,81 @@
     var c = clampSticky(p.x, p.y, w, h);
     el.style.left = c.x + 'px'; el.style.top = c.y + 'px'; el.style.right = 'auto';
   }
-  function showStickyPanel() {
+  // Where the minimized pin lives (bottom-right corner) — the animation target.
+  function stickyFabCenter() { return { x: window.innerWidth - 18 - 21, y: window.innerHeight - 18 - 21 }; }
+  function applyStickyColor(name, save) {
+    if (STICKY_COLORS.indexOf(name) < 0) name = 'yellow';
+    [$('sticky'), $('stickyFab')].forEach(function (el) {
+      if (!el) return;
+      STICKY_COLORS.forEach(function (c) { el.classList.remove('c-' + c); });
+      el.classList.add('c-' + name);
+    });
+    var row = $('stickyColors');
+    if (row) Array.prototype.forEach.call(row.children, function (b) { b.classList.toggle('active', b.getAttribute('data-color') === name); });
+    if (save) { state.settings.stickyColor = name; API.saveSettings({ stickyColor: name }).catch(function () {}); }
+  }
+  function buildStickySwatches() {
+    var row = $('stickyColors'); if (!row || row.children.length) return;
+    STICKY_COLORS.forEach(function (name) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'sticky-sw'; b.setAttribute('data-color', name);
+      b.title = name.charAt(0).toUpperCase() + name.slice(1); b.setAttribute('aria-label', b.title);
+      b.style.background = STICKY_SWATCH[name];
+      b.addEventListener('click', function () { applyStickyColor(name, true); row.classList.add('hidden'); });
+      row.appendChild(b);
+    });
+  }
+  function finalizeCollapse() {
+    setStickyCollapsed(true);
+    var el = $('sticky');
+    el.classList.add('hidden');
+    el.style.transition = ''; el.style.transform = ''; el.style.opacity = '';
+    if (stickyEnabled()) { var fab = $('stickyFab'); fab.classList.remove('hidden'); fab.classList.remove('pop'); void fab.offsetWidth; fab.classList.add('pop'); }
+  }
+  function collapseSticky(animate) {
+    var el = $('sticky');
+    $('stickyColors').classList.add('hidden');
+    if (!animate || el.classList.contains('hidden') || stickyReduceMotion()) { finalizeCollapse(); return; }
+    var r = el.getBoundingClientRect(), fc = stickyFabCenter();
+    var dx = fc.x - (r.left + r.width / 2), dy = fc.y - (r.top + r.height / 2);
+    var done = function () { el.removeEventListener('transitionend', done); finalizeCollapse(); };
+    el.addEventListener('transitionend', done);
+    el.style.transformOrigin = 'center';
+    el.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1), opacity .28s ease';
+    requestAnimationFrame(function () { el.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.15)'; el.style.opacity = '0'; });
+    setTimeout(function () { if (!el.classList.contains('hidden')) { el.removeEventListener('transitionend', done); finalizeCollapse(); } }, 420); // safety
+  }
+  function showStickyPanel(animate) {
     if (!stickyEnabled()) return;
+    var el = $('sticky'), wasHidden = el.classList.contains('hidden');
     setStickyCollapsed(false);
     $('stickyFab').classList.add('hidden');
-    $('sticky').classList.remove('hidden');
+    el.classList.remove('hidden');
     placeSticky();
-  }
-  function collapseSticky() {
-    setStickyCollapsed(true);
-    $('sticky').classList.add('hidden');
-    if (stickyEnabled()) $('stickyFab').classList.remove('hidden');
+    if (!animate || !wasHidden || stickyReduceMotion()) { el.style.transition = ''; el.style.transform = ''; el.style.opacity = ''; return; }
+    var r = el.getBoundingClientRect(), fc = stickyFabCenter();
+    var dx = fc.x - (r.left + r.width / 2), dy = fc.y - (r.top + r.height / 2);
+    el.style.transformOrigin = 'center'; el.style.transition = 'none';
+    el.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.15)'; el.style.opacity = '0';
+    requestAnimationFrame(function () {
+      el.style.transition = 'transform .3s cubic-bezier(.2,.9,.3,1), opacity .28s ease';
+      el.style.transform = ''; el.style.opacity = '';
+    });
+    var clear = function () { el.removeEventListener('transitionend', clear); el.style.transition = ''; };
+    el.addEventListener('transitionend', clear);
   }
   function applyStickyVisibility() {
     if (!$('sticky')) return;
     if (!stickyEnabled()) { $('sticky').classList.add('hidden'); $('stickyFab').classList.add('hidden'); return; }
     // Phones start collapsed so the panel never covers the editor.
     var startCollapsed = stickyCollapsed() || window.matchMedia('(max-width: 760px)').matches;
-    if (startCollapsed) collapseSticky(); else showStickyPanel();
+    if (startCollapsed) collapseSticky(false); else showStickyPanel(false);
   }
   function initSticky() {
     var el = $('sticky'); if (!el) return;
     $('stickyText').value = state.settings.stickyText || '';
+    buildStickySwatches();
+    applyStickyColor(stickyColor(), false);
     applyStickyVisibility();
     // Autosave (debounced) to encrypted settings.
     $('stickyText').addEventListener('input', function () {
@@ -632,12 +689,13 @@
       clearTimeout(stickySaveTimer);
       stickySaveTimer = setTimeout(function () { API.saveSettings({ stickyText: state.settings.stickyText }).catch(function () {}); }, 500);
     });
-    $('stickyCollapse').addEventListener('click', collapseSticky);
-    $('stickyFab').addEventListener('click', showStickyPanel);
+    $('stickyCollapse').addEventListener('click', function () { collapseSticky(true); });
+    $('stickyFab').addEventListener('click', function () { showStickyPanel(true); });
+    $('stickyColorBtn').addEventListener('click', function () { $('stickyColors').classList.toggle('hidden'); });
     // Drag by the header via Pointer Events (mouse + touch).
     var head = $('stickyHead'), drag = null;
     head.addEventListener('pointerdown', function (e) {
-      if (e.target.closest('.sticky-x')) return; // let the collapse button click
+      if (e.target.closest('.sticky-x')) return; // let the header buttons click
       var r = el.getBoundingClientRect();
       drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
       try { head.setPointerCapture(e.pointerId); } catch (_e) {}
@@ -900,7 +958,7 @@
       { label: '＋ New Daily note', run: function () { createNewNote({}); } },
       { label: '✏️ New scratch note', run: function () { createNewNote({ scratch: true }); } },
       { label: 'Go to: Current note', run: function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); } },
-      { label: 'Sticky note: open / focus', run: function () { if (!stickyEnabled()) { state.settings.stickyEnabled = true; API.saveSettings({ stickyEnabled: true }); } showStickyPanel(); try { $('stickyText').focus(); } catch (_e) {} } },
+      { label: 'Sticky note: open / focus', run: function () { if (!stickyEnabled()) { state.settings.stickyEnabled = true; API.saveSettings({ stickyEnabled: true }); } showStickyPanel(true); try { $('stickyText').focus(); } catch (_e) {} } },
       { label: 'Go to: Tasks', run: openTasksPage },
       { label: 'Go to: Task calendar', run: renderCalendar },
       { label: 'Go to: Favorites', run: renderFavorites },
