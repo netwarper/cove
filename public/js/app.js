@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.59.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.60.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -3284,6 +3284,33 @@
     state.settings.dailyNudgeSeconds = parseInt($('dailyNudgeDelay').value, 10) || 0;
     API.saveSettings({ dailyNudgeSeconds: state.settings.dailyNudgeSeconds });
     dailyNudge.forNoteId = null; armDailyNudge(); // re-arm the current note with the new delay
+  });
+  if ($('dailyNudgeTest')) $('dailyNudgeTest').addEventListener('click', async function () {
+    // Force-show the banner now (bypassing the once-a-day + "already have today's
+    // daily" guards) so the reminder can be verified on demand, and explain what
+    // the automatic rule would have decided — the usual reason it "doesn't show"
+    // is simply that today's daily already exists or it already fired today.
+    var msg = $('dailyNudgeTestMsg');
+    closeModals();
+    if (!state.note) { try { await loadCurrentNote(); } catch (_e) {} }
+    showView('note');
+    var el = $('dailyNudge');
+    el.classList.remove('hidden');
+    if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+    if (!msg) return;
+    try {
+      var today = todayStr();
+      var notes = await API.listNotes(state.wsId, { sort: 'created', dir: 'desc' });
+      var dailies = (notes || []).filter(function (x) { return (x.kind || 'daily') !== 'scratch'; });
+      var hasToday = dailies.some(function (x) { return x.title === today; });
+      var why = 'Shown above. ';
+      if (dailyNudgeDelayMs() <= 0) why += 'Note: the reminder is set to “Never”, so it won’t appear on its own.';
+      else if (!dailies.length) why += 'Automatically it appears once you have at least one daily note here.';
+      else if (hasToday) why += 'Automatically it stays hidden right now because today’s daily (' + today + ') already exists.';
+      else if (dailyNudgeShownToday()) why += 'Automatically it already fired once today (it shows at most once a day per device).';
+      else why += 'Automatically it will appear ' + $('dailyNudgeDelay').selectedOptions[0].textContent.toLowerCase() + ' after you open an older note.';
+      msg.textContent = why;
+    } catch (_e) { msg.textContent = 'Shown above.'; }
   });
   $('completedKeep').addEventListener('change', function () {
     state.settings.completedKeep = parseInt($('completedKeep').value, 10) || 0;
