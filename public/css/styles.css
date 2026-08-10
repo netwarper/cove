@@ -239,6 +239,41 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .update-toast .ut-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 6px; }
 .update-toast .ut-x:hover { background: var(--panel-2); color: var(--ink); }
 
+/* ---- Global sticky note (window-pinned, draggable) ---- */
+:root { --sticky-bg: #fff6c9; --sticky-edge: #f0e08a; --sticky-ink: #3a3320; --sticky-muted: #8a7f4e; }
+:root:not([data-theme="light"]) { }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sticky-bg: #2a2718; --sticky-edge: #4a4326; --sticky-ink: #ece3c0; --sticky-muted: #b7ab7e; } }
+:root[data-theme="dark"] { --sticky-bg: #2a2718; --sticky-edge: #4a4326; --sticky-ink: #ece3c0; --sticky-muted: #b7ab7e; }
+:root[data-theme="light"] { --sticky-bg: #fff6c9; --sticky-edge: #f0e08a; --sticky-ink: #3a3320; --sticky-muted: #8a7f4e; }
+.sticky {
+  position: fixed; z-index: 220; width: 240px; display: flex; flex-direction: column;
+  background: var(--sticky-bg); border: 1px solid var(--sticky-edge); border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(20,30,60,.18); color: var(--sticky-ink); overflow: hidden;
+}
+.sticky-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 5px 6px 5px 10px; cursor: grab; user-select: none; touch-action: none;
+  background: linear-gradient(var(--sticky-edge), var(--sticky-bg)); border-bottom: 1px solid var(--sticky-edge);
+}
+.sticky-head:active { cursor: grabbing; }
+.sticky-title { font-size: 12px; font-weight: 600; color: var(--sticky-muted); }
+.sticky-x { background: none; border: 0; color: var(--sticky-muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 6px; border-radius: 6px; }
+.sticky-x:hover { background: rgba(0,0,0,.08); color: var(--sticky-ink); }
+.sticky-text {
+  border: 0; outline: none; resize: none; background: transparent; color: var(--sticky-ink);
+  font: inherit; font-size: 13px; line-height: 1.45; padding: 8px 10px; height: 150px; width: 100%;
+}
+.sticky-text::placeholder { color: var(--sticky-muted); }
+.sticky-fab {
+  position: fixed; z-index: 220; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--sticky-bg); border: 1px solid var(--sticky-edge); color: var(--sticky-ink);
+  box-shadow: 0 4px 14px rgba(20,30,60,.18); cursor: pointer; font-size: 18px; line-height: 1;
+}
+.sticky-fab:hover { filter: brightness(1.03); }
+@media (max-width: 760px) {
+  .sticky { width: min(240px, 84vw); }
+}
+
 /* ---- Sections ---- */
 /* To-Do + Reminders side by side on the first row, then Carryover (full width),
    then Meeting Notes (full width). Scratch notes show only Meeting Notes. */

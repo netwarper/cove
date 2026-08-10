@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.60.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.61.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -487,6 +487,7 @@
     applyFontSize(state.settings.fontSize || 14);
     applyListCaps();
     applyEditorSizes();
+    initSticky();
     applyTheme(state.settings.theme || 'auto');
     applySortControl();
     renderTagBookmarks();
@@ -578,6 +579,81 @@
     // If scripts are out of sync a normal reload won't help — clear caches.
     $('updateReloadBtn').addEventListener('click', function () { if (scriptsOutOfSync()) hardReload(); else location.reload(); });
     $('updateDismissBtn').addEventListener('click', function () { $('updateToast').classList.add('hidden'); });
+  }
+
+  // ---------------- Global sticky note ----------------
+  // A small, window-pinned, draggable scratch pad (classic Stickies). Content is
+  // encrypted in settings (synced); its position + collapsed state are per-device
+  // UI in localStorage. Collapses to a corner pin (FAB) so it's never in the way,
+  // and defaults to collapsed on phones.
+  var stickySaveTimer = null;
+  function stickyEnabled() { return state.settings.stickyEnabled !== false; } // default on
+  function stickyPos() { try { return JSON.parse(localStorage.getItem('cove.stickyPos') || 'null'); } catch (_e) { return null; } }
+  function setStickyPos(x, y) { try { localStorage.setItem('cove.stickyPos', JSON.stringify({ x: x, y: y })); } catch (_e) {} }
+  function stickyCollapsed() { try { return localStorage.getItem('cove.stickyCollapsed') === '1'; } catch (_e) { return false; } }
+  function setStickyCollapsed(v) { try { localStorage.setItem('cove.stickyCollapsed', v ? '1' : '0'); } catch (_e) {} }
+  function clampSticky(x, y, w, h) {
+    var m = 8, maxX = Math.max(m, window.innerWidth - w - m), maxY = Math.max(m, window.innerHeight - h - m);
+    return { x: Math.min(Math.max(m, x), maxX), y: Math.min(Math.max(m, y), maxY) };
+  }
+  function placeSticky() {
+    var el = $('sticky'); if (!el) return;
+    var w = el.offsetWidth || 240, h = el.offsetHeight || 200;
+    var p = stickyPos() || { x: window.innerWidth - w - 20, y: 84 };
+    var c = clampSticky(p.x, p.y, w, h);
+    el.style.left = c.x + 'px'; el.style.top = c.y + 'px'; el.style.right = 'auto';
+  }
+  function showStickyPanel() {
+    if (!stickyEnabled()) return;
+    setStickyCollapsed(false);
+    $('stickyFab').classList.add('hidden');
+    $('sticky').classList.remove('hidden');
+    placeSticky();
+  }
+  function collapseSticky() {
+    setStickyCollapsed(true);
+    $('sticky').classList.add('hidden');
+    if (stickyEnabled()) $('stickyFab').classList.remove('hidden');
+  }
+  function applyStickyVisibility() {
+    if (!$('sticky')) return;
+    if (!stickyEnabled()) { $('sticky').classList.add('hidden'); $('stickyFab').classList.add('hidden'); return; }
+    // Phones start collapsed so the panel never covers the editor.
+    var startCollapsed = stickyCollapsed() || window.matchMedia('(max-width: 760px)').matches;
+    if (startCollapsed) collapseSticky(); else showStickyPanel();
+  }
+  function initSticky() {
+    var el = $('sticky'); if (!el) return;
+    $('stickyText').value = state.settings.stickyText || '';
+    applyStickyVisibility();
+    // Autosave (debounced) to encrypted settings.
+    $('stickyText').addEventListener('input', function () {
+      state.settings.stickyText = $('stickyText').value;
+      clearTimeout(stickySaveTimer);
+      stickySaveTimer = setTimeout(function () { API.saveSettings({ stickyText: state.settings.stickyText }).catch(function () {}); }, 500);
+    });
+    $('stickyCollapse').addEventListener('click', collapseSticky);
+    $('stickyFab').addEventListener('click', showStickyPanel);
+    // Drag by the header via Pointer Events (mouse + touch).
+    var head = $('stickyHead'), drag = null;
+    head.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('.sticky-x')) return; // let the collapse button click
+      var r = el.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      try { head.setPointerCapture(e.pointerId); } catch (_e) {}
+      e.preventDefault();
+    });
+    head.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var w = el.offsetWidth, h = el.offsetHeight;
+      var c = clampSticky(e.clientX - drag.dx, e.clientY - drag.dy, w, h);
+      el.style.left = c.x + 'px'; el.style.top = c.y + 'px'; el.style.right = 'auto';
+    });
+    var end = function (e) { if (!drag) return; drag = null; try { head.releasePointerCapture(e.pointerId); } catch (_e) {} setStickyPos(parseInt(el.style.left, 10) || 0, parseInt(el.style.top, 10) || 0); };
+    head.addEventListener('pointerup', end);
+    head.addEventListener('pointercancel', end);
+    // Keep it on-screen if the window is resized smaller.
+    window.addEventListener('resize', function () { if (!$('sticky').classList.contains('hidden')) placeSticky(); });
   }
 
   // Live-sync: refresh when note files change on disk (e.g. another device via a
@@ -824,6 +900,7 @@
       { label: '＋ New Daily note', run: function () { createNewNote({}); } },
       { label: '✏️ New scratch note', run: function () { createNewNote({ scratch: true }); } },
       { label: 'Go to: Current note', run: function () { if (state.note) { showView('note'); renderNoteList(); } else loadCurrentNote(); } },
+      { label: 'Sticky note: open / focus', run: function () { if (!stickyEnabled()) { state.settings.stickyEnabled = true; API.saveSettings({ stickyEnabled: true }); } showStickyPanel(); try { $('stickyText').focus(); } catch (_e) {} } },
       { label: 'Go to: Tasks', run: openTasksPage },
       { label: 'Go to: Task calendar', run: renderCalendar },
       { label: 'Go to: Favorites', run: renderFavorites },
@@ -2959,6 +3036,7 @@
     $('fontSize').value = state.settings.fontSize || 14;
     $('ocrEnabled').checked = state.settings.ocrEnabled !== false;
     $('dailyNudgeDelay').value = String(dailyNudgeSeconds());
+    $('stickyEnabled').checked = stickyEnabled();
     $('idleLock').value = String(state.settings.idleLockMinutes != null ? state.settings.idleLockMinutes : IDLE_DEFAULT_MIN);
     var ttlDefault = (state.instance && state.instance.sessionTtlDefaultMin) || 240;
     $('sessionTtl').value = String(state.settings.sessionTtlMinutes != null ? state.settings.sessionTtlMinutes : ttlDefault);
@@ -3284,6 +3362,11 @@
     state.settings.dailyNudgeSeconds = parseInt($('dailyNudgeDelay').value, 10) || 0;
     API.saveSettings({ dailyNudgeSeconds: state.settings.dailyNudgeSeconds });
     dailyNudge.forNoteId = null; armDailyNudge(); // re-arm the current note with the new delay
+  });
+  if ($('stickyEnabled')) $('stickyEnabled').addEventListener('change', function () {
+    state.settings.stickyEnabled = $('stickyEnabled').checked;
+    API.saveSettings({ stickyEnabled: state.settings.stickyEnabled });
+    if (state.settings.stickyEnabled) { setStickyCollapsed(false); applyStickyVisibility(); } else applyStickyVisibility();
   });
   if ($('dailyNudgeTest')) $('dailyNudgeTest').addEventListener('click', async function () {
     // Force-show the banner now (bypassing the once-a-day + "already have today's

@@ -54,6 +54,18 @@
     <button id="updateDismissBtn" class="ut-x" type="button" aria-label="Dismiss" title="Dismiss">✕</button>
   </div>
 
+  <!-- Global sticky note: a small, window-pinned, draggable scratch pad that stays
+       put while notes scroll. Content is encrypted like everything else; its
+       position/collapsed state are per-device (localStorage). -->
+  <div id="sticky" class="sticky hidden" aria-label="Sticky note">
+    <div class="sticky-head" id="stickyHead">
+      <span class="sticky-title">📌 Sticky</span>
+      <button id="stickyCollapse" class="sticky-x" type="button" aria-label="Collapse sticky" title="Collapse">–</button>
+    </div>
+    <textarea id="stickyText" class="sticky-text" placeholder="Things I'm keeping an eye on…&#10;one per line" spellcheck="true"></textarea>
+  </div>
+  <button id="stickyFab" class="sticky-fab hidden" type="button" aria-label="Open sticky note" title="Sticky note">📌</button>
+
   <!-- ---------- Auth gate ---------- -->
   <div id="authGate" class="auth-gate hidden">
     <div class="auth-card">
@@ -582,6 +594,11 @@
           <button id="dailyNudgeTest" class="btn-sm" type="button" title="Show the reminder now to check it works">Test now</button>
         </div>
         <p id="dailyNudgeTestMsg" class="muted tiny" aria-live="polite"></p>
+      </div>
+      <div class="acct-block">
+        <h4>Sticky note</h4>
+        <p class="muted tiny">A small, always-on-top scratch pad that stays put while notes scroll — for things you're keeping an eye on. Drag it by its title bar; collapse it to a corner pin. Its text is encrypted like your notes; its position stays on this device.</p>
+        <label class="tiny"><input id="stickyEnabled" type="checkbox" checked> Show the sticky note</label>
       </div>
       <div class="acct-block">
         <h4>Time zone</h4>
