@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.62.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.63.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -595,6 +595,16 @@
   function setStickyPos(x, y) { try { localStorage.setItem('cove.stickyPos', JSON.stringify({ x: x, y: y })); } catch (_e) {} }
   function stickyCollapsed() { try { return localStorage.getItem('cove.stickyCollapsed') === '1'; } catch (_e) { return false; } }
   function setStickyCollapsed(v) { try { localStorage.setItem('cove.stickyCollapsed', v ? '1' : '0'); } catch (_e) {} }
+  function stickySize() { try { return JSON.parse(localStorage.getItem('cove.stickySize') || 'null'); } catch (_e) { return null; } }
+  function setStickySize(w, h) { try { localStorage.setItem('cove.stickySize', JSON.stringify({ w: w, h: h })); } catch (_e) {} }
+  function stickyMaxW() { return Math.max(180, Math.round(window.innerWidth * 0.9)); }
+  function stickyMaxH() { return Math.max(120, Math.round(window.innerHeight * 0.9)); }
+  function applyStickySize() {
+    var el = $('sticky'); if (!el) return;
+    var s = stickySize() || { w: 240, h: 210 };
+    el.style.width = Math.max(180, Math.min(s.w, stickyMaxW())) + 'px';
+    el.style.height = Math.max(120, Math.min(s.h, stickyMaxH())) + 'px';
+  }
   function stickyReduceMotion() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_e) { return false; } }
   function clampSticky(x, y, w, h) {
     var m = 8, maxX = Math.max(m, window.innerWidth - w - m), maxY = Math.max(m, window.innerHeight - h - m);
@@ -602,6 +612,7 @@
   }
   function placeSticky() {
     var el = $('sticky'); if (!el) return;
+    applyStickySize();
     var w = el.offsetWidth || 240, h = el.offsetHeight || 200;
     var p = stickyPos() || { x: window.innerWidth - w - 20, y: 84 };
     var c = clampSticky(p.x, p.y, w, h);
@@ -710,6 +721,23 @@
     var end = function (e) { if (!drag) return; drag = null; try { head.releasePointerCapture(e.pointerId); } catch (_e) {} setStickyPos(parseInt(el.style.left, 10) || 0, parseInt(el.style.top, 10) || 0); };
     head.addEventListener('pointerup', end);
     head.addEventListener('pointercancel', end);
+    // Resize from the bottom-right grip (width + height), remembered per device.
+    var grip = $('stickyResize'), rz = null;
+    grip.addEventListener('pointerdown', function (e) {
+      var r = el.getBoundingClientRect();
+      rz = { x: e.clientX, y: e.clientY, w: r.width, h: r.height };
+      try { grip.setPointerCapture(e.pointerId); } catch (_e) {}
+      e.preventDefault(); e.stopPropagation();
+    });
+    grip.addEventListener('pointermove', function (e) {
+      if (!rz) return;
+      var w = Math.max(180, Math.min(rz.w + (e.clientX - rz.x), stickyMaxW()));
+      var h = Math.max(120, Math.min(rz.h + (e.clientY - rz.y), stickyMaxH()));
+      el.style.width = w + 'px'; el.style.height = h + 'px';
+    });
+    var rzEnd = function (e) { if (!rz) return; rz = null; try { grip.releasePointerCapture(e.pointerId); } catch (_e) {} setStickySize(parseInt(el.style.width, 10) || 240, parseInt(el.style.height, 10) || 210); placeSticky(); };
+    grip.addEventListener('pointerup', rzEnd);
+    grip.addEventListener('pointercancel', rzEnd);
     // Keep it on-screen if the window is resized smaller.
     window.addEventListener('resize', function () { if (!$('sticky').classList.contains('hidden')) placeSticky(); });
   }

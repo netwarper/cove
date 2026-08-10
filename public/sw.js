@@ -8,7 +8,7 @@
  * stored here; it stays encrypted on the server. */
 'use strict';
 
-const CACHE = 'meeting-notes-shell-v91';
+const CACHE = 'meeting-notes-shell-v92';
 const SHELL = [
   '/', '/index.html', '/manual.html',
   '/css/styles.css',

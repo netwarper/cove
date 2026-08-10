@@ -291,9 +291,16 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .sticky-sw.active { outline: 2px solid var(--sticky-ink); outline-offset: 1px; }
 .sticky-text {
   border: 0; outline: none; resize: none; background: transparent; color: var(--sticky-ink);
-  font: inherit; font-size: 13px; line-height: 1.45; padding: 8px 10px; height: 150px; width: 100%;
+  font: inherit; font-size: 13px; line-height: 1.45; padding: 8px 10px; width: 100%;
+  flex: 1 1 auto; min-height: 70px;
 }
 .sticky-text::placeholder { color: var(--sticky-muted); }
+.sticky-resize {
+  position: absolute; right: 1px; bottom: 1px; width: 15px; height: 15px; cursor: nwse-resize;
+  touch-action: none; opacity: .55;
+  background: linear-gradient(135deg, transparent 0 45%, var(--sticky-muted) 45% 55%, transparent 55% 68%, var(--sticky-muted) 68% 78%, transparent 78%);
+}
+.sticky-resize:hover { opacity: 1; }
 .sticky-fab {
   position: fixed; right: 18px; bottom: 18px; z-index: 220; width: 42px; height: 42px; border-radius: 50%;
   background: var(--sticky-bg); border: 1px solid var(--sticky-edge); color: var(--sticky-ink);
