@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.64.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.65.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -1173,9 +1173,11 @@
       var o = document.createElement('option'); o.value = w.id; o.textContent = w.name;
       if (w.id === state.wsId) o.selected = true; sel.appendChild(o);
     });
+    refreshQaLink();
   }
   $('workspaceSelect').addEventListener('change', async function () {
-    state.wsId = $('workspaceSelect').value; showView('note'); closeDrawer(); await loadCurrentNote();
+    state.wsId = $('workspaceSelect').value; state.qaLinks = []; refreshQaLink();
+    showView('note'); closeDrawer(); await loadCurrentNote();
   });
 
   // ---------------- Note sort control ----------------
@@ -1889,7 +1891,53 @@
     state.qa = { due: null, time: null, priority: 4, recurrence: null };
     state.qaManual = { due: false, time: false, priority: false, recurrence: false };
     state.qaLast = { due: null, time: null, priority: null, recurrence: null };
+    state.qaLinks = [];
   }
+  // Quick-add "🔗 Link" control: pick other workspaces to link the new task into
+  // at creation time (it's created here, then shared to the ticked workspaces).
+  function updateQaLinkLabel() {
+    var n = (state.qaLinks || []).length;
+    if ($('qaLinkLbl')) $('qaLinkLbl').textContent = n ? ('Link · ' + n) : 'Link';
+    if ($('qaLink')) $('qaLink').classList.toggle('set', n > 0);
+  }
+  function qaLinkOthers() { return (state.workspaces || []).filter(function (w) { return w.id !== state.wsId; }); }
+  function refreshQaLink() {
+    if (!$('qaLink')) return;
+    var others = qaLinkOthers();
+    $('qaLink').classList.toggle('hidden', others.length === 0);
+    // Keep only still-valid selections (drop any that became the current ws or vanished).
+    state.qaLinks = (state.qaLinks || []).filter(function (id) { return others.some(function (w) { return w.id === id; }); });
+    updateQaLinkLabel();
+    if ($('qaLinkMenu') && !$('qaLinkMenu').classList.contains('hidden')) buildQaLinkMenu();
+  }
+  function buildQaLinkMenu() {
+    var menu = $('qaLinkMenu'); if (!menu) return;
+    menu.innerHTML = '';
+    var others = qaLinkOthers();
+    if (!others.length) { var e = document.createElement('div'); e.className = 'qa-link-empty'; e.textContent = 'No other workspaces'; menu.appendChild(e); return; }
+    var sel = {}; (state.qaLinks || []).forEach(function (id) { sel[id] = true; });
+    others.forEach(function (w) {
+      var lab = document.createElement('label'); lab.className = 'qa-link-item';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = w.id; cb.checked = !!sel[w.id];
+      cb.addEventListener('change', function () {
+        if (cb.checked) { if (state.qaLinks.indexOf(w.id) < 0) state.qaLinks.push(w.id); }
+        else { state.qaLinks = state.qaLinks.filter(function (id) { return id !== w.id; }); }
+        updateQaLinkLabel();
+      });
+      lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + w.name));
+      menu.appendChild(lab);
+    });
+  }
+  if ($('qaLink')) $('qaLink').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var menu = $('qaLinkMenu');
+    if (menu.classList.contains('hidden')) { buildQaLinkMenu(); menu.classList.remove('hidden'); }
+    else menu.classList.add('hidden');
+  });
+  document.addEventListener('click', function (e) {
+    var menu = $('qaLinkMenu');
+    if (menu && !menu.classList.contains('hidden') && !e.target.closest('.qa-link-wrap')) menu.classList.add('hidden');
+  });
   function qaEq(a, b) { return JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b); }
   // Reconcile one parsed field against the picker state. A token whose value
   // CHANGED since the last keystroke wins (and clears the manual flag); an
@@ -1980,9 +2028,16 @@
     // date/priority/recurrence still drive scheduling via the chips, but we no
     // longer strip those words out of the title.
     var payload = { text: raw, due: state.qa.due || recurrenceImpliedDue(), time: state.qa.time, priority: state.qa.priority, recurrence: state.qa.recurrence };
-    $('taskInput').value = ''; resetQa(); syncQa();
+    var links = (state.qaLinks || []).slice();
+    $('taskInput').value = ''; if ($('qaLinkMenu')) $('qaLinkMenu').classList.add('hidden');
+    resetQa(); syncQa(); updateQaLinkLabel();
     var res = await API.addTask(state.wsId, payload);
     applyTaskResult(res);
+    // Link the just-created task into any workspaces picked in the 🔗 dropdown.
+    if (links.length && res && res.task && res.task.id) {
+      try { res = await API.shareTask(res.task.id, links); applyTaskResult(res); }
+      catch (_e) { /* task was still created; sharing is best-effort */ }
+    }
     announceNewTask(res && res.task);
   }
 

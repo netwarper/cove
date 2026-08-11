@@ -376,6 +376,16 @@ select.qa-pill { padding: 4px 6px; }
 .qa-dow:hover { border-color: var(--brand); }
 .qa-dow.on { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 #qaDate.set { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+#qaLink.set { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.qa-link-wrap { position: relative; display: inline-flex; }
+.qa-link-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; min-width: 190px; max-height: 240px; overflow: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+  padding: 8px; display: flex; flex-direction: column; gap: 7px;
+}
+.qa-link-item { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.qa-link-item input[type="checkbox"] { width: auto; margin: 0; }
+.qa-link-empty { color: var(--muted); font-size: 12px; }
 .qa-controls #qaAdd { margin-left: auto; }
 
 .task-list { list-style: none; margin: 0; padding: 0; }
