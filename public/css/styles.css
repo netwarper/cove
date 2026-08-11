@@ -540,6 +540,7 @@ button.gt-ws {
   padding: 1px 8px; color: var(--muted); cursor: pointer; flex: none;
 }
 button.gt-ws:hover { border-color: var(--brand); color: var(--brand); }
+button.gt-ws-linked { border-style: dashed; }
 
 /* ---- Task calendar ---- */
 .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

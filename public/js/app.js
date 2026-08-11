@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.63.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.64.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -2709,10 +2709,8 @@
     });
     var main = document.createElement('div'); main.className = 'task-main';
     var line = document.createElement('div'); line.className = 'gt-line';
-    var ws = document.createElement('button'); ws.className = 'gt-ws'; ws.textContent = t.workspaceName; ws.title = 'Open ' + t.workspaceName;
-    ws.addEventListener('click', function () { openWorkspace(t.workspaceId); });
     var text = document.createElement('span'); text.className = 'task-text'; text.textContent = t.text;
-    line.appendChild(ws); line.appendChild(text); main.appendChild(line);
+    appendWsLabels(line, t); line.appendChild(text); main.appendChild(line);
     var meta = document.createElement('div'); meta.className = 'task-meta';
     if (t.time) { var tm = document.createElement('span'); tm.className = 'task-recur'; tm.textContent = '🕑 ' + t.time; meta.appendChild(tm); }
     if (t.recurrence) { var rc = document.createElement('span'); rc.className = 'task-recur'; rc.textContent = '🔁 ' + recurLabel(t.recurrence); meta.appendChild(rc); }
@@ -2827,6 +2825,20 @@
       sec.appendChild(ul); box.appendChild(sec);
     });
   }
+  // Workspace label chip(s) for a global/completed task row: the owning
+  // workspace, then a "🔗 name" chip for every workspace the task is linked into.
+  function wsLabelChip(name, wsId, linked) {
+    var b = document.createElement('button');
+    b.className = 'gt-ws' + (linked ? ' gt-ws-linked' : '');
+    b.textContent = (linked ? '🔗 ' : '') + name;
+    b.title = 'Open ' + name + (linked ? ' (linked here)' : '');
+    b.addEventListener('click', function () { openWorkspace(wsId); });
+    return b;
+  }
+  function appendWsLabels(line, t) {
+    line.appendChild(wsLabelChip(t.workspaceName, t.workspaceId, false));
+    (t.sharedNames || []).forEach(function (s) { line.appendChild(wsLabelChip(s.name, s.id, true)); });
+  }
   function completedTaskRow(t) {
     var li = document.createElement('li'); li.className = 'task done prio-p' + t.priority;
     var cb = document.createElement('button'); cb.className = 'task-check checked';
@@ -2842,10 +2854,8 @@
     });
     var main = document.createElement('div'); main.className = 'task-main';
     var line = document.createElement('div'); line.className = 'gt-line';
-    var ws = document.createElement('button'); ws.className = 'gt-ws'; ws.textContent = t.workspaceName; ws.title = 'Open ' + t.workspaceName;
-    ws.addEventListener('click', function () { openWorkspace(t.workspaceId); });
     var text = document.createElement('span'); text.className = 'task-text'; text.textContent = t.text;
-    line.appendChild(ws); line.appendChild(text); main.appendChild(line);
+    appendWsLabels(line, t); line.appendChild(text); main.appendChild(line);
     var meta = document.createElement('div'); meta.className = 'task-meta';
     var done = document.createElement('span'); done.className = 'task-recur'; done.textContent = '✓ ' + fmtDoneTime(t.completedAt); meta.appendChild(done);
     if (t.due) { var du = document.createElement('span'); du.className = 'task-due'; du.textContent = '📅 was due ' + fmtDueShort(t.due); meta.appendChild(du); }

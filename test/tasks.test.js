@@ -160,6 +160,11 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     t.ok(inX && inX.done && inX.completedAt, 'completing a shared task marks it done in the home space');
     t.ok(inY && inY.done && inY.completedAt === inX.completedAt, 'same completed date reflects in the shared space');
     t.eq(store.completedTasks().filter((x) => x.id === shId).length, 1, 'a shared task appears once in global completed history');
+    // The completed record carries the names of every workspace it's linked into,
+    // so the UI can label it with all of them (not just its home workspace).
+    const doneShared = store.completedTasks().find((x) => x.id === shId);
+    t.eq((doneShared.sharedNames || []).map((s) => s.name), [wsY.name], 'completedTasks includes linked workspace names (sharedNames)');
+    t.eq(doneShared.workspaceName, wsX.name, 'completed shared task still names its home workspace');
     // Moving home strips the destination from sharedWith.
     store.updateTask(shId, { done: false });
     store.moveTask(shId, wsY.id);
