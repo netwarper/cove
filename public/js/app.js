@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.66.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.67.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -566,14 +566,17 @@
     } catch (_e) { /* best effort */ }
     location.reload();
   }
-  // Detect a script-version split: editor.js is cached separately from app.js,
-  // so if the loaded editor.js build doesn't match this app.js, newer editor
-  // features silently go missing. Surface it and offer the cache-clearing fix.
+  // Detect a script-version split: editor.js is cached separately from app.js.
+  // With the network-first SW and the server's revalidation headers the two
+  // normally stay in lockstep, so we DON'T pop the reload toast for this on its
+  // own (that just felt like a spurious "reload" nag after an update). We only
+  // log it, surface a passive note + Force-refresh in Settings, and — if a real
+  // split does exist when the genuine update toast shows — make its Reload
+  // button clear caches instead of a plain reload.
   function editorBuild() { return window.__coveEditorBuild || null; }
   function scriptsOutOfSync() { var eb = editorBuild(); return !!eb && eb !== APP_BUILD; }
   if (scriptsOutOfSync()) {
-    try { console.warn('Cove: editor.js build ' + editorBuild() + ' != app build ' + APP_BUILD + ' — cached script mismatch'); } catch (_e) {}
-    showUpdateToast();
+    try { console.warn('Cove: editor.js build ' + editorBuild() + ' != app build ' + APP_BUILD + ' — cached script mismatch (use Settings → Force refresh if features look missing)'); } catch (_e) {}
   }
   if ($('updateReloadBtn')) {
     // If scripts are out of sync a normal reload won't help — clear caches.
