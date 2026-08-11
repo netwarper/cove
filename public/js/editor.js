@@ -6,7 +6,7 @@
   // separately-cached editor.js (a known installed-PWA failure mode) is detected
   // and the user is offered a cache-clearing reload instead of silently missing
   // newer editor features (auto-list, Tab/Shift+Tab indent, …).
-  var EDITOR_BUILD = '1.65.0';
+  var EDITOR_BUILD = '1.66.0';
   window.__coveEditorBuild = EDITOR_BUILD;
 
   var TOOLS = [
@@ -80,7 +80,14 @@
       return;
     }
 
-    if (command.indexOf('formatBlock:') === 0) { document.execCommand('formatBlock', false, command.split(':')[1]); fireInput(editor); return; }
+    if (command.indexOf('formatBlock:') === 0) {
+      var tag = command.split(':')[1];                 // e.g. "H3"
+      // Toggle: if the caret's block is already this heading, revert to a
+      // paragraph instead of re-applying it (so the button turns off).
+      document.execCommand('formatBlock', false, currentBlockTag() === tag.toLowerCase() ? 'P' : tag);
+      fireInput(editor);
+      return;
+    }
     document.execCommand(command, false, null);
     fireInput(editor);
   }
@@ -110,6 +117,25 @@
     input.click();
   }
 
+  // Tag name (lowercase) of the block the caret sits in, e.g. "h3", "p".
+  // formatBlock isn't a boolean state command, so its button can't use
+  // queryCommandState — we compare the current block tag instead.
+  function currentBlockTag() {
+    try {
+      var v = (document.queryCommandValue('formatBlock') || '').replace(/[<>]/g, '').toLowerCase();
+      if (v) return v;
+    } catch (_e) { /* fall through */ }
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount) {
+      var n = sel.getRangeAt(0).startContainer;
+      for (var c = (n.nodeType === 3 ? n.parentNode : n); c && c.tagName; c = c.parentNode) {
+        var tag = c.tagName.toLowerCase();
+        if (/^(h[1-6]|p|div|blockquote|pre|li)$/.test(tag)) return tag;
+        if (c.getAttribute && c.getAttribute('contenteditable') === 'true') break;
+      }
+    }
+    return '';
+  }
   function updateActiveStates(toolbarEl) {
     STATE_CMDS.forEach(function (cmd) {
       var b = toolbarEl.querySelector('button[data-cmd="' + cmd + '"]');
@@ -117,6 +143,12 @@
       var on = false; try { on = document.queryCommandState(cmd); } catch (e) { on = false; }
       b.classList.toggle('active', on);
     });
+    // Heading button: active when the caret is inside its heading level.
+    var hb = toolbarEl.querySelector('button[data-cmd^="formatBlock:"]');
+    if (hb) {
+      var want = (hb.getAttribute('data-cmd').split(':')[1] || '').toLowerCase();
+      hb.classList.toggle('active', currentBlockTag() === want);
+    }
   }
 
   function buildToolbar(toolbarEl, editor, opts) {
