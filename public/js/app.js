@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.67.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.68.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -1272,7 +1272,13 @@
     if (s <= 1) return 250;            // "Immediately" — just enough for the note to render
     return s * 1000;
   }
-  function dailyNudgeShownToday() { try { return localStorage.getItem('cove.dailyNudge') === todayStr(); } catch (_e) { return false; } }
+  // "Nudged today" is tracked PER WORKSPACE (a { wsId: 'YYYY-MM-DD' } map), so a
+  // reminder shown in one workspace doesn't suppress it in another that still
+  // has no daily for today. (Older builds stored a single date string here; that
+  // fails JSON.parse and is treated as "nothing shown yet", which is harmless.)
+  function dailyNudgeSeen() { try { var m = JSON.parse(localStorage.getItem('cove.dailyNudge') || '{}'); return (m && typeof m === 'object') ? m : {}; } catch (_e) { return {}; } }
+  function dailyNudgeShownToday(wsId) { return dailyNudgeSeen()[wsId] === todayStr(); }
+  function markDailyNudgeShown(wsId) { try { var m = dailyNudgeSeen(); m[wsId] = todayStr(); localStorage.setItem('cove.dailyNudge', JSON.stringify(m)); } catch (_e) {} }
   function armDailyNudge() {
     var n = state.note;
     if (!n || dailyNudge.forNoteId === n.id) return; // only (re)arm when the note changes
@@ -1282,12 +1288,12 @@
     $('dailyNudge').classList.add('hidden');
     var delay = dailyNudgeDelayMs();
     if (delay <= 0) return; // reminder turned off
-    if (dailyNudgeShownToday()) return;
+    var wsId = state.wsId;
+    if (dailyNudgeShownToday(wsId)) return;
     var today = todayStr();
     if (n.kind !== 'scratch' && n.title === today) return; // already on today's daily
-    var wsId = state.wsId;
     dailyNudge.timer = setTimeout(function () {
-      if (dailyNudgeShownToday() || state.view !== 'note' || state.wsId !== wsId || !state.note) return;
+      if (dailyNudgeShownToday(wsId) || state.view !== 'note' || state.wsId !== wsId || !state.note) return;
       if (state.note.kind !== 'scratch' && state.note.title === today) return;
       API.listNotes(wsId, { sort: 'created', dir: 'desc' }).then(function (notes) {
         var dailies = (notes || []).filter(function (x) { return (x.kind || 'daily') !== 'scratch'; });
@@ -1295,7 +1301,7 @@
         // Only nudge people who actually use daily notes here, and only when
         // there's still no daily for today.
         if (dailies.length && !hasToday && state.wsId === wsId && state.view === 'note') {
-          try { localStorage.setItem('cove.dailyNudge', todayStr()); } catch (_e) {}
+          markDailyNudgeShown(wsId);
           $('dailyNudge').classList.remove('hidden');
         }
       }).catch(function () {});
@@ -3544,7 +3550,7 @@
       if (dailyNudgeDelayMs() <= 0) why += 'Note: the reminder is set to “Never”, so it won’t appear on its own.';
       else if (!dailies.length) why += 'Automatically it appears once you have at least one daily note here.';
       else if (hasToday) why += 'Automatically it stays hidden right now because today’s daily (' + today + ') already exists.';
-      else if (dailyNudgeShownToday()) why += 'Automatically it already fired once today (it shows at most once a day per device).';
+      else if (dailyNudgeShownToday(state.wsId)) why += 'Automatically it already fired once today for this workspace (it shows at most once a day per workspace, per device).';
       else why += 'Automatically it will appear ' + $('dailyNudgeDelay').selectedOptions[0].textContent.toLowerCase() + ' after you open an older note.';
       msg.textContent = why;
     } catch (_e) { msg.textContent = 'Shown above.'; }
