@@ -93,7 +93,14 @@ function startDetached(dataDir, port) {
   const log = logFile();
   fs.mkdirSync(path.dirname(log), { recursive: true });
   const out = fs.openSync(log, 'a');
-  const env = Object.assign({}, process.env, { DATA_DIR: dataDir, PORT: String(port) });
+  // Pass PORT always. Pass DATA_DIR to the server ONLY when the user explicitly
+  // set one (a shell env var or a line in .env). For the default-or-pointer
+  // case, leave it unset so the server resolves the SAME location from its own
+  // pointer/default (APP_DIR === server's dir) WITHOUT reporting it as
+  // env-pinned — otherwise the launcher itself would make the app show the data
+  // location as "Pinned by DATA_DIR" and disable "change data directory".
+  const env = Object.assign({}, process.env, { PORT: String(port) });
+  if (process.env.DATA_DIR) env.DATA_DIR = dataDir; else delete env.DATA_DIR;
   const child = spawn(process.execPath, [SERVER], { cwd: APP_DIR, env, detached: true, stdio: ['ignore', out, out], windowsHide: true });
   child.unref();
   return { pid: child.pid, log };
