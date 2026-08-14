@@ -156,9 +156,43 @@ PLIST
     else
       echo "Cove service is not loaded. Run: scripts/macos-service.sh install"
     fi
+    echo
+    echo "Where DATA_DIR is set (this is what makes the app show 'Pinned by DATA_DIR'):"
+    found=""
+    pdd="$(plutil -extract EnvironmentVariables.DATA_DIR raw "$PLIST" 2>/dev/null || true)"
+    if [ -n "$pdd" ]; then echo "   • launch-agent plist → $pdd   (fix: scripts/macos-service.sh unpin)"; found=1
+    else echo "   • launch-agent plist → not set ✓"; fi
+    edd="$(grep -HnE '^[[:space:]]*DATA_DIR=' "$REPO/.env" 2>/dev/null || true)"
+    [ -n "$edd" ] && { echo "   • $edd   (fix: remove that line from .env, then ./stop.sh && ./start.sh)"; found=1; }
+    for f in "$HOME/.zshenv" "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
+      s="$(grep -HnE 'DATA_DIR=' "$f" 2>/dev/null || true)"; [ -n "$s" ] && { echo "   • shell → $s   (fix: remove that line, open a new terminal, restart Cove)"; found=1; }
+    done
+    for pid in $(pgrep -f 'server.js' 2>/dev/null | sort -u); do
+      live="$(ps eww "$pid" 2>/dev/null | tr ' ' '\n' | grep '^DATA_DIR=' | head -1 || true)"
+      [ -n "$live" ] && { echo "   • running server pid $pid → $live   (the live value in effect now)"; break; }
+    done
+    [ -z "$found" ] && echo "   (nothing pins it — the app's Settings → Data location should be editable)"
+    ;;
+  unpin)
+    # Convert a DATA_DIR env-pin in the service into an editable pointer: keep the
+    # SAME location (so no notes are lost) but stop pinning it via the env var, so
+    # the app's Settings → Data location becomes editable again.
+    [ -f "$PLIST" ] || { echo "No service plist at $PLIST. If you don't use the login service, DATA_DIR is set elsewhere — run: scripts/macos-service.sh status"; exit 1; }
+    cur="$(plutil -extract EnvironmentVariables.DATA_DIR raw "$PLIST" 2>/dev/null || true)"
+    [ -z "$cur" ] && { echo "DATA_DIR isn't pinned in the service plist — nothing to unpin. Run 'status' to see where it comes from."; exit 0; }
+    NODE="$(find_node || true)"; [ -z "$NODE" ] && { echo "❌ node was not found."; exit 1; }
+    "$NODE" -e 'require(process.argv[1]+"/lib/config").writeDataDirPointer(process.argv[1], process.argv[2])' "$REPO" "$cur" \
+      && echo "→ recorded the current location as an editable pointer ($cur)."
+    /usr/bin/sed -i '' '/<key>DATA_DIR<\/key>/d' "$PLIST"
+    if load_agent; then
+      echo "✅ Unpinned DATA_DIR. Reload the app — Settings → Data location is now editable (source: pointer)."
+    else
+      echo "⚠ Edited the plist but launchd wouldn't reload it. Try: scripts/macos-service.sh restart"
+    fi
     ;;
   *)
-    echo "Usage: scripts/macos-service.sh {install|uninstall|status|restart}"
-    echo "  DATA_DIR=... KEEP_AWAKE=1 scripts/macos-service.sh install"
+    echo "Usage: scripts/macos-service.sh {install|uninstall|status|restart|unpin}"
+    echo "  DATA_DIR=... KEEP_AWAKE=1 scripts/macos-service.sh install   # pin a specific data folder"
+    echo "  scripts/macos-service.sh unpin                               # stop pinning DATA_DIR (keep the location, make it editable)"
     ;;
 esac
