@@ -167,11 +167,24 @@ PLIST
     for f in "$HOME/.zshenv" "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile"; do
       s="$(grep -HnE 'DATA_DIR=' "$f" 2>/dev/null || true)"; [ -n "$s" ] && { echo "   • shell → $s   (fix: remove that line, open a new terminal, restart Cove)"; found=1; }
     done
+    live_pid=""; live=""
     for pid in $(pgrep -f 'server.js' 2>/dev/null | sort -u); do
-      live="$(ps eww "$pid" 2>/dev/null | tr ' ' '\n' | grep '^DATA_DIR=' | head -1 || true)"
-      [ -n "$live" ] && { echo "   • running server pid $pid → $live   (the live value in effect now)"; break; }
+      v="$(ps eww "$pid" 2>/dev/null | tr ' ' '\n' | grep '^DATA_DIR=' | head -1 || true)"
+      [ -n "$v" ] && { echo "   • running server pid $pid → $v   (the live value in effect now)"; live_pid="$pid"; live="$v"; break; }
     done
-    [ -z "$found" ] && echo "   (nothing pins it — the app's Settings → Data location should be editable)"
+    if [ -n "$found" ]; then
+      : # a persistent source was reported above with its fix
+    elif [ -n "$live_pid" ]; then
+      echo "   → Not set anywhere persistent, but the RUNNING server still carries it —"
+      echo "     baked in by an OLDER launcher. A plain restart.sh may not replace it if"
+      echo "     it now resolves a different data dir/port. Stop EVERY Cove server and"
+      echo "     start once with the current code:"
+      echo "         pkill -f server.js   &&   ./start.sh"
+      echo "     (start.sh uses your saved location; your notes are wherever the line"
+      echo "      above points — copy that folder to a new spot first if you relocate.)"
+    else
+      echo "   (nothing pins it — the app's Settings → Data location should be editable)"
+    fi
     ;;
   unpin)
     # Convert a DATA_DIR env-pin in the service into an editable pointer: keep the
