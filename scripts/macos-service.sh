@@ -7,7 +7,10 @@
 #
 # Options (env vars):
 #   DATA_DIR=/path/to/folder   where notes live (default: <repo>/data — point at
-#                              a Google Drive / Dropbox / iCloud folder to sync)
+#                              a Google Drive / Dropbox / iCloud folder to sync).
+#                              Only baked into the service when set here; the
+#                              default is left unpinned so you can relocate it
+#                              later from the app's Settings → Data location.
 #   KEEP_AWAKE=1               wrap the server in `caffeinate` so the Mac does
 #                              not sleep while you are logged in (see caveats in
 #                              docs/macos-startup.md)
@@ -61,9 +64,18 @@ case "$CMD" in
   install)
     NODE="$(find_node || true)"
     [ -z "$NODE" ] && { echo "❌ node was not found. Install Node 18+ from https://nodejs.org first."; exit 1; }
-    DATA_DIR="${DATA_DIR:-$REPO/data}"
+    # Only PIN a data dir into the service when the user explicitly chose one.
+    # Otherwise leave DATA_DIR unset in the plist so the server falls back to its
+    # WorkingDirectory (<repo>/data) or a location picked later in the app's
+    # Settings — a baked-in default would wrongly show the app's "change data
+    # directory" field as permanently "Pinned by DATA_DIR".
+    DATA_DIR_EXPLICIT="${DATA_DIR:-}"
+    DATA_DIR="${DATA_DIR:-$REPO/data}"      # effective path (for mkdir + port probe)
     LOG="$HOME/Library/Logs/cove.log"
     mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$DATA_DIR"
+    DATA_DIR_PLIST_LINE=""
+    [ -n "$DATA_DIR_EXPLICIT" ] && DATA_DIR_PLIST_LINE="    <key>DATA_DIR</key><string>$DATA_DIR</string>
+"
     # Run node DIRECTLY (no login shell) with absolute paths — avoids the
     # dotfile-sourcing flakiness of `zsh -lc`. caffeinate wraps it for keep-awake.
     ARGS="    <string>$NODE</string>
@@ -86,8 +98,7 @@ $ARGS
   <key>WorkingDirectory</key><string>$REPO</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>DATA_DIR</key><string>$DATA_DIR</string>
-    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+$DATA_DIR_PLIST_LINE    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -114,7 +125,8 @@ PLIST
     done
     if [ -n "$up" ]; then
       echo "✅ Cove is running and answering on http://127.0.0.1:$PORT (starts at login, restarts if it stops)."
-      echo "   Data:  $DATA_DIR"
+      echo "   Data:  $DATA_DIR${DATA_DIR_EXPLICIT:+  (pinned by DATA_DIR — set explicitly)}"
+      [ -z "$DATA_DIR_EXPLICIT" ] && echo "          (not pinned — you can relocate it later from the app's Settings → Data location)"
       echo "   Log:   $LOG"
       [ "${KEEP_AWAKE:-0}" = "1" ] && echo "   Keep-awake: ON (see docs/macos-startup.md)."
     else
