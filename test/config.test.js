@@ -27,6 +27,11 @@ try {
   t.ok(p1 !== p3, 'different domains derive different ports');
   t.ok(p1 >= 20000 && p1 < 30000, 'derived port sits in the high range');
 
+  // a domain with no pinned port now defaults to 3000 (not a derived high port),
+  // so naming an instance doesn't surprise you with an odd port. (DIR has no
+  // instance.json yet at this point.)
+  t.eq(config.resolve(DIR, { DOMAIN: 'notes' }).port, config.DEFAULT_PORT, 'a domain without a pinned port defaults to 3000');
+
   // writing instance.json makes the port durable
   config.writeInstance(DIR, { name: 'Meeting Notes', domain: 'notes.localhost', host: '127.0.0.1', port: p1, createdAt: new Date().toISOString() });
   cfg = config.resolve(DIR, {});

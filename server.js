@@ -769,7 +769,9 @@ Environment: DATA_DIR, PORT, HOST, DOMAIN, MAX_BODY, SESSION_TTL, COOKIE_SECURE.
     const domain = config.normalizeDomain(val('--set-domain'));
     if (!domain) { console.error('Provide a name, e.g. --set-domain notes'); process.exitCode = 1; return true; }
     const existing = config.readInstance(DATA_DIR) || {};
-    const port = parseInt(val('--port'), 10) || existing.port || config.derivePort(domain);
+    // Keep an already-pinned port; otherwise default to 3000 (add --port to pick
+    // another). Naming an instance no longer silently assigns a high derived port.
+    const port = parseInt(val('--port'), 10) || existing.port || config.DEFAULT_PORT;
     config.writeInstance(DATA_DIR, {
       name: existing.name || 'Cove',
       domain, host: existing.host || '127.0.0.1', port,
