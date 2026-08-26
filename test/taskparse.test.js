@@ -28,6 +28,15 @@ try {
   r = parse('review every other month');
   t.eq(r.recurrence, { type: 'monthly', n: 2 }, 'parses "every other month" -> monthly n=2');
 
+  // Yearly / annual recurrence.
+  t.eq(parse('renew domain yearly').recurrence, { type: 'yearly' }, 'parses "yearly"');
+  t.eq(parse('pay taxes annually').recurrence, { type: 'yearly' }, 'parses "annually"');
+  t.eq(parse('review policy annual').recurrence, { type: 'yearly' }, 'parses "annual"');
+  t.eq(parse('anniversary every year').recurrence, { type: 'yearly' }, 'parses "every year"');
+  t.eq(parse('check filters every 2 years').recurrence, { type: 'yearly', n: 2 }, 'parses "every 2 years" -> yearly n=2');
+  t.eq(parse('audit every other year').recurrence, { type: 'yearly', n: 2 }, 'parses "every other year" -> yearly n=2');
+  t.eq(parse('renew domain yearly').text.trim(), 'renew domain', 'strips "yearly" from the text');
+
   // Regression: the plain phrases still parse without an interval.
   t.eq(parse('sync weekly').recurrence, { type: 'weekly' }, 'plain "weekly" stays interval-less');
   t.eq(parse('report monthly').recurrence, { type: 'monthly' }, 'plain "monthly" stays interval-less');

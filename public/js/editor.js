@@ -6,7 +6,7 @@
   // separately-cached editor.js (a known installed-PWA failure mode) is detected
   // and the user is offered a cache-clearing reload instead of silently missing
   // newer editor features (auto-list, Tab/Shift+Tab indent, …).
-  var EDITOR_BUILD = '1.68.0';
+  var EDITOR_BUILD = '1.69.0';
   window.__coveEditorBuild = EDITOR_BUILD;
 
   var TOOLS = [

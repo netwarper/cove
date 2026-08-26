@@ -35,6 +35,12 @@ const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-tasks-'));
     // --- interval recurrence: every N weeks / N months ---
     t.eq(tasksLib.nextDue('2026-07-22', { type: 'weekly', n: 2 }), '2026-08-05', 'nextDue every 2 weeks = +14d');
     t.eq(tasksLib.nextDue('2026-07-15', { type: 'monthly', n: 2 }), '2026-09-15', 'nextDue every 2 months = +2 months');
+    t.eq(tasksLib.nextDue('2026-03-15', { type: 'yearly' }), '2027-03-15', 'nextDue yearly keeps month/day');
+    t.eq(tasksLib.nextDue('2024-02-29', { type: 'yearly' }), '2025-02-28', 'nextDue yearly clamps Feb 29 in a non-leap year');
+    t.eq(tasksLib.nextDue('2026-06-01', { type: 'yearly', n: 2 }), '2028-06-01', 'nextDue every 2 years = +2 years');
+    t.eq(tasksLib.normalizeRecurrence({ type: 'yearly', n: 3 }).n, 3, 'yearly keeps interval n>=2');
+    t.eq(tasksLib.describeRecurrence({ type: 'yearly' }), 'every year', 'describes plain yearly');
+    t.eq(tasksLib.describeRecurrence({ type: 'yearly', n: 2 }), 'every 2 years', 'describes every-2-years');
     t.eq(tasksLib.nextDue('2026-07-22', { type: 'weekly' }), '2026-07-29', 'nextDue plain weekly still = +7d');
     t.eq(tasksLib.normalizeRecurrence({ type: 'weekly', n: 2 }).n, 2, 'weekly keeps interval n>=2');
     t.eq(tasksLib.normalizeRecurrence({ type: 'weekly', n: 1 }).n, undefined, 'weekly drops n=1 (backward-compatible)');

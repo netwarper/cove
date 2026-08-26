@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.68.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.69.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -1724,6 +1724,7 @@
       return rec.n > 1 ? 'every ' + rec.n + ' wks' : 'weekly';
     }
     if (rec.type === 'monthly') return rec.n > 1 ? 'every ' + rec.n + ' mos' : 'monthly';
+    if (rec.type === 'yearly') return rec.n > 1 ? 'every ' + rec.n + ' yrs' : 'yearly';
     if (rec.type === 'everyNDays') return 'every ' + rec.n + 'd'; return '';
   }
   function sortTasks(a, b) { return (a.due || '9999').localeCompare(b.due || '9999') || (a.priority - b.priority) || (a.order - b.order); }
@@ -1880,13 +1881,14 @@
     var isDaily = type === 'daily' || type === 'everyNDays';
     var isWeekly = type === 'weekly';
     var isMonthly = type === 'monthly';
+    var isYearly = type === 'yearly';
     var weeklyByDays = isWeekly && rec.days && rec.days.length;
-    // Interval field applies to daily/monthly and to weekly-by-interval (not
-    // weekly-by-specific-days, where the interval is implicitly 1 week).
-    var showEvery = isDaily || isMonthly || (isWeekly && !weeklyByDays);
+    // Interval field applies to daily/monthly/yearly and to weekly-by-interval
+    // (not weekly-by-specific-days, where the interval is implicitly 1 week).
+    var showEvery = isDaily || isMonthly || isYearly || (isWeekly && !weeklyByDays);
     $('qaEvery').classList.toggle('hidden', !showEvery);
     if (showEvery) {
-      $('qaEveryUnit').textContent = isDaily ? 'days' : isMonthly ? 'months' : 'weeks';
+      $('qaEveryUnit').textContent = isDaily ? 'days' : isMonthly ? 'months' : isYearly ? 'years' : 'weeks';
       $('qaRecurN').value = String((rec && rec.n) || 1);
     }
     // Day-of-week chips: weekly only.
@@ -1997,7 +1999,7 @@
     var n = parseInt($('qaRecurN').value, 10) || 1;
     if (v === 'none') { state.qa.recurrence = null; }
     else if (v === 'daily') { state.qa.recurrence = n >= 2 ? { type: 'everyNDays', n: n } : { type: 'daily' }; }
-    else if (v === 'weekly' || v === 'monthly') { var rec = { type: v }; if (n >= 2) rec.n = n; state.qa.recurrence = rec; }
+    else if (v === 'weekly' || v === 'monthly' || v === 'yearly') { var rec = { type: v }; if (n >= 2) rec.n = n; state.qa.recurrence = rec; }
     else { state.qa.recurrence = { type: v }; } // weekdays
     state.qaManual.recurrence = true;
     if (!state.qaManual.due) state.qa.due = recurrenceImpliedDue();
@@ -2008,7 +2010,7 @@
     var n = parseInt($('qaRecurN').value, 10);
     var t = rec.type;
     if (t === 'daily' || t === 'everyNDays') { if (n >= 2) { rec.type = 'everyNDays'; rec.n = n; } else { rec.type = 'daily'; delete rec.n; } }
-    else if (t === 'weekly' || t === 'monthly') { if (n >= 2) rec.n = n; else delete rec.n; }
+    else if (t === 'weekly' || t === 'monthly' || t === 'yearly') { if (n >= 2) rec.n = n; else delete rec.n; }
     state.qaManual.recurrence = true; syncRecurUI();
   });
   // Weekly day-of-week chips: toggling specific days switches weekly to a

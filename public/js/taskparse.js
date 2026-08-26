@@ -35,12 +35,15 @@
     if ((m = /\severy\s+(\d+)\s+days?\b/i.exec(text))) { res.recurrence = { type: 'everyNDays', n: parseInt(m[1], 10) }; res.matched.recurrence = true; strip(m[0]); }
     else if ((m = /\severy\s+(\d+)\s+weeks?\b/i.exec(text))) { res.recurrence = { type: 'weekly', n: parseInt(m[1], 10) }; res.matched.recurrence = true; strip(m[0]); }
     else if ((m = /\severy\s+(\d+)\s+months?\b/i.exec(text))) { res.recurrence = { type: 'monthly', n: parseInt(m[1], 10) }; res.matched.recurrence = true; strip(m[0]); }
+    else if ((m = /\severy\s+(\d+)\s+years?\b/i.exec(text))) { res.recurrence = { type: 'yearly', n: parseInt(m[1], 10) }; res.matched.recurrence = true; strip(m[0]); }
     else if ((m = /\severy\s+other\s+weeks?\b/i.exec(text))) { res.recurrence = { type: 'weekly', n: 2 }; res.matched.recurrence = true; strip(m[0]); }
     else if ((m = /\severy\s+other\s+months?\b/i.exec(text))) { res.recurrence = { type: 'monthly', n: 2 }; res.matched.recurrence = true; strip(m[0]); }
+    else if ((m = /\severy\s+other\s+years?\b/i.exec(text))) { res.recurrence = { type: 'yearly', n: 2 }; res.matched.recurrence = true; strip(m[0]); }
     else if (/\severy\s+weekday(s)?\b/i.test(text)) { res.recurrence = { type: 'weekdays' }; res.matched.recurrence = true; strip(/\severy\s+weekday(s)?\b/i); }
     else if (/\s(every\s+day|daily)\b/i.test(text)) { res.recurrence = { type: 'daily' }; res.matched.recurrence = true; strip(/\s(every\s+day|daily)\b/i); }
     else if (/\s(every\s+week|weekly)\b/i.test(text)) { res.recurrence = { type: 'weekly' }; res.matched.recurrence = true; strip(/\s(every\s+week|weekly)\b/i); }
     else if (/\s(every\s+month|monthly)\b/i.test(text)) { res.recurrence = { type: 'monthly' }; res.matched.recurrence = true; strip(/\s(every\s+month|monthly)\b/i); }
+    else if (/\s(every\s+year|yearly|annually|annual)\b/i.test(text)) { res.recurrence = { type: 'yearly' }; res.matched.recurrence = true; strip(/\s(every\s+year|yearly|annually|annual)\b/i); }
     else if ((m = /\severy\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tues|tue|weds|wed|thurs|thur|thu|fri|sat)\b/i.exec(text))) {
       var wd = DOW[m[1].toLowerCase().slice(0, 3)];
       res.recurrence = { type: 'weekly', days: [wd] }; res.matched.recurrence = true; strip(m[0]);
