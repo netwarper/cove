@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.71.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.72.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -595,12 +595,19 @@
       collapse(); say('Checking GitHub…'); checkBtn.disabled = true;
       try {
         var s = await API.updateCheck();
-        if (!s.isGit) return say('This install isn’t a git checkout — update by downloading the latest release.', true);
+        if (s.error) return say(s.error, true);
         if (s.fetchError) return say('Couldn’t reach GitHub: ' + s.fetchError, true);
-        if (s.ahead > 0 && s.behind > 0) return say('Your checkout has diverged from GitHub — reconcile it with git first.', true);
-        if (s.dirty && s.behind > 0) return say('There are ' + s.behind + ' update(s), but the app folder has local changes — commit or discard them, then update.', true);
-        if (s.behind > 0) { say(s.behind + ' update' + (s.behind === 1 ? '' : 's') + ' available on ' + s.branch + ' (you’re at ' + s.current + ').'); show(applyBtn, true); }
-        else say('You’re on the latest version (' + s.branch + ' @ ' + s.current + ').');
+        if (s.isGit) {
+          if (s.ahead > 0 && s.behind > 0) return say('Your checkout has diverged from GitHub — reconcile it with git first.', true);
+          if (s.dirty && s.behind > 0) return say('There are ' + s.behind + ' update(s), but the app folder has local changes — commit or discard them, then update.', true);
+          if (s.behind > 0) { say(s.behind + ' update' + (s.behind === 1 ? '' : 's') + ' available on ' + s.branch + ' (you’re at ' + s.current + ').'); show(applyBtn, true); }
+          else say('You’re on the latest version (' + s.branch + ' @ ' + s.current + ').');
+        } else {
+          // Downloaded (zip/tarball) install — compares versions, updates by
+          // fetching the latest source archive from GitHub.
+          if (s.updatable) { say('Update available: ' + s.current + ' → ' + s.latest + '.'); show(applyBtn, true); }
+          else say('You’re on the latest version (' + s.current + ').');
+        }
       } catch (e) { say('Update check failed: ' + ((e && e.message) || 'error'), true); }
       finally { checkBtn.disabled = false; }
     });
