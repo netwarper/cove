@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.70.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.71.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -1139,7 +1139,8 @@
       var d = await API.getDataDir();
       var src = d.source === 'env' ? 'set by the DATA_DIR environment variable'
         : d.source === 'pointer' ? 'configured here' : 'default (bundled with the app)';
-      info.innerHTML = 'Current: <code>' + esc(d.path) + '</code><br><span class="muted">' + esc(src) + '</span>';
+      info.innerHTML = 'Current: <code>' + esc(d.path) + '</code><br><span class="muted">' + esc(src) + '</span>'
+        + (d.cloud ? '<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--danger);background:var(--panel);border-radius:4px;font-size:.9em">⚠️ Your data lives in a <strong>' + esc(d.cloud) + '</strong> folder. It stays available only while ' + esc(d.cloud) + ' is installed, signed in and synced on this device — if that connection is lost or the files are evicted to “online-only,” the app can’t read your notes. Keep a <strong>Backup</strong> too, and prefer a plain local folder if you don’t want the data to depend on the sync app.</div>' : '');
       if (d.envOverride) {
         input.value = ''; input.disabled = true; btn.disabled = true;
         input.placeholder = 'Pinned by DATA_DIR — unset that env var to change it here';

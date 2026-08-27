@@ -447,6 +447,7 @@ const server = http.createServer(async (req, res) => {
         envOverride: !!DATA_DIR_ENV,
         appDir: __dirname,
         pointerFile: config.dataDirPointerPath(__dirname),
+        cloud: config.cloudProvider(DATA_DIR),
       });
     }
 

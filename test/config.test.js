@@ -61,6 +61,17 @@ try {
   t.eq(config.readDataDirPointer(APP), null, 'clearing the pointer removes it');
   fs.rmSync(APP, { recursive: true, force: true });
 
+  // --- cloud-sync provider detection (for the "availability depends on the
+  //     sync app" warning shown in Settings) ---
+  t.eq(config.cloudProvider('/Users/x/Library/CloudStorage/GoogleDrive-a@b.dev/My Drive/Cove'), 'Google Drive', 'detects Google Drive (CloudStorage path)');
+  t.eq(config.cloudProvider('/Users/x/Google Drive/Cove'), 'Google Drive', 'detects a legacy "Google Drive" folder');
+  t.eq(config.cloudProvider('/Users/x/Dropbox/Cove'), 'Dropbox', 'detects Dropbox');
+  t.eq(config.cloudProvider('/Users/x/Library/Mobile Documents/com~apple~CloudDocs/Cove'), 'iCloud Drive', 'detects iCloud Drive (Mobile Documents)');
+  t.eq(config.cloudProvider('/Users/x/OneDrive-Personal/Cove'), 'OneDrive', 'detects OneDrive');
+  t.eq(config.cloudProvider('C:/Users/x/Box/Cove'.replace(/\//g, '\\')), 'Box', 'detects Box on a Windows-style path');
+  t.eq(config.cloudProvider('/Users/x/Documents/Cove'), null, 'a plain local folder is not flagged');
+  t.eq(config.cloudProvider(''), null, 'an empty path is not flagged');
+
   // lock lifecycle
   t.eq(config.readActiveLock(DIR), null, 'no active lock initially');
   config.writeLock(DIR, p1);
