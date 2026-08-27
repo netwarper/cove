@@ -45,6 +45,9 @@
     viewerUrl: () => '/api/viewer',
     restore: (bundle) => req('POST', '/api/restore', { bundle }),
 
+    updateCheck: () => req('GET', '/api/update/check'),
+    updateApply: () => req('POST', '/api/update', {}),
+    updateRestart: () => req('POST', '/api/update/restart', {}),
     getSettings: () => req('GET', '/api/settings'),
     saveSettings: (patch) => req('PUT', '/api/settings', patch),
 

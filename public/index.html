@@ -566,6 +566,17 @@
         <div id="statsInfo" class="tiny muted" style="margin-top:6px"></div>
       </div>
       <div class="acct-block">
+        <h4>Software update</h4>
+        <p class="muted tiny">Pull the latest Cove from GitHub. It only <b>fast-forwards</b> your checkout — never overwriting local changes — and updating server code needs a quick restart to finish.</p>
+        <div class="setting-row">
+          <button id="updateCheckBtn" class="btn-sm" type="button">Check for updates</button>
+          <button id="updateApplyBtn" class="btn-sm hidden" type="button">Update now</button>
+          <button id="updateRestartBtn" class="btn-sm hidden" type="button">Restart server</button>
+          <button id="updateReloadBtn2" class="btn-sm hidden" type="button">Reload app</button>
+        </div>
+        <p id="updateStatus" class="tiny muted" aria-live="polite" style="margin-top:6px"></p>
+      </div>
+      <div class="acct-block">
         <h4>Data location</h4>
         <p class="muted tiny">Where your encrypted notes are stored. Point this at a Google&nbsp;Drive, Dropbox, iCloud or Box sync folder to keep your notes on the cloud and in sync across devices. Everything stays end-to-end encrypted — the sync service only ever sees ciphertext.</p>
         <div id="dataDirInfo" class="tiny"></div>

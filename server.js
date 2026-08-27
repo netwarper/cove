@@ -29,6 +29,7 @@ const viewer = require('./lib/viewer');
 const transcribe = require('./lib/transcribe');
 const summarize = require('./lib/summarize');
 const slack = require('./lib/slack');
+const update = require('./lib/update');
 const { Store } = store;
 
 // Where data lives. An explicit DATA_DIR env var always wins; otherwise a
@@ -447,6 +448,25 @@ const server = http.createServer(async (req, res) => {
         appDir: __dirname,
         pointerFile: config.dataDirPointerPath(__dirname),
       });
+    }
+
+    // ---- self-update: fast-forward the local checkout from GitHub ----
+    // Read-only check (does a `git fetch`, reports how far behind origin we are).
+    if (pathname === '/api/update/check' && req.method === 'GET') {
+      return sendJSON(res, 200, await update.status(__dirname, true));
+    }
+    // Apply: fast-forward only; refuses on a dirty or diverged tree.
+    if (pathname === '/api/update' && req.method === 'POST') {
+      const r = await update.apply(__dirname);
+      return sendJSON(res, r.ok ? 200 : 409, r);
+    }
+    // Best-effort restart via the cross-platform launcher (stop + start). We do
+    // NOT force-exit: the launcher signals us through our instance lock, so if it
+    // can't find us it simply no-ops and we keep running the old code.
+    if (pathname === '/api/update/restart' && req.method === 'POST') {
+      try { update.restartViaLauncher(__dirname, process.env); }
+      catch (e) { return sendJSON(res, 500, { error: 'could not launch the restart helper: ' + e.message }); }
+      return sendJSON(res, 200, { ok: true, restarting: true });
     }
 
     // Change where data lives. This only records the new location (in the

@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.69.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.70.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -583,6 +583,53 @@
     $('updateReloadBtn').addEventListener('click', function () { if (scriptsOutOfSync()) hardReload(); else location.reload(); });
     $('updateDismissBtn').addEventListener('click', function () { $('updateToast').classList.add('hidden'); });
   }
+
+  // ---- Software update (git fast-forward from GitHub), in Settings ----
+  (function wireSoftwareUpdate() {
+    var checkBtn = $('updateCheckBtn'); if (!checkBtn) return;
+    var applyBtn = $('updateApplyBtn'), restartBtn = $('updateRestartBtn'), reloadBtn = $('updateReloadBtn2'), out = $('updateStatus');
+    function say(msg, warn) { out.textContent = msg; out.className = 'tiny ' + (warn ? 'warn' : 'muted'); }
+    function show(el, on) { el.classList.toggle('hidden', !on); }
+    function collapse() { show(applyBtn, false); show(restartBtn, false); show(reloadBtn, false); }
+    checkBtn.addEventListener('click', async function () {
+      collapse(); say('Checking GitHub…'); checkBtn.disabled = true;
+      try {
+        var s = await API.updateCheck();
+        if (!s.isGit) return say('This install isn’t a git checkout — update by downloading the latest release.', true);
+        if (s.fetchError) return say('Couldn’t reach GitHub: ' + s.fetchError, true);
+        if (s.ahead > 0 && s.behind > 0) return say('Your checkout has diverged from GitHub — reconcile it with git first.', true);
+        if (s.dirty && s.behind > 0) return say('There are ' + s.behind + ' update(s), but the app folder has local changes — commit or discard them, then update.', true);
+        if (s.behind > 0) { say(s.behind + ' update' + (s.behind === 1 ? '' : 's') + ' available on ' + s.branch + ' (you’re at ' + s.current + ').'); show(applyBtn, true); }
+        else say('You’re on the latest version (' + s.branch + ' @ ' + s.current + ').');
+      } catch (e) { say('Update check failed: ' + ((e && e.message) || 'error'), true); }
+      finally { checkBtn.disabled = false; }
+    });
+    applyBtn.addEventListener('click', async function () {
+      say('Updating…'); applyBtn.disabled = true;
+      try {
+        var r = await API.updateApply();
+        if (!r.ok) return say(r.error || 'Update failed.', true);
+        show(applyBtn, false);
+        if (!r.updated) return say('Already up to date.');
+        say('Updated ' + r.from + ' → ' + r.to + ' (' + r.filesChanged + ' file' + (r.filesChanged === 1 ? '' : 's') + '). ' + (r.serverChanged ? 'Restart the server to finish.' : 'Reload the app to finish.'));
+        show(reloadBtn, true); show(restartBtn, !!r.serverChanged);
+      } catch (e) { say('Update failed: ' + ((e && e.message) || 'error'), true); }
+      finally { applyBtn.disabled = false; }
+    });
+    reloadBtn.addEventListener('click', function () { hardReload(); }); // cache-clearing reload → new client files
+    restartBtn.addEventListener('click', async function () {
+      say('Restarting the server…'); restartBtn.disabled = true;
+      try { await API.updateRestart(); } catch (_e) { /* the socket may drop as it restarts — expected */ }
+      var tries = 0;
+      var timer = setInterval(async function () {
+        tries++;
+        var up = false;
+        try { up = (await fetch('/api/health', { cache: 'no-store' })).ok; } catch (_e) { up = false; }
+        if (up) { clearInterval(timer); say('Server is back — reloading…'); setTimeout(hardReload, 500); }
+        else if (tries > 40) { clearInterval(timer); say('The server didn’t come back on its own — restart it manually (e.g. ./stop.sh && ./start.sh), then reload.', true); restartBtn.disabled = false; }
+      }, 1000);
+    });
+  })();
 
   // ---------------- Global sticky note ----------------
   // A small, window-pinned, draggable scratch pad (classic Stickies). Content is
