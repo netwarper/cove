@@ -5,7 +5,7 @@
   var API = window.API;
   // Bumped with the service-worker cache; logged at load so you can confirm the
   // browser is actually running the latest build (not a stale cached app.js).
-  var APP_BUILD = '1.72.0'; // keep in sync with package.json version on each release
+  var APP_BUILD = '1.73.0'; // keep in sync with package.json version on each release
   try { console.log('Cove app build ' + APP_BUILD + ' @ ' + location.host); } catch (_e) { /* no console */ }
   var IDLE_DEFAULT_MIN = 15;
   // Idle-lock delay in ms from settings; 0 (or "Never") disables auto-lock.
@@ -530,7 +530,13 @@
     // its freshly-loaded JS/CSS is stale until reload, so offer a reload.
     var hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (hadController) showUpdateToast();
+      // A new sw.js just took over. That happens on EVERY release (the cache
+      // name changes), including in a window that only just opened — which has
+      // already fetched the latest files network-first, so a reload would do
+      // nothing. Only prompt when the page we're actually running is behind the
+      // server, so a freshly opened window stays quiet and a long-open one still
+      // gets the nudge.
+      if (hadController) maybePromptReload();
     });
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('/sw.js').then(function (reg) {
@@ -548,6 +554,21 @@
     var t = $('updateToast');
     if (!t || !t.classList.contains('hidden')) return;
     t.classList.remove('hidden');
+  }
+  // Ask the reload toast to appear only if the running page is genuinely stale.
+  // Compares the build this window loaded (APP_BUILD) with the version the server
+  // is serving right now (/api/health, unauthenticated). Equal → nothing to do
+  // (this is the common "new window after an update" case, where the page already
+  // has the latest files); different, or the split-script guard trips → prompt.
+  // If the server can't be reached, stay quiet: a reload wouldn't help offline.
+  function maybePromptReload() {
+    fetch('/api/health', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (h) {
+        if (!h || !h.version) return;
+        if (h.version !== APP_BUILD || scriptsOutOfSync()) showUpdateToast();
+      })
+      .catch(function () { /* offline / server restarting — no reload can help */ });
   }
   // A plain reload can keep serving a stale, separately-cached script (this is
   // exactly how an installed PWA ends up on a new app.js but an old editor.js).
